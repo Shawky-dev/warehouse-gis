@@ -1,0 +1,26 @@
+session_name: warehouse
+start_directory: .
+
+windows:
+  - window_name: infra
+    panes:
+      - docker compose up -d
+      - docker compose logs -f
+
+  - window_name: backend
+    panes:
+      - sleep 5 && docker compose exec backend bash
+
+  - window_name: frontend
+    panes:
+      - sleep 5 && docker compose exec frontend sh
+
+  - window_name: db
+    panes:
+      - sleep 5 && docker compose exec db bash
+
+  - window_name: dev
+    layout: even-horizontal
+    panes:
+      - cd backend && exec zsh
+      - cd frontend && exec zsh
