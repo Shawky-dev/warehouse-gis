@@ -13,3 +13,19 @@ spring:
 
   flyway:
     enabled: true
+
+security:
+  jwt:
+    issuer: warehouse-platform-api
+    audience: warehouse-platform-web
+    access-token-ttl: 10m
+    refresh-token-ttl: 14d
+    key-id: warehouse-k1
+    private-key: file:keys/jwt-private.pem
+    public-key: file:keys/jwt-public.pem
+  auth:
+    refresh-cookie:
+      name: refresh_token
+      path: /auth
+      same-site: Lax
+      secure: false
