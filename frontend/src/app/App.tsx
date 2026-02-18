@@ -1,12 +1,15 @@
 import { useRoutes } from "react-router-dom"
-import { ThemeProvider } from "@/shared/components/theme-provider"
+import { ThemeProvider } from "@/lib/theme-provider"
+import { AuthProvider } from "@/features/auth/context/AuthContext"
 import { routes } from "./routes"
 
 export default function App() {
   const element = useRoutes(routes)
   return (
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
-      {element}
+      <AuthProvider>
+        {element}
+      </AuthProvider>
     </ThemeProvider>
   )
 }

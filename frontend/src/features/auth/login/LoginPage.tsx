@@ -1,10 +1,15 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useLogin } from "./useLogin";
+import { useAuth } from "@/features/auth/context/AuthContext";
+import { PATHS } from "@/shared/consts/paths";
 
 type Props = {}
 
 const LoginPage = (props: Props) => {
-const { doLogin, loading, error } = useLogin();
+  const { doLogin, loading, error } = useLogin();
+  const { setAuth } = useAuth();
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -12,7 +17,8 @@ const { doLogin, loading, error } = useLogin();
     e.preventDefault();
     try {
       const { token } = await doLogin({ email, password });
-      // handle storing token later
+      setAuth({ email }, token);
+      navigate(PATHS.LANDLORD, { replace: true });
     } catch (err: any) {
       console.error("Login error:", err);
     }
