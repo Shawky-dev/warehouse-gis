@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 
 interface Props {
     open: boolean;
-    onConfirm: () => void;
+    onConfirm: () => void | Promise<void>;
     onCancel: () => void;
 }
 
@@ -28,7 +28,7 @@ export function LogoutConfirmModal({ open, onConfirm, onCancel }: Props) {
                     <Button variant="outline" onClick={onCancel}>
                         Cancel
                     </Button>
-                    <Button variant="destructive" onClick={onConfirm}>
+                    <Button variant="destructive" onClick={() => void onConfirm()}>
                         Sign out
                     </Button>
                 </DialogFooter>

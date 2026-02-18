@@ -6,7 +6,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Settings, User, LogOut, Sun, Moon } from "lucide-react";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { useAvatarMenu } from "../hooks/useAvatarMenu";
@@ -22,27 +22,27 @@ export function AvatarMenu() {
         theme === "dark" ||
         (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
 
-    const initials = user?.name
-        ?.split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase() ?? "?";
+    const initials = user?.email?.slice(0, 1).toUpperCase() ?? "?";
+
+    const handleLogout = async () => {
+        await logout();
+        closeLogoutModal();
+    };
 
     return (
         <>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Avatar className="cursor-pointer ring-2 ring-transparent hover:ring-primary transition-all">
-                        <AvatarImage src={user?.avatarUrl} alt={user?.name} />
                         <AvatarFallback>{initials}</AvatarFallback>
                     </Avatar>
                 </DropdownMenuTrigger>
 
                 <DropdownMenuContent align="end" className="w-56">
                     <DropdownMenuLabel className="flex flex-col gap-0.5">
-                        <span className="font-semibold text-sm">{user?.name ?? "User"}</span>
+                        <span className="font-semibold text-sm">{user?.email ?? "User"}</span>
                         <span className="text-xs font-normal text-muted-foreground">
-                            {user?.email}
+                            {user?.roles.join(", ")}
                         </span>
                     </DropdownMenuLabel>
 
@@ -83,7 +83,7 @@ export function AvatarMenu() {
 
             <LogoutConfirmModal
                 open={showLogoutModal}
-                onConfirm={logout}
+                onConfirm={handleLogout}
                 onCancel={closeLogoutModal}
             />
         </>
