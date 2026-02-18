@@ -7,7 +7,7 @@ import { LandlordLayout } from "@/layouts/LandlordLayout"
 export const routes = [
     {
         path: PATHS.ROOT,
-        element: <Navigate to={PATHS.LANDLORD} replace />,
+        element: <Navigate to={PATHS.LANDLORD.ROOT} replace />,
     },
     ...authRoutes,
     {

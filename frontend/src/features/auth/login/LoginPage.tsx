@@ -18,7 +18,7 @@ const LoginPage = (props: Props) => {
     try {
       const { token } = await doLogin({ email, password });
       setAuth({ email }, token);
-      navigate(PATHS.LANDLORD, { replace: true });
+      navigate(PATHS.LANDLORD.ROOT, { replace: true });
     } catch (err: any) {
       console.error("Login error:", err);
     }

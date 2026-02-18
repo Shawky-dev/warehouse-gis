@@ -72,11 +72,11 @@ export function AvatarMenu() {
                     <DropdownMenuSeparator />
 
                     <DropdownMenuItem
-                        className="cursor-pointer gap-2 text-destructive focus:text-destructive"
+                        className="cursor-pointer gap-2 text-red-600 focus:text-red-600"
                         onClick={openLogoutModal}
                     >
-                        <LogOut className="h-4 w-4" />
-                        Sign out
+                        <LogOut className="h-4 w-4 text-red-600" />
+                        <span className="text-red-600">Sign out</span>
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
