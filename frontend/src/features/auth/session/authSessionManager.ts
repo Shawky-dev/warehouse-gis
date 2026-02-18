@@ -19,6 +19,12 @@ export function clearAuthSessionManagerConfig() {
   inFlightRefresh = null;
 }
 
+export function resetAuthSessionManager() {
+  accessToken = null;
+  config = null;
+  inFlightRefresh = null;
+}
+
 export function getAccessToken() {
   return accessToken;
 }

@@ -17,5 +17,11 @@ export default defineConfig({
     watch: {
       usePolling: true // important for Docker
     }
-  }
+  },
+  test: {
+    environment: "jsdom",
+    setupFiles: "./src/test/setup.ts",
+    globals: true,
+    css: false,
+  },
 })
