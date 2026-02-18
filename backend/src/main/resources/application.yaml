@@ -1,3 +1,15 @@
 spring:
-  application:
-    name: warehouse-platform
+  datasource:
+    url: jdbc:postgresql://localhost:5432/warehouse
+    username: warehouse
+    password: warehouse
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  flyway:
+    enabled: true

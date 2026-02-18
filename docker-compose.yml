@@ -20,32 +20,16 @@ services:
       timeout: 5s
       retries: 5
 
-  backend:
-    build: ./backend
-    container_name: warehouse-backend
-    ports:
-      - "8080:8080"
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      SPRING_PROFILES_ACTIVE: docker
-
   frontend:
     image: node:20
     container_name: warehouse-frontend
     working_dir: /app
     volumes:
       - ./frontend:/app
-      - /app/node_modules
     ports:
       - "3000:3000"
     environment:
-      - CHOKIDAR_USEPOLLING=true
-    command: sh -c "npm install && npm run dev"
-    depends_on:
-      - backend
-
-
+      CHOKIDAR_USEPOLLING: "true"
+    command: sh -c "npm install && npm run dev -- --host"
 volumes:
   postgres_data:

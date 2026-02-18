@@ -9,15 +9,15 @@ windows:
 
   - window_name: backend
     panes:
-      - sleep 5 && docker compose exec backend bash
+      - cd backend && mvn spring-boot:run
 
   - window_name: frontend
     panes:
-      - sleep 5 && docker compose exec frontend sh
+      - sleep 5 && docker exec -it warehouse-frontend bash
 
   - window_name: db
     panes:
-      - sleep 5 && docker compose exec db bash
+      - sleep 5 && docker exec -it warehouse-db bash
 
   - window_name: dev
     layout: even-horizontal
