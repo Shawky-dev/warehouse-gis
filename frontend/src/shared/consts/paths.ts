@@ -9,6 +9,7 @@ export const PATHS = {
     DASHBOARD: "/landlord",
     WAREHOUSES: "/landlord/warehouses",
     USERS: "/landlord/users",
+    ROLES: "/landlord/roles",
   },
 
   TENANT: {

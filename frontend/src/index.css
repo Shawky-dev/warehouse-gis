@@ -4,6 +4,7 @@
 @import "@fontsource-variable/outfit";
 
 @custom-variant dark (&:is(.dark *));
+
 :root {
   --background: oklch(0.9793 0.0029 84.5589);
   --foreground: oklch(0.3355 0.0171 97.8686);
@@ -164,18 +165,20 @@
   --shadow-xl: var(--shadow-xl);
   --shadow-2xl: var(--shadow-2xl);
 }
-
 body {
   letter-spacing: var(--tracking-normal);
 }
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    }
+  }
+
   body {
     @apply font-sans bg-background text-foreground;
-    }
+  }
+
   html {
     @apply font-sans;
-    }
+  }
 }
