@@ -73,7 +73,8 @@ public class SecurityConfig {
                 "Content-Type",
                 "Accept",
                 "Origin",
-                "X-Requested-With"
+                "X-Requested-With",
+                "X-TENANT-ID"
         ));
         config.setAllowCredentials(true);
 

@@ -1,10 +1,10 @@
-
-type Props = {}
-
-const LandlordDashboardPage = (props: Props) => {
+const LandlordDashboardPage = () => {
   return (
-    <div>LandlordDashboardPage</div>
-  )
-}
+    <div className="space-y-2">
+      <h1 className="text-xl font-semibold">Landlord Dashboard</h1>
 
-export default LandlordDashboardPage
+    </div>
+  );
+};
+
+export default LandlordDashboardPage;

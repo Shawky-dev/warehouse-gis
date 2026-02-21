@@ -1,5 +1,8 @@
 package com.warehouse.warehouse_platform.multi_tenancy.service;
 
+import java.util.Comparator;
+import java.util.List;
+
 import javax.sql.DataSource;
 
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -68,6 +71,14 @@ public class TenantManagementServiceImpl implements TenantManagementService {
                 .schema(normalizedSchema)
                 .build();
         tenantRepository.save(tenant);
+    }
+
+    @Override
+    public List<TenantSummary> getTenants() {
+        return tenantRepository.findAll().stream()
+                .map(tenant -> new TenantSummary(tenant.getTenantId(), tenant.getSchema()))
+                .sorted(Comparator.comparing(TenantSummary::tenantId))
+                .toList();
     }
 
     private void validateInput(String tenantId, String schema) {

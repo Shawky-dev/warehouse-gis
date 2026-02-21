@@ -1,5 +1,7 @@
 package com.warehouse.warehouse_platform.landlord;
 
+import java.util.List;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -11,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.warehouse.warehouse_platform.multi_tenancy.service.TenantCreationException;
 import com.warehouse.warehouse_platform.multi_tenancy.service.TenantManagementService;
+import com.warehouse.warehouse_platform.multi_tenancy.service.TenantSummary;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -40,6 +43,14 @@ public class LandlordController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/tenants")
+    public ResponseEntity<List<TenantSummaryResponse>> getTenants() {
+        List<TenantSummaryResponse> tenants = tenantManagementService.getTenants().stream()
+                .map(this::toResponse)
+                .toList();
+        return ResponseEntity.ok(tenants);
+    }
+
     @ExceptionHandler(TenantCreationException.class)
     public ResponseEntity<String> onTenantCreationError(TenantCreationException exception) {
         return ResponseEntity.badRequest().body(exception.getMessage());
@@ -48,5 +59,14 @@ public class LandlordController {
     public record CreateTenantRequest(
             @NotBlank String tenantId,
             @NotBlank String schema) {
+    }
+
+    public record TenantSummaryResponse(
+            String tenantId,
+            String schema) {
+    }
+
+    private TenantSummaryResponse toResponse(TenantSummary tenantSummary) {
+        return new TenantSummaryResponse(tenantSummary.tenantId(), tenantSummary.schema());
     }
 }
