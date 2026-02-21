@@ -19,9 +19,9 @@ export async function createTenant(payload: CreateTenantRequest) {
   });
 }
 
-export function extractTenantErrorMessage(error: unknown) {
+export function extractTenantErrorMessage(error: unknown): string | null {
   if (!axios.isAxiosError(error)) {
-    return "Failed to create tenant.";
+    return null;
   }
 
   const data = error.response?.data;
@@ -33,5 +33,5 @@ export function extractTenantErrorMessage(error: unknown) {
     return data.message;
   }
 
-  return "Failed to create tenant.";
+  return null;
 }

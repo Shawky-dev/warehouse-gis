@@ -1,4 +1,3 @@
-
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
@@ -6,12 +5,18 @@ import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 import { Badge } from "@/shared/components/ui/badge";
 import { Separator } from "@/shared/components/ui/separator";
-import { createTenant, extractTenantErrorMessage, getTenants } from "@/features/landlord/api/tenantApi";
+import {
+  createTenant,
+  extractTenantErrorMessage,
+  getTenants,
+} from "@/features/landlord/api/tenantApi";
 import type { TenantSummary } from "@/features/landlord/types/tenant";
+import { useI18n } from "@/i18n";
 
 const SCHEMA_REGEXP = /^[A-Za-z0-9_]*$/;
 
 const WarehousesPage = () => {
+  const { t } = useI18n();
   const [tenantId, setTenantId] = useState("");
   const [schema, setSchema] = useState("");
   const [tenants, setTenants] = useState<TenantSummary[]>([]);
@@ -26,10 +31,10 @@ const WarehousesPage = () => {
       return null;
     }
     if (!SCHEMA_REGEXP.test(schema)) {
-      return "Schema can only contain letters, numbers, and underscore.";
+      return t("warehouses.schemaValidation");
     }
     return null;
-  }, [schema]);
+  }, [schema, t]);
 
   async function loadTenants() {
     setIsLoadingTenants(true);
@@ -38,7 +43,7 @@ const WarehousesPage = () => {
       const result = await getTenants();
       setTenants(result);
     } catch {
-      setListError("Failed to load warehouses.");
+      setListError(t("warehouses.listLoadFailed"));
     } finally {
       setIsLoadingTenants(false);
     }
@@ -46,7 +51,7 @@ const WarehousesPage = () => {
 
   useEffect(() => {
     void loadTenants();
-  }, []);
+  }, [t]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -57,11 +62,11 @@ const WarehousesPage = () => {
     const normalizedSchema = schema.trim();
 
     if (!normalizedTenantId) {
-      setFormError("Warehouse ID is required.");
+      setFormError(t("warehouses.requiredWarehouseId"));
       return;
     }
     if (!normalizedSchema) {
-      setFormError("Schema is required.");
+      setFormError(t("warehouses.requiredSchema"));
       return;
     }
     if (!SCHEMA_REGEXP.test(normalizedSchema)) {
@@ -77,10 +82,10 @@ const WarehousesPage = () => {
       });
       setTenantId("");
       setSchema("");
-      setSuccessMessage(`Warehouse "${normalizedTenantId}" created successfully.`);
+      setSuccessMessage(t("warehouses.createdSuccess", { tenantId: normalizedTenantId }));
       await loadTenants();
     } catch (error) {
-      setFormError(extractTenantErrorMessage(error));
+      setFormError(extractTenantErrorMessage(error) ?? t("warehouses.createFailedFallback"));
     } finally {
       setIsSubmitting(false);
     }
@@ -89,21 +94,19 @@ const WarehousesPage = () => {
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-xl font-semibold">Warehouses</h1>
-        <p className="text-sm text-muted-foreground">
-          Create and review warehouse-to-schema mappings.
-        </p>
+        <h1 className="text-xl font-semibold">{t("warehouses.pageTitle")}</h1>
+        <p className="text-sm text-muted-foreground">{t("warehouses.pageDescription")}</p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Create Warehouse</CardTitle>
-          <CardDescription>Provision a new warehouse tenant and initialize its schema.</CardDescription>
+          <CardTitle>{t("warehouses.createTitle")}</CardTitle>
+          <CardDescription>{t("warehouses.createDescription")}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="warehouse-id">Warehouse ID</Label>
+              <Label htmlFor="warehouse-id">{t("warehouses.warehouseId")}</Label>
               <Input
                 id="warehouse-id"
                 value={tenantId}
@@ -114,7 +117,7 @@ const WarehousesPage = () => {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="warehouse-schema">Schema</Label>
+              <Label htmlFor="warehouse-schema">{t("warehouses.schema")}</Label>
               <Input
                 id="warehouse-schema"
                 value={schema}
@@ -129,7 +132,7 @@ const WarehousesPage = () => {
             {successMessage ? <Badge variant="outline">{successMessage}</Badge> : null}
 
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Creating..." : "Create Warehouse"}
+              {isSubmitting ? t("warehouses.createSubmitting") : t("warehouses.createSubmit")}
             </Button>
           </form>
         </CardContent>
@@ -137,21 +140,21 @@ const WarehousesPage = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Warehouse List</CardTitle>
-          <CardDescription>Current warehouse IDs and target schemas.</CardDescription>
+          <CardTitle>{t("warehouses.listTitle")}</CardTitle>
+          <CardDescription>{t("warehouses.listDescription")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {listError ? <p className="text-xs text-destructive">{listError}</p> : null}
 
           {isLoadingTenants ? (
-            <p className="text-sm text-muted-foreground">Loading warehouses...</p>
+            <p className="text-sm text-muted-foreground">{t("warehouses.listLoading")}</p>
           ) : tenants.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No warehouses found.</p>
+            <p className="text-sm text-muted-foreground">{t("warehouses.listEmpty")}</p>
           ) : (
             <div>
               <div className="grid grid-cols-2 gap-4 pb-2 text-xs font-medium text-muted-foreground">
-                <span>Warehouse ID</span>
-                <span>Schema</span>
+                <span>{t("warehouses.warehouseId")}</span>
+                <span>{t("warehouses.schema")}</span>
               </div>
               <Separator />
               {tenants.map((tenant) => (

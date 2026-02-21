@@ -4,6 +4,7 @@ import { render, screen } from "@testing-library/react";
 import { RequireAuth } from "@/features/auth/guards/RequireAuth";
 import { RequireRole } from "@/features/auth/guards/RequireRole";
 import { PublicOnly } from "@/features/auth/guards/PublicOnly";
+import { I18nProvider } from "@/i18n";
 
 const mockUseAuth = vi.fn();
 
@@ -13,12 +14,14 @@ vi.mock("@/features/auth/context/AuthContext", () => ({
 
 function renderGuard(path: string, element: React.ReactElement) {
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route path="/login" element={<p>login-page</p>} />
-        <Route path="*" element={element} />
-      </Routes>
-    </MemoryRouter>
+    <I18nProvider initialLocale="en" storageKey="test-locale-auth-guards">
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route path="/login" element={<p>login-page</p>} />
+          <Route path="*" element={element} />
+        </Routes>
+      </MemoryRouter>
+    </I18nProvider>
   );
 }
 

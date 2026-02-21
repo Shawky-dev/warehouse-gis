@@ -1,11 +1,14 @@
-import React from 'react'
+import { useI18n } from "@/i18n";
 
-type Props = {}
+const UserPage = () => {
+  const { t } = useI18n();
 
-const UserPage = (props: Props) => {
-    return (
-        <div>UserPage</div>
-    )
-}
+  return (
+    <div className="space-y-1">
+      <h1 className="text-xl font-semibold">{t("pages.usersTitle")}</h1>
+      <p className="text-sm text-muted-foreground">{t("pages.usersDescription")}</p>
+    </div>
+  );
+};
 
-export default UserPage
+export default UserPage;

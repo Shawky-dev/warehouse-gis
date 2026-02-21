@@ -61,4 +61,14 @@ describe("WarehousesPage", () => {
     });
     expect(screen.getByText("globex_schema")).toBeInTheDocument();
   });
+
+  it("renders Arabic labels when locale is ar", async () => {
+    server.use(http.get(`${API_URL}/landlord/tenants`, () => HttpResponse.json([])));
+
+    renderWithRouter(<WarehousesPage />, ["/"], "ar");
+
+    expect(await screen.findByText("المستودعات")).toBeInTheDocument();
+    expect(screen.getByLabelText("معرف المستودع")).toBeInTheDocument();
+    expect(screen.getByLabelText("المخطط")).toBeInTheDocument();
+  });
 });
