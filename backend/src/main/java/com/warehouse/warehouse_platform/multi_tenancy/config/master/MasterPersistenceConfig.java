@@ -1,0 +1,81 @@
+package com.warehouse.warehouse_platform.multi_tenancy.config.master;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import javax.sql.DataSource;
+
+import org.hibernate.cfg.AvailableSettings;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
+import org.springframework.boot.autoconfigure.orm.jpa.JpaProperties;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.orm.hibernate5.SpringBeanContainer;
+import org.springframework.orm.jpa.JpaTransactionManager;
+import org.springframework.orm.jpa.JpaVendorAdapter;
+import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
+import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
+
+import com.warehouse.warehouse_platform.multi_tenancy.repository.TenantRepository;
+
+import jakarta.persistence.EntityManagerFactory;
+
+@Configuration
+@EnableJpaRepositories(
+        basePackageClasses = { TenantRepository.class },
+        entityManagerFactoryRef = "masterEntityManagerFactory",
+        transactionManagerRef = "masterTransactionManager")
+@EnableConfigurationProperties(JpaProperties.class)
+public class MasterPersistenceConfig {
+
+    private final ConfigurableListableBeanFactory beanFactory;
+    private final JpaProperties jpaProperties;
+    private final String[] entityPackages;
+    private final String masterSchema;
+
+    public MasterPersistenceConfig(
+            ConfigurableListableBeanFactory beanFactory,
+            JpaProperties jpaProperties,
+            @Value("${multitenancy.master.entityManager.packages}") String[] entityPackages,
+            @Value("${multitenancy.master.schema:master}") String masterSchema) {
+        this.beanFactory = beanFactory;
+        this.jpaProperties = jpaProperties;
+        this.entityPackages = entityPackages;
+        this.masterSchema = masterSchema;
+    }
+
+    @Bean
+    public LocalContainerEntityManagerFactoryBean masterEntityManagerFactory(DataSource dataSource) {
+        LocalContainerEntityManagerFactoryBean em = new LocalContainerEntityManagerFactoryBean();
+
+        em.setPersistenceUnitName("master-persistence-unit");
+        em.setPackagesToScan(entityPackages);
+        em.setDataSource(dataSource);
+
+        JpaVendorAdapter vendorAdapter = new HibernateJpaVendorAdapter();
+        em.setJpaVendorAdapter(vendorAdapter);
+
+        Map<String, Object> properties = new HashMap<>(this.jpaProperties.getProperties());
+        properties.put(AvailableSettings.PHYSICAL_NAMING_STRATEGY,
+                "org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy");
+        properties.put(AvailableSettings.IMPLICIT_NAMING_STRATEGY,
+                "org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy");
+        properties.put(AvailableSettings.DEFAULT_SCHEMA, masterSchema);
+        properties.put(AvailableSettings.BEAN_CONTAINER, new SpringBeanContainer(this.beanFactory));
+        em.setJpaPropertyMap(properties);
+
+        return em;
+    }
+
+    @Bean
+    public JpaTransactionManager masterTransactionManager(
+            @Qualifier("masterEntityManagerFactory") EntityManagerFactory emf) {
+        JpaTransactionManager transactionManager = new JpaTransactionManager();
+        transactionManager.setEntityManagerFactory(emf);
+        return transactionManager;
+    }
+}

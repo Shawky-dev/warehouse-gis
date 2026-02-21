@@ -1,0 +1,22 @@
+databaseChangeLog:
+  - changeSet:
+      id: tenant-1
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/V1__create_users_table.sql
+            relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-2
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/V2__add_role_to_users.sql
+            relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-3
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/V3__create_auth_refresh_tokens_table.sql
+            relativeToChangelogFile: false

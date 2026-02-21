@@ -7,12 +7,35 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
 
   flyway:
-    enabled: true
+    enabled: false
+
+  liquibase:
+    enabled: false
+
+multitenancy:
+  bootstrap-schema: public
+  schema-cache:
+    maximumSize: 100
+    expireAfterAccess: 10
+  master:
+    schema: master
+    repository:
+      packages: com.warehouse.warehouse_platform.multi_tenancy.repository
+    entityManager:
+      packages: com.warehouse.warehouse_platform.multi_tenancy.domain.entity
+    liquibase:
+      enabled: true
+      change-log: classpath:db/changelog/db.changelog-master.yaml
+  tenant:
+    repository:
+      packages: com.warehouse.warehouse_platform.user,com.warehouse.warehouse_platform.auth.session
+    entityManager:
+      packages: com.warehouse.warehouse_platform.user,com.warehouse.warehouse_platform.auth.session
+    liquibase:
+      enabled: true
+      change-log: classpath:db/changelog/db.changelog-tenant.yaml
 
 security:
   jwt:

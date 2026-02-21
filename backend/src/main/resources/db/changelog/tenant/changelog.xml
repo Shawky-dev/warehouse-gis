@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="tenant-1" author="codex">
+        <sqlFile path="db/migration/V1__create_users_table.sql" relativeToChangelogFile="false"/>
+    </changeSet>
+
+    <changeSet id="tenant-2" author="codex">
+        <sqlFile path="db/migration/V2__add_role_to_users.sql" relativeToChangelogFile="false"/>
+    </changeSet>
+
+    <changeSet id="tenant-3" author="codex">
+        <sqlFile path="db/migration/V3__create_auth_refresh_tokens_table.sql" relativeToChangelogFile="false"/>
+    </changeSet>
+</databaseChangeLog>

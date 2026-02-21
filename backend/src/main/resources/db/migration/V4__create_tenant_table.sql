@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS tenant (
+    tenant_id VARCHAR(30) PRIMARY KEY,
+    db VARCHAR(30) NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    url VARCHAR(256) NOT NULL
+);

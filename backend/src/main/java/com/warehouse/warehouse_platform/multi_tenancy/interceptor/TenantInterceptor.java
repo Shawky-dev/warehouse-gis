@@ -15,15 +15,40 @@ import com.warehouse.warehouse_platform.multi_tenancy.util.TenantContext;
 @Component
 public class TenantInterceptor implements WebRequestInterceptor {
 
+    private static final String BOOTSTRAP_TENANT = "BOOTSTRAP";
+
     @Override
     public void preHandle(WebRequest request) throws Exception {
-        String tenantId = null;
-        if (request.getHeader("X-TENANT-ID") != null) {
-            tenantId = request.getHeader("X-TENANT-ID");
-        } else {
-            tenantId = ((ServletWebRequest)request).getRequest().getServerName().split("\\.")[0];
-        }
+        String tenantId = resolveTenantId(request);
         TenantContext.setTenantId(tenantId);
+    }
+
+    private String resolveTenantId(WebRequest request) {
+        String headerTenantId = request.getHeader("X-TENANT-ID");
+        if (headerTenantId != null && !headerTenantId.isBlank()) {
+            return headerTenantId;
+        }
+
+        String serverName = ((ServletWebRequest) request).getRequest().getServerName();
+        if (serverName == null || serverName.isBlank()) {
+            return BOOTSTRAP_TENANT;
+        }
+
+        String normalized = serverName.toLowerCase();
+        if ("localhost".equals(normalized) || "127.0.0.1".equals(normalized) || "::1".equals(normalized)) {
+            return BOOTSTRAP_TENANT;
+        }
+
+        if (!normalized.contains(".")) {
+            return BOOTSTRAP_TENANT;
+        }
+
+        String candidate = normalized.split("\\.")[0];
+        if (candidate.isBlank() || "www".equals(candidate)) {
+            return BOOTSTRAP_TENANT;
+        }
+
+        return candidate;
     }
 
     @Override

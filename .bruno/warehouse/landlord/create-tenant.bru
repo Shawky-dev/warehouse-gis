@@ -1,12 +1,12 @@
 meta {
-  name: session
+  name: create-tenant
   type: http
-  seq: 1
+  seq: 2
 }
 
-get {
-  url: {{URL}}/landlord/session
-  body: none
+post {
+  url: {{URL}}/landlord/tenants
+  body: json
   auth: bearer
 }
 
@@ -16,6 +16,13 @@ auth:bearer {
 
 headers {
   X-TENANT-ID: BOOTSTRAP
+}
+
+body:json {
+  {
+    "tenantId": "acme",
+    "schema": "acme"
+  }
 }
 
 settings {

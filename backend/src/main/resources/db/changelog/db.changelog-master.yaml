@@ -1,0 +1,36 @@
+databaseChangeLog:
+  - changeSet:
+      id: master-1
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/V1__create_users_table.sql
+            relativeToChangelogFile: false
+  - changeSet:
+      id: master-2
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/V2__add_role_to_users.sql
+            relativeToChangelogFile: false
+  - changeSet:
+      id: master-3
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/V3__create_auth_refresh_tokens_table.sql
+            relativeToChangelogFile: false
+  - changeSet:
+      id: master-4
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/V4__create_tenant_table.sql
+            relativeToChangelogFile: false
+  - changeSet:
+      id: master-5
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/V5__migrate_tenant_metadata_to_master_schema.sql
+            relativeToChangelogFile: false
