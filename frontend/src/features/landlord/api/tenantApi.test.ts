@@ -25,7 +25,11 @@ describe("tenantApi", () => {
     server.use(
       http.post(`${API_URL}/landlord/tenants`, async ({ request }) => {
         tenantHeader = request.headers.get("x-tenant-id");
-        const body = (await request.json()) as { tenantId: string; schema: string };
+        const body = (await request.json()) as {
+          tenantId: string;
+          schema: string;
+          admin: { email: string; password: string };
+        };
         return HttpResponse.json(
           {
             tenantId: body.tenantId,
@@ -36,7 +40,13 @@ describe("tenantApi", () => {
       })
     );
 
-    await expect(createTenant({ tenantId: "acme", schema: "acme" })).resolves.toBeUndefined();
+    await expect(
+      createTenant({
+        tenantId: "acme",
+        schema: "acme",
+        admin: { email: "admin@acme.local", password: "admin1234" },
+      })
+    ).resolves.toBeUndefined();
     expect(tenantHeader).toBe("BOOTSTRAP");
   });
 
@@ -49,7 +59,11 @@ describe("tenantApi", () => {
     );
 
     try {
-      await createTenant({ tenantId: "acme", schema: "acme" });
+      await createTenant({
+        tenantId: "acme",
+        schema: "acme",
+        admin: { email: "admin@acme.local", password: "admin1234" },
+      });
     } catch (error) {
       expect(extractTenantErrorMessage(error)).toBe("Tenant already exists: acme");
       return;

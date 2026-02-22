@@ -14,11 +14,14 @@ import type { TenantSummary } from "@/features/landlord/types/tenant";
 import { useI18n } from "@/i18n";
 
 const SCHEMA_REGEXP = /^[A-Za-z0-9_]*$/;
+const MIN_ADMIN_PASSWORD_LENGTH = 8;
 
 const WarehousesPage = () => {
   const { t } = useI18n();
   const [tenantId, setTenantId] = useState("");
   const [schema, setSchema] = useState("");
+  const [adminEmail, setAdminEmail] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
   const [tenants, setTenants] = useState<TenantSummary[]>([]);
   const [isLoadingTenants, setIsLoadingTenants] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -35,6 +38,8 @@ const WarehousesPage = () => {
     }
     return null;
   }, [schema, t]);
+
+  const normalizedTenantPreview = tenantId.trim().toLowerCase();
 
   async function loadTenants() {
     setIsLoadingTenants(true);
@@ -73,15 +78,33 @@ const WarehousesPage = () => {
       setFormError(null);
       return;
     }
+    if (!adminEmail.trim()) {
+      setFormError(t("warehouses.requiredAdminEmail"));
+      return;
+    }
+    if (!adminPassword) {
+      setFormError(t("warehouses.requiredAdminPassword"));
+      return;
+    }
+    if (adminPassword.length < MIN_ADMIN_PASSWORD_LENGTH) {
+      setFormError(t("warehouses.adminPasswordValidation", { min: String(MIN_ADMIN_PASSWORD_LENGTH) }));
+      return;
+    }
 
     setIsSubmitting(true);
     try {
       await createTenant({
         tenantId: normalizedTenantId,
         schema: normalizedSchema,
+        admin: {
+          email: adminEmail.trim(),
+          password: adminPassword,
+        },
       });
       setTenantId("");
       setSchema("");
+      setAdminEmail("");
+      setAdminPassword("");
       setSuccessMessage(t("warehouses.createdSuccess", { tenantId: normalizedTenantId }));
       await loadTenants();
     } catch (error) {
@@ -103,38 +126,82 @@ const WarehousesPage = () => {
           <CardTitle>{t("warehouses.createTitle")}</CardTitle>
           <CardDescription>{t("warehouses.createDescription")}</CardDescription>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="warehouse-id">{t("warehouses.warehouseId")}</Label>
-              <Input
-                id="warehouse-id"
-                value={tenantId}
-                onChange={(event) => setTenantId(event.target.value)}
-                placeholder="acme"
-                required
-              />
+        <CardContent className="p-0">
+          <div className="grid md:grid-cols-3">
+            <form onSubmit={handleSubmit} className="space-y-4 p-6 md:col-span-2 md:border-e">
+              <div className="space-y-1.5">
+                <Label htmlFor="warehouse-id">{t("warehouses.warehouseId")}</Label>
+                <Input
+                  id="warehouse-id"
+                  value={tenantId}
+                  onChange={(event) => setTenantId(event.target.value)}
+                  placeholder="acme"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="warehouse-schema">{t("warehouses.schema")}</Label>
+                <Input
+                  id="warehouse-schema"
+                  value={schema}
+                  onChange={(event) => setSchema(event.target.value)}
+                  placeholder="acme"
+                  required
+                />
+                {schemaError ? <p className="text-xs text-destructive">{schemaError}</p> : null}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="warehouse-admin-email">{t("warehouses.adminEmail")}</Label>
+                <Input
+                  id="warehouse-admin-email"
+                  type="email"
+                  value={adminEmail}
+                  onChange={(event) => setAdminEmail(event.target.value)}
+                  placeholder={`admin@${normalizedTenantPreview || "tenant"}.local`}
+                  autoComplete="email"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="warehouse-admin-password">{t("warehouses.adminPassword")}</Label>
+                <Input
+                  id="warehouse-admin-password"
+                  type="password"
+                  value={adminPassword}
+                  onChange={(event) => setAdminPassword(event.target.value)}
+                  autoComplete="new-password"
+                  required
+                />
+              </div>
+
+              <div className="rounded-md border bg-muted/40 p-3">
+                <p className="text-xs text-muted-foreground">{t("warehouses.tenantPreviewLabel")}</p>
+                <p className="mt-1 font-mono text-sm">
+                  /{normalizedTenantPreview || "tenant"}/auth/login
+                </p>
+              </div>
+
+              {formError ? <p className="text-xs text-destructive">{formError}</p> : null}
+              {successMessage ? <Badge variant="outline">{successMessage}</Badge> : null}
+
+              <Button type="submit" className="w-full md:w-auto" disabled={isSubmitting}>
+                {isSubmitting ? t("warehouses.createSubmitting") : t("warehouses.createSubmit")}
+              </Button>
+            </form>
+
+            <div className="space-y-3 bg-muted/30 p-6">
+              <h3 className="text-sm font-semibold">{t("warehouses.quickRulesTitle")}</h3>
+              <p className="text-xs text-muted-foreground">{t("warehouses.quickRulesTenantId")}</p>
+              <p className="text-xs text-muted-foreground">{t("warehouses.quickRulesSchema")}</p>
+              <p className="text-xs text-muted-foreground">
+                {t("warehouses.quickRulesAdminPassword", { min: String(MIN_ADMIN_PASSWORD_LENGTH) })}
+              </p>
+              <p className="text-xs text-muted-foreground">{t("warehouses.quickRulesIsolation")}</p>
             </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="warehouse-schema">{t("warehouses.schema")}</Label>
-              <Input
-                id="warehouse-schema"
-                value={schema}
-                onChange={(event) => setSchema(event.target.value)}
-                placeholder="acme"
-                required
-              />
-              {schemaError ? <p className="text-xs text-destructive">{schemaError}</p> : null}
-            </div>
-
-            {formError ? <p className="text-xs text-destructive">{formError}</p> : null}
-            {successMessage ? <Badge variant="outline">{successMessage}</Badge> : null}
-
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? t("warehouses.createSubmitting") : t("warehouses.createSubmit")}
-            </Button>
-          </form>
+          </div>
         </CardContent>
       </Card>
 
