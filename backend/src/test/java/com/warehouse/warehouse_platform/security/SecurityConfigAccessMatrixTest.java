@@ -20,24 +20,28 @@ class SecurityConfigAccessMatrixTest {
     private final SecurityConfig securityConfig = new SecurityConfig();
 
     @Test
-    void bootstrapAdmin_shouldBeAllowedForLandlordAccess() throws Exception {
-        Authentication authentication = jwtAuthentication("admin@system.local", "BOOTSTRAP", List.of("ROLE_ADMIN"));
+    void bootstrapManager_shouldBeAllowedForLandlordAccess() throws Exception {
+        Authentication authentication = jwtAuthentication(
+                "manager@system.local",
+                "BOOTSTRAP",
+                List.of("ROLE_MANAGER"),
+                List.of("landlord.users.view"));
 
-        assertTrue(invokeIsBootstrapAdmin(authentication));
+        assertTrue(invokeIsBootstrapTenantAuthentication(authentication));
     }
 
     @Test
     void tenantAdmin_shouldBeDeniedForLandlordAccess() throws Exception {
-        Authentication authentication = jwtAuthentication("admin@acme.local", "acme", List.of("ROLE_ADMIN"));
+        Authentication authentication = jwtAuthentication("admin@acme.local", "acme", List.of("ROLE_ADMIN"), List.of());
 
-        assertFalse(invokeIsBootstrapAdmin(authentication));
+        assertFalse(invokeIsBootstrapTenantAuthentication(authentication));
     }
 
     @Test
-    void bootstrapUserWithoutAdminRole_shouldBeDeniedForLandlordAccess() throws Exception {
-        Authentication authentication = jwtAuthentication("worker@system.local", "BOOTSTRAP", List.of("ROLE_WORKER"));
+    void bootstrapUserWithoutAdminRole_shouldStillBeAllowedForLandlordAccess() throws Exception {
+        Authentication authentication = jwtAuthentication("worker@system.local", "BOOTSTRAP", List.of("ROLE_WORKER"), List.of());
 
-        assertFalse(invokeIsBootstrapAdmin(authentication));
+        assertTrue(invokeIsBootstrapTenantAuthentication(authentication));
     }
 
     @Test
@@ -46,12 +50,16 @@ class SecurityConfigAccessMatrixTest {
                 "anonymous",
                 "n/a");
 
-        assertFalse(invokeIsBootstrapAdmin(authentication));
+        assertFalse(invokeIsBootstrapTenantAuthentication(authentication));
     }
 
     @Test
-    void jwtAuthenticationConverter_shouldMapRolesClaimToAuthorities() {
-        Jwt jwt = jwt("user@acme.local", "acme", List.of("ROLE_ADMIN", "ROLE_WORKER"));
+    void jwtAuthenticationConverter_shouldMapRolesAndPermissionsClaimsToAuthorities() {
+        Jwt jwt = jwt(
+                "user@acme.local",
+                "acme",
+                List.of("ROLE_ADMIN", "ROLE_WORKER"),
+                List.of("landlord.users.view", "landlord.users.create"));
 
         JwtAuthenticationToken token = (JwtAuthenticationToken) securityConfig
                 .jwtAuthenticationConverter()
@@ -60,23 +68,29 @@ class SecurityConfigAccessMatrixTest {
         assertEquals("user@acme.local", token.getName());
         assertTrue(token.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN")));
         assertTrue(token.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_WORKER")));
+        assertTrue(token.getAuthorities().contains(new SimpleGrantedAuthority("landlord.users.view")));
+        assertTrue(token.getAuthorities().contains(new SimpleGrantedAuthority("landlord.users.create")));
     }
 
-    private boolean invokeIsBootstrapAdmin(Authentication authentication) throws Exception {
-        Method method = SecurityConfig.class.getDeclaredMethod("isBootstrapAdmin", Authentication.class);
+    private boolean invokeIsBootstrapTenantAuthentication(Authentication authentication) throws Exception {
+        Method method = SecurityConfig.class.getDeclaredMethod("isBootstrapTenantAuthentication", Authentication.class);
         method.setAccessible(true);
         return (boolean) method.invoke(securityConfig, authentication);
     }
 
-    private static Authentication jwtAuthentication(String subject, String tenant, List<String> roles) {
-        Jwt jwt = jwt(subject, tenant, roles);
+    private static Authentication jwtAuthentication(
+            String subject,
+            String tenant,
+            List<String> roles,
+            List<String> permissions) {
+        Jwt jwt = jwt(subject, tenant, roles, permissions);
         List<SimpleGrantedAuthority> authorities = roles.stream()
                 .map(SimpleGrantedAuthority::new)
                 .toList();
         return new JwtAuthenticationToken(jwt, authorities, subject);
     }
 
-    private static Jwt jwt(String subject, String tenant, List<String> roles) {
+    private static Jwt jwt(String subject, String tenant, List<String> roles, List<String> permissions) {
         Instant now = Instant.now();
         return Jwt.withTokenValue("test-token")
                 .header("alg", "none")
@@ -85,7 +99,7 @@ class SecurityConfigAccessMatrixTest {
                 .expiresAt(now.plusSeconds(600))
                 .claim("tenant", tenant)
                 .claim("roles", roles)
+                .claim("permissions", permissions)
                 .build();
     }
 }
-

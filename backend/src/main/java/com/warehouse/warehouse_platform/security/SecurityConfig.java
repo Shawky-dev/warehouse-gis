@@ -52,7 +52,7 @@ public class SecurityConfig {
                         .requestMatchers("/landlord/**")
                         .access((authentication, context) ->
                                 new org.springframework.security.authorization.AuthorizationDecision(
-                                        isBootstrapAdmin(authentication.get())))
+                                        isBootstrapTenantAuthentication(authentication.get())))
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())))
@@ -102,28 +102,15 @@ public class SecurityConfig {
     public Converter<Jwt, AbstractAuthenticationToken> jwtAuthenticationConverter() {
         return jwt -> {
             Collection<GrantedAuthority> authorities = new ArrayList<>();
-            Object rolesClaim = jwt.getClaim("roles");
-
-            if (rolesClaim instanceof Collection<?> roles) {
-                for (Object role : roles) {
-                    if (role instanceof String roleName && !roleName.isBlank()) {
-                        authorities.add(new SimpleGrantedAuthority(roleName));
-                    }
-                }
-            }
+            addAuthoritiesFromClaim(jwt.getClaim("roles"), authorities);
+            addAuthoritiesFromClaim(jwt.getClaim("permissions"), authorities);
 
             return new JwtAuthenticationToken(jwt, authorities, jwt.getSubject());
         };
     }
 
-    private boolean isBootstrapAdmin(Authentication authentication) {
+    private boolean isBootstrapTenantAuthentication(Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()) {
-            return false;
-        }
-
-        boolean hasAdminRole = authentication.getAuthorities().stream()
-                .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
-        if (!hasAdminRole) {
             return false;
         }
 
@@ -133,6 +120,18 @@ public class SecurityConfig {
         }
 
         return false;
+    }
+
+    private void addAuthoritiesFromClaim(Object claim, Collection<GrantedAuthority> authorities) {
+        if (!(claim instanceof Collection<?> values)) {
+            return;
+        }
+
+        for (Object value : values) {
+            if (value instanceof String authority && !authority.isBlank()) {
+                authorities.add(new SimpleGrantedAuthority(authority));
+            }
+        }
     }
 
 }

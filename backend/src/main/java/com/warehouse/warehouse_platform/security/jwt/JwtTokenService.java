@@ -21,6 +21,7 @@ public class JwtTokenService {
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final String BOOTSTRAP_TENANT = "BOOTSTRAP";
+    private static final String ROLE_PREFIX = "ROLE_";
 
     private final JwtEncoder jwtEncoder;
     private final JwtProperties properties;
@@ -37,6 +38,16 @@ public class JwtTokenService {
 
         List<String> roles = authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
+                .filter(authority -> authority != null && authority.startsWith(ROLE_PREFIX))
+                .distinct()
+                .sorted()
+                .toList();
+
+        List<String> permissions = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .filter(authority -> authority != null && !authority.startsWith(ROLE_PREFIX))
+                .distinct()
+                .sorted()
                 .toList();
 
         JwtClaimsSet claims = JwtClaimsSet.builder()
@@ -47,6 +58,7 @@ public class JwtTokenService {
                 .expiresAt(expiresAt)
                 .id(UUID.randomUUID().toString())
                 .claim("roles", roles)
+                .claim("permissions", permissions)
                 .claim("tenant", tenantId)
                 .build();
 

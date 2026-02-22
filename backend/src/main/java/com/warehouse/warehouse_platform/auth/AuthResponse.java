@@ -18,13 +18,15 @@ public record AuthResponse(
                 new UserPayload(
                         result.userId(),
                         result.email(),
-                        List.of("ROLE_" + result.role())));
+                        result.roles(),
+                        result.permissions()));
     }
 
     public record UserPayload(
             UUID id,
             String email,
-            List<String> roles
+            List<String> roles,
+            List<String> permissions
     ) {
     }
 }

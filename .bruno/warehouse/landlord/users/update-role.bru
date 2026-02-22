@@ -1,0 +1,36 @@
+meta {
+  name: update-role
+  type: http
+  seq: 9
+}
+
+put {
+  url: {{URL}}/landlord/roles/{{LANDLORD_ROLE_CODE}}
+  body: json
+  auth: bearer
+}
+
+headers {
+  X-TENANT-ID: BOOTSTRAP
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+body:json {
+  {
+    "name": "Operations Manager",
+    "description": "Can handle selected landlord operations",
+    "permissionCodes": [
+      "landlord.tenants.view",
+      "landlord.tenants.create",
+      "landlord.users.view"
+    ]
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

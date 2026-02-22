@@ -56,7 +56,8 @@ class AuthControllerTest {
                         refreshExp,
                         UUID.randomUUID(),
                         "admin@system.local",
-                        "ADMIN"));
+                        java.util.List.of("ROLE_ADMIN"),
+                        java.util.List.of("landlord.users.view")));
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRemoteAddr("127.0.0.1");
@@ -90,7 +91,8 @@ class AuthControllerTest {
                             refreshExp,
                             UUID.randomUUID(),
                             "admin@system.local",
-                            "ADMIN");
+                            java.util.List.of("ROLE_ADMIN"),
+                            java.util.List.of("landlord.users.view"));
                 });
 
         MockHttpServletRequest request = new MockHttpServletRequest();
@@ -129,7 +131,8 @@ class AuthControllerTest {
                         refreshExp,
                         UUID.randomUUID(),
                         "admin@system.local",
-                        "ADMIN"));
+                        java.util.List.of("ROLE_ADMIN"),
+                        java.util.List.of("landlord.users.view")));
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRemoteAddr("127.0.0.1");

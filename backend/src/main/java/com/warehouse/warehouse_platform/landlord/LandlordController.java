@@ -3,6 +3,7 @@ package com.warehouse.warehouse_platform.landlord;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -41,6 +42,7 @@ public class LandlordController {
     }
 
     @PostMapping("/tenants")
+    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.LandlordPermissions).TENANTS_CREATE)")
     public ResponseEntity<Void> createTenant(@Valid @RequestBody CreateTenantRequest request) {
         tenantManagementService.createTenant(
                 request.tenantId(),
@@ -51,6 +53,7 @@ public class LandlordController {
     }
 
     @GetMapping("/tenants")
+    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.LandlordPermissions).TENANTS_VIEW)")
     public ResponseEntity<List<TenantSummaryResponse>> getTenants() {
         List<TenantSummaryResponse> tenants = tenantManagementService.getTenants().stream()
                 .map(this::toResponse)

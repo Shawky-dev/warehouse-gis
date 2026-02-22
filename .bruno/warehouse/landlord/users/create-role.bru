@@ -1,0 +1,35 @@
+meta {
+  name: create-role
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{URL}}/landlord/roles
+  body: json
+  auth: bearer
+}
+
+headers {
+  X-TENANT-ID: BOOTSTRAP
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+body:json {
+  {
+    "code": "{{LANDLORD_NEW_ROLE_CODE}}",
+    "name": "{{LANDLORD_NEW_ROLE_NAME}}",
+    "description": "{{LANDLORD_NEW_ROLE_DESCRIPTION}}",
+    "permissionCodes": [
+      "landlord.users.view"
+    ]
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

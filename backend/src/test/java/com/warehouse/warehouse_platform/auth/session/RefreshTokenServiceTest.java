@@ -268,6 +268,35 @@ class RefreshTokenServiceTest {
         verify(repository).saveAll(any(List.class));
     }
 
+    @Test
+    void revokeAllActiveForUser_shouldRevokeEveryActiveTokenForUser() {
+        UUID userId = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+
+        RefreshTokenSession activeOne = RefreshTokenSession.builder()
+                .id(UUID.randomUUID())
+                .tokenHash("active-1")
+                .tokenFamilyId(UUID.randomUUID())
+                .expiresAt(Instant.now().plusSeconds(1000))
+                .build();
+
+        RefreshTokenSession activeTwo = RefreshTokenSession.builder()
+                .id(UUID.randomUUID())
+                .tokenHash("active-2")
+                .tokenFamilyId(UUID.randomUUID())
+                .expiresAt(Instant.now().plusSeconds(1000))
+                .build();
+
+        when(repository.findAllByUser_IdAndRevokedAtIsNull(userId)).thenReturn(List.of(activeOne, activeTwo));
+
+        service.revokeAllActiveForUser(userId, "PASSWORD_RESET");
+
+        assertTrue(activeOne.isRevoked());
+        assertTrue(activeTwo.isRevoked());
+        assertEquals("PASSWORD_RESET", activeOne.getRevocationReason());
+        assertEquals("PASSWORD_RESET", activeTwo.getRevocationReason());
+        verify(repository).saveAll(any(List.class));
+    }
+
     private User testUser() {
         User user = new User();
         user.setId(UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));

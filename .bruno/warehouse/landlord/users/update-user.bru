@@ -1,0 +1,31 @@
+meta {
+  name: update-user
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{URL}}/landlord/users/{{LANDLORD_USER_ID}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: BOOTSTRAP
+}
+
+body:json {
+  {
+    "email": "{{LANDLORD_USER_UPDATED_EMAIL}}",
+    "role": "{{LANDLORD_USER_UPDATED_ROLE}}"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

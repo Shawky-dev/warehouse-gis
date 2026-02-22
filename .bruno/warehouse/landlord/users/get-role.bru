@@ -1,0 +1,24 @@
+meta {
+  name: get-role
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{URL}}/landlord/roles/{{LANDLORD_ROLE_CODE}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: BOOTSTRAP
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

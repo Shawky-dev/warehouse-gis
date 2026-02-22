@@ -107,9 +107,9 @@ class TenantAuthControllerCrossTenantTest {
                 handler);
     }
 
-    private static final class TenantAwareAuthService extends AuthService {
+        private static final class TenantAwareAuthService extends AuthService {
         private TenantAwareAuthService() {
-            super(null, null, null, null);
+            super(null, null, null, null, null);
         }
 
         @Override
@@ -130,8 +130,8 @@ class TenantAuthControllerCrossTenantTest {
                     now.plusSeconds(1200),
                     UUID.fromString("00000000-0000-0000-0000-000000000001"),
                     "admin@" + tokenTenant + ".local",
-                    "ADMIN");
+                    java.util.List.of("ROLE_ADMIN"),
+                    java.util.List.of("landlord.users.view"));
         }
     }
 }
-

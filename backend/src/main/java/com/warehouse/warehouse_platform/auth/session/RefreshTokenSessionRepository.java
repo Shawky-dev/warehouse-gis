@@ -14,4 +14,6 @@ public interface RefreshTokenSessionRepository extends JpaRepository<RefreshToke
     Optional<RefreshTokenSession> findByTokenHashAndRevokedAtIsNullAndExpiresAtAfter(String tokenHash, Instant now);
 
     List<RefreshTokenSession> findAllByTokenFamilyId(UUID tokenFamilyId);
+
+    List<RefreshTokenSession> findAllByUser_IdAndRevokedAtIsNull(UUID userId);
 }

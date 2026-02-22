@@ -63,7 +63,8 @@ class TenantAuthControllerTest {
                             refreshExp,
                             UUID.randomUUID(),
                             "admin@acme.local",
-                            "ADMIN");
+                            List.of("ROLE_ADMIN"),
+                            List.of("landlord.users.view"));
                 });
 
         MockHttpServletRequest request = new MockHttpServletRequest();

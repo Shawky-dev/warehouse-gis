@@ -1,0 +1,32 @@
+meta {
+  name: create-user
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{URL}}/landlord/users
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: BOOTSTRAP
+}
+
+body:json {
+  {
+    "email": "{{LANDLORD_USER_EMAIL}}",
+    "password": "{{LANDLORD_USER_PASSWORD}}",
+    "role": "{{LANDLORD_USER_ROLE}}"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

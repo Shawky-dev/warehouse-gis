@@ -6,3 +6,10 @@ databaseChangeLog:
         - sqlFile:
             path: db/migration/tenant/V1__create_tenant_auth_tables.sql
             relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-rbac-2
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V2__add_rbac_and_user_lifecycle.sql
+            relativeToChangelogFile: false

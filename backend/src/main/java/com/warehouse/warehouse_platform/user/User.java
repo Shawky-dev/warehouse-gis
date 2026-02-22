@@ -23,7 +23,17 @@ public class User {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
-    
+
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean active = true;
+
+    @Column(name = "deactivated_at")
+    private Instant deactivatedAt;
+
     @Column(nullable = false)
     private String role;
 
@@ -33,6 +43,16 @@ public class User {
         if (id == null) {
             id = UUID.randomUUID();
         }
-        createdAt = Instant.now();
+        Instant now = Instant.now();
+        createdAt = now;
+        updatedAt = now;
+        if (active == null) {
+            active = true;
+        }
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        updatedAt = Instant.now();
     }
 }

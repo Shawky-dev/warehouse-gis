@@ -1,6 +1,7 @@
 package com.warehouse.warehouse_platform.auth;
 
 import com.warehouse.warehouse_platform.auth.session.RefreshTokenService;
+import com.warehouse.warehouse_platform.security.RoleAuthorityResolver;
 import com.warehouse.warehouse_platform.security.jwt.JwtTokenService;
 import com.warehouse.warehouse_platform.user.User;
 import com.warehouse.warehouse_platform.user.UserRepository;
@@ -13,8 +14,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -39,16 +42,23 @@ class AuthServiceTest {
     @Mock
     private RefreshTokenService refreshTokenService;
 
+    @Mock
+    private RoleAuthorityResolver roleAuthorityResolver;
+
     @InjectMocks
     private AuthService authService;
 
     @Test
     void login_shouldAuthenticateIssueTokens_andReturnContract() {
+        List<SimpleGrantedAuthority> authorities = List.of(
+                new SimpleGrantedAuthority("ROLE_ADMIN"),
+                new SimpleGrantedAuthority("landlord.users.view"));
+
         LoginRequest request = new LoginRequest("admin@system.local", "admin123");
         Authentication authenticated = UsernamePasswordAuthenticationToken.authenticated(
                 "admin@system.local",
                 null,
-                java.util.List.of());
+                authorities);
 
         User user = testUser();
         Instant accessExp = Instant.now().plusSeconds(600);
@@ -56,7 +66,11 @@ class AuthServiceTest {
 
         when(authenticationManager.authenticate(any(Authentication.class))).thenReturn(authenticated);
         when(userRepository.findByEmail("admin@system.local")).thenReturn(Optional.of(user));
-        when(jwtTokenService.createAccessToken(authenticated))
+        when(roleAuthorityResolver.splitAuthorities(any()))
+                .thenReturn(new RoleAuthorityResolver.AuthoritySnapshot(
+                        List.of("ROLE_ADMIN"),
+                        List.of("landlord.users.view")));
+        when(jwtTokenService.createAccessToken(any(Authentication.class)))
                 .thenReturn(new JwtTokenService.AccessTokenResult("access-token", accessExp));
         when(refreshTokenService.issueForLogin(user, "127.0.0.1", "bruno"))
                 .thenReturn(new RefreshTokenService.RefreshTokenIssueResult(
@@ -76,7 +90,8 @@ class AuthServiceTest {
         assertEquals(refreshExp, result.refreshTokenExpiresAt());
         assertEquals(user.getId(), result.userId());
         assertEquals(user.getEmail(), result.email());
-        assertEquals(user.getRole(), result.role());
+        assertEquals(List.of("ROLE_ADMIN"), result.roles());
+        assertEquals(List.of("landlord.users.view"), result.permissions());
 
         ArgumentCaptor<Authentication> authCaptor = ArgumentCaptor.forClass(Authentication.class);
         verify(authenticationManager).authenticate(authCaptor.capture());
@@ -105,6 +120,10 @@ class AuthServiceTest {
     @Test
     void refresh_shouldRotateRefreshToken_andIssueAccessTokenWithRoleAuthority() {
         User user = testUser();
+        List<SimpleGrantedAuthority> authorities = List.of(
+                new SimpleGrantedAuthority("ROLE_ADMIN"),
+                new SimpleGrantedAuthority("landlord.users.view"));
+
         Instant refreshExp = Instant.now().plusSeconds(1000);
         Instant accessExp = Instant.now().plusSeconds(500);
 
@@ -117,6 +136,12 @@ class AuthServiceTest {
                         user.getId(),
                         user.getEmail(),
                         user.getRole()));
+        when(roleAuthorityResolver.resolveAuthorities("ADMIN"))
+                .thenReturn(List.copyOf(authorities));
+        when(roleAuthorityResolver.splitAuthorities(any()))
+                .thenReturn(new RoleAuthorityResolver.AuthoritySnapshot(
+                        List.of("ROLE_ADMIN"),
+                        List.of("landlord.users.view")));
 
         when(jwtTokenService.createAccessToken(any(Authentication.class)))
                 .thenReturn(new JwtTokenService.AccessTokenResult("new-access", accessExp));
@@ -125,7 +150,8 @@ class AuthServiceTest {
 
         assertEquals("new-access", result.accessToken());
         assertEquals("new-refresh", result.refreshToken());
-        assertEquals(user.getRole(), result.role());
+        assertEquals(List.of("ROLE_ADMIN"), result.roles());
+        assertEquals(List.of("landlord.users.view"), result.permissions());
 
         ArgumentCaptor<Authentication> authCaptor = ArgumentCaptor.forClass(Authentication.class);
         verify(jwtTokenService).createAccessToken(authCaptor.capture());

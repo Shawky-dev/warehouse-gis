@@ -1,6 +1,5 @@
 package com.warehouse.warehouse_platform.landlord;
 
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
@@ -10,7 +9,6 @@ import java.util.List;
 @Service
 public class LandlordAccessService {
 
-    @PreAuthorize("hasRole('ADMIN')")
     public LandlordSessionResponse getAdminSession(Authentication authentication) {
         List<String> authorities = authentication.getAuthorities().stream()
                 .map(grantedAuthority -> grantedAuthority.getAuthority())

@@ -48,7 +48,8 @@ class JwtTokenServiceTest {
                 null,
                 List.of(
                         new SimpleGrantedAuthority("ROLE_ADMIN"),
-                        new SimpleGrantedAuthority("ROLE_WORKER")));
+                        new SimpleGrantedAuthority("ROLE_WORKER"),
+                        new SimpleGrantedAuthority("landlord.users.view")));
 
         JwtTokenService.AccessTokenResult result = service.createAccessToken(authentication);
         Jwt decoded = decoder.decode(result.token());
@@ -63,6 +64,11 @@ class JwtTokenServiceTest {
         assertNotNull(roles);
         assertTrue(roles.contains("ROLE_ADMIN"));
         assertTrue(roles.contains("ROLE_WORKER"));
+
+        @SuppressWarnings("unchecked")
+        List<String> permissions = (List<String>) decoded.getClaim("permissions");
+        assertNotNull(permissions);
+        assertTrue(permissions.contains("landlord.users.view"));
 
         assertNotNull(decoded.getIssuedAt());
         assertNotNull(decoded.getExpiresAt());

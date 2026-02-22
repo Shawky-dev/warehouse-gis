@@ -1,17 +1,19 @@
 package com.warehouse.warehouse_platform.auth;
 
 import com.warehouse.warehouse_platform.auth.session.RefreshTokenService;
+import com.warehouse.warehouse_platform.security.RoleAuthorityResolver;
 import com.warehouse.warehouse_platform.security.jwt.JwtTokenService;
 import com.warehouse.warehouse_platform.user.User;
 import com.warehouse.warehouse_platform.user.UserRepository;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 @Service
@@ -21,22 +23,25 @@ public class AuthService {
     private final UserRepository userRepository;
     private final JwtTokenService jwtTokenService;
     private final RefreshTokenService refreshTokenService;
+    private final RoleAuthorityResolver roleAuthorityResolver;
 
     public AuthService(AuthenticationManager authenticationManager,
             UserRepository userRepository,
             JwtTokenService jwtTokenService,
-            RefreshTokenService refreshTokenService) {
+            RefreshTokenService refreshTokenService,
+            RoleAuthorityResolver roleAuthorityResolver) {
         this.authenticationManager = authenticationManager;
         this.userRepository = userRepository;
         this.jwtTokenService = jwtTokenService;
         this.refreshTokenService = refreshTokenService;
+        this.roleAuthorityResolver = roleAuthorityResolver;
     }
 
     public AuthResult login(LoginRequest request, String ipAddress, String userAgent) {
 
         UsernamePasswordAuthenticationToken authToken =
                 new UsernamePasswordAuthenticationToken(
-                        request.email(),
+                        normalizeEmail(request.email()),
                         request.password()
                 );
 
@@ -45,11 +50,19 @@ public class AuthService {
         User user = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new IllegalStateException("Authenticated user not found"));
 
-        JwtTokenService.AccessTokenResult accessToken = jwtTokenService.createAccessToken(authentication);
+        List<GrantedAuthority> grantedAuthorities = ensureAuthorities(authentication, user.getRole());
+        Authentication tokenAuthentication = UsernamePasswordAuthenticationToken.authenticated(
+                authentication.getName(),
+                null,
+                grantedAuthorities);
+
+        JwtTokenService.AccessTokenResult accessToken = jwtTokenService.createAccessToken(tokenAuthentication);
         RefreshTokenService.RefreshTokenIssueResult refreshToken = refreshTokenService.issueForLogin(
                 user,
                 ipAddress,
                 userAgent);
+        RoleAuthorityResolver.AuthoritySnapshot authoritySnapshot =
+                roleAuthorityResolver.splitAuthorities(grantedAuthorities);
 
         return new AuthResult(
                 accessToken.token(),
@@ -58,7 +71,8 @@ public class AuthService {
                 refreshToken.expiresAt(),
                 user.getId(),
                 user.getEmail(),
-                user.getRole());
+                authoritySnapshot.roles(),
+                authoritySnapshot.permissions());
     }
 
     public AuthResult refresh(String rawRefreshToken, String ipAddress, String userAgent) {
@@ -67,12 +81,15 @@ public class AuthService {
                 ipAddress,
                 userAgent);
 
+        List<GrantedAuthority> grantedAuthorities = roleAuthorityResolver.resolveAuthorities(rotatedToken.userRole());
         Authentication authentication = UsernamePasswordAuthenticationToken.authenticated(
                 rotatedToken.userEmail(),
                 null,
-                List.of(new SimpleGrantedAuthority("ROLE_" + rotatedToken.userRole())));
+                grantedAuthorities);
 
         JwtTokenService.AccessTokenResult accessToken = jwtTokenService.createAccessToken(authentication);
+        RoleAuthorityResolver.AuthoritySnapshot authoritySnapshot =
+                roleAuthorityResolver.splitAuthorities(grantedAuthorities);
 
         return new AuthResult(
                 accessToken.token(),
@@ -81,7 +98,8 @@ public class AuthService {
                 rotatedToken.expiresAt(),
                 rotatedToken.userId(),
                 rotatedToken.userEmail(),
-                rotatedToken.userRole());
+                authoritySnapshot.roles(),
+                authoritySnapshot.permissions());
     }
 
     public void logout(String rawRefreshToken) {
@@ -95,6 +113,24 @@ public class AuthService {
             Instant refreshTokenExpiresAt,
             UUID userId,
             String email,
-            String role) {
+            List<String> roles,
+            List<String> permissions) {
+    }
+
+    private List<GrantedAuthority> ensureAuthorities(Authentication authentication, String roleCode) {
+        if (authentication.getAuthorities() == null || authentication.getAuthorities().isEmpty()) {
+            return roleAuthorityResolver.resolveAuthorities(roleCode);
+        }
+
+        return authentication.getAuthorities().stream()
+                .map(grantedAuthority -> (GrantedAuthority) grantedAuthority)
+                .toList();
+    }
+
+    private String normalizeEmail(String email) {
+        if (email == null) {
+            return null;
+        }
+        return email.trim().toLowerCase(Locale.ROOT);
     }
 }

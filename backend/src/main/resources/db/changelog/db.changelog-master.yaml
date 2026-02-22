@@ -6,3 +6,10 @@ databaseChangeLog:
         - sqlFile:
             path: db/migration/master/V1__create_master_schema_and_tables.sql
             relativeToChangelogFile: false
+  - changeSet:
+      id: master-rbac-2
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/master/V2__add_rbac_and_user_lifecycle.sql
+            relativeToChangelogFile: false

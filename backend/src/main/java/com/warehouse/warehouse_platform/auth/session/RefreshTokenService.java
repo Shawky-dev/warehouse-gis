@@ -122,6 +122,18 @@ public class RefreshTokenService {
         revokeFamily(token.getTokenFamilyId(), reason, Instant.now());
     }
 
+    @Transactional
+    public void revokeAllActiveForUser(UUID userId, String reason) {
+        Instant now = Instant.now();
+        List<RefreshTokenSession> activeTokens = refreshTokenSessionRepository.findAllByUser_IdAndRevokedAtIsNull(userId);
+        for (RefreshTokenSession token : activeTokens) {
+            revokeToken(token, reason, now);
+        }
+        if (!activeTokens.isEmpty()) {
+            refreshTokenSessionRepository.saveAll(activeTokens);
+        }
+    }
+
     private void revokeFamily(UUID tokenFamilyId, String reason, Instant now) {
         List<RefreshTokenSession> family = refreshTokenSessionRepository.findAllByTokenFamilyId(tokenFamilyId);
         for (RefreshTokenSession token : family) {

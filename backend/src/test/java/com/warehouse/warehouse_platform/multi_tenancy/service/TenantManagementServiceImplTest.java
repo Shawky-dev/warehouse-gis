@@ -71,7 +71,7 @@ class TenantManagementServiceImplTest {
         assertEquals("acme", tenantCaptor.getValue().getSchema());
 
         verify(jdbcTemplate).update(
-                "INSERT INTO acme.users (id, email, password, role) VALUES (?, ?, ?, ?)",
+                org.mockito.ArgumentMatchers.eq("INSERT INTO acme.users (id, email, password, role) VALUES (?, ?, ?, ?)"),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.eq("admin@acme.local"),
                 org.mockito.ArgumentMatchers.eq("encoded-admin-password"),
