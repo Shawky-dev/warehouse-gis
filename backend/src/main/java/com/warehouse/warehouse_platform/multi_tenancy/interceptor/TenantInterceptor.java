@@ -9,14 +9,26 @@ import org.springframework.web.context.request.WebRequestInterceptor;
 
 import com.warehouse.warehouse_platform.multi_tenancy.util.TenantContext;
 
+import java.util.Set;
+
 /*
     * Interceptor that extracts tenant ID from incoming requests and sets it in TenantContext.
-    * It resolves route-specific auth paths first, then falls back to the "X-TENANT-ID" header, then subdomain parsing.
+    * It resolves tenant from path first for tenant-scoped routes (/{tenant}/...), then falls back to "X-TENANT-ID",
+    * then subdomain parsing.
 */
 @Component
 public class TenantInterceptor implements WebRequestInterceptor {
 
     private static final String BOOTSTRAP_TENANT = "BOOTSTRAP";
+    private static final Set<String> FORCE_BOOTSTRAP_PATH_PREFIXES = Set.of(
+            "landlord",
+            "auth",
+            "actuator",
+            "swagger-ui",
+            "v3",
+            "error",
+            "favicon.ico");
+    private static final Set<String> NO_PATH_TENANT_PREFIXES = Set.of("api");
 
     @Override
     public void preHandle(WebRequest request) throws Exception {
@@ -81,25 +93,20 @@ public class TenantInterceptor implements WebRequestInterceptor {
             return null;
         }
 
-        if (normalizedPath.equals("auth")
-                || normalizedPath.startsWith("auth/")
-                || normalizedPath.equals("landlord")
-                || normalizedPath.startsWith("landlord/")) {
-            return BOOTSTRAP_TENANT;
-        }
-
-        int separatorIndex = normalizedPath.indexOf('/');
-        if (separatorIndex <= 0) {
+        String[] segments = normalizedPath.split("/");
+        String firstPathSegment = segments[0];
+        if (firstPathSegment == null || firstPathSegment.isBlank()) {
             return null;
         }
 
-        String firstPathSegment = normalizedPath.substring(0, separatorIndex);
-        String remainingPath = normalizedPath.substring(separatorIndex + 1);
-        if (remainingPath.equals("auth") || remainingPath.startsWith("auth/")) {
-            return firstPathSegment;
+        if (FORCE_BOOTSTRAP_PATH_PREFIXES.contains(firstPathSegment)) {
+            return BOOTSTRAP_TENANT;
+        }
+        if (NO_PATH_TENANT_PREFIXES.contains(firstPathSegment)) {
+            return null;
         }
 
-        return null;
+        return firstPathSegment;
     }
 
     @Override

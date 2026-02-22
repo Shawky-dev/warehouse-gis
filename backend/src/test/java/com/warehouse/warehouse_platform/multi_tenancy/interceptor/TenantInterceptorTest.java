@@ -58,4 +58,26 @@ class TenantInterceptorTest {
 
         assertEquals("acme", TenantContext.getTenantId());
     }
+
+    @Test
+    void preHandle_shouldUsePathTenantForAnyTenantScopedPath() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/acme/products");
+        request.addHeader("X-TENANT-ID", "beta");
+        request.setServerName("beta.example.com");
+
+        tenantInterceptor.preHandle(new ServletWebRequest(request));
+
+        assertEquals("acme", TenantContext.getTenantId());
+    }
+
+    @Test
+    void preHandle_shouldUsePathTenantForTenantRootPath() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/acme");
+        request.addHeader("X-TENANT-ID", "beta");
+        request.setServerName("beta.example.com");
+
+        tenantInterceptor.preHandle(new ServletWebRequest(request));
+
+        assertEquals("acme", TenantContext.getTenantId());
+    }
 }
