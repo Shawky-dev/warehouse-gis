@@ -1,7 +1,8 @@
 import { Navigate } from "react-router-dom";
 import { PATHS } from "@/shared/consts/paths";
 import LandlordDashboardPage from "./dashboard/LandlordDashboardPage";
-import WarehousesPage from "./warehouse/WarehousesPage";
+import CreateWarehousePage from "./warehouse/create/CreateWarehousePage";
+import WarehouseListPage from "./warehouse/list/WarehouseListPage";
 import UserPage from "./user/UserPage";
 import RolesPage from "./roles/RolesPage";
 
@@ -16,11 +17,11 @@ export const landlordRoutes = [
   },
   {
     path: PATHS.LANDLORD.WAREHOUSES_CREATE,
-    element: <WarehousesPage mode="create" />,
+    element: <CreateWarehousePage />,
   },
   {
     path: PATHS.LANDLORD.WAREHOUSES_LIST,
-    element: <WarehousesPage mode="list" />,
+    element: <WarehouseListPage />,
   },
   {
     path: PATHS.LANDLORD.USERS,
