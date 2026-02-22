@@ -1,5 +1,6 @@
 package com.warehouse.warehouse_platform.multi_tenancy.interceptor;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.context.request.ServletWebRequest;
@@ -10,7 +11,7 @@ import com.warehouse.warehouse_platform.multi_tenancy.util.TenantContext;
 
 /*
     * Interceptor that extracts tenant ID from incoming requests and sets it in TenantContext.
-    * It looks for tenant ID in the "X-TENANT-ID" header first, and if not found, it falls back to subdomain parsing.
+    * It resolves route-specific auth paths first, then falls back to the "X-TENANT-ID" header, then subdomain parsing.
 */
 @Component
 public class TenantInterceptor implements WebRequestInterceptor {
@@ -24,12 +25,18 @@ public class TenantInterceptor implements WebRequestInterceptor {
     }
 
     private String resolveTenantId(WebRequest request) {
+        HttpServletRequest httpRequest = ((ServletWebRequest) request).getRequest();
+        String tenantIdFromPath = resolveTenantIdFromPath(resolveRequestPath(httpRequest));
+        if (tenantIdFromPath != null) {
+            return tenantIdFromPath;
+        }
+
         String headerTenantId = request.getHeader("X-TENANT-ID");
         if (headerTenantId != null && !headerTenantId.isBlank()) {
             return headerTenantId;
         }
 
-        String serverName = ((ServletWebRequest) request).getRequest().getServerName();
+        String serverName = httpRequest.getServerName();
         if (serverName == null || serverName.isBlank()) {
             return BOOTSTRAP_TENANT;
         }
@@ -49,6 +56,54 @@ public class TenantInterceptor implements WebRequestInterceptor {
         }
 
         return candidate;
+    }
+
+    private String resolveRequestPath(HttpServletRequest request) {
+        String requestUri = request.getRequestURI();
+        String contextPath = request.getContextPath();
+        if (contextPath == null || contextPath.isBlank() || requestUri == null || requestUri.isBlank()) {
+            return requestUri;
+        }
+
+        if (requestUri.startsWith(contextPath)) {
+            return requestUri.substring(contextPath.length());
+        }
+        return requestUri;
+    }
+
+    private String resolveTenantIdFromPath(String requestUri) {
+        if (requestUri == null || requestUri.isBlank()) {
+            return null;
+        }
+
+        String normalizedPath = requestUri.startsWith("/") ? requestUri.substring(1) : requestUri;
+        if (normalizedPath.isBlank()) {
+            return null;
+        }
+
+        if (normalizedPath.equals("auth")
+                || normalizedPath.startsWith("auth/")
+                || normalizedPath.equals("landlord")
+                || normalizedPath.startsWith("landlord/")) {
+            return BOOTSTRAP_TENANT;
+        }
+
+        if (normalizedPath.equals("tenant") || normalizedPath.startsWith("tenant/")) {
+            return null;
+        }
+
+        int separatorIndex = normalizedPath.indexOf('/');
+        if (separatorIndex <= 0) {
+            return null;
+        }
+
+        String firstPathSegment = normalizedPath.substring(0, separatorIndex);
+        String remainingPath = normalizedPath.substring(separatorIndex + 1);
+        if (remainingPath.equals("auth") || remainingPath.startsWith("auth/")) {
+            return firstPathSegment;
+        }
+
+        return null;
     }
 
     @Override

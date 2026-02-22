@@ -1,7 +1,9 @@
 package com.warehouse.warehouse_platform.auth;
 
 import com.warehouse.warehouse_platform.auth.session.RefreshTokenException;
+import com.warehouse.warehouse_platform.multi_tenancy.util.TenantContext;
 import jakarta.servlet.http.Cookie;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -24,12 +26,17 @@ class AuthControllerTest {
     private AuthService authService;
     private AuthController controller;
 
+    @AfterEach
+    void tearDown() {
+        TenantContext.clear();
+    }
+
     @BeforeEach
     void setUp() {
         authService = mock(AuthService.class);
         RefreshCookieProperties cookieProperties = new RefreshCookieProperties(
                 "refresh_token",
-                "/auth",
+                "/landlord/auth",
                 "Lax",
                 false,
                 null);
@@ -64,7 +71,37 @@ class AuthControllerTest {
         String setCookie = response.getHeader(HttpHeaders.SET_COOKIE);
         assertTrue(setCookie.contains("refresh_token=refresh-token"));
         assertTrue(setCookie.contains("HttpOnly"));
-        assertTrue(setCookie.contains("Path=/auth"));
+        assertTrue(setCookie.contains("Path=/landlord/auth"));
+    }
+
+    @Test
+    void login_shouldForceBootstrapTenantContext_andRestorePreviousContext() {
+        TenantContext.setTenantId("acme");
+        Instant accessExp = Instant.now().plusSeconds(600);
+        Instant refreshExp = Instant.now().plusSeconds(1200);
+
+        when(authService.login(eq(new LoginRequest("admin@system.local", "admin123")), eq("127.0.0.1"), eq("bruno")))
+                .thenAnswer(invocation -> {
+                    assertEquals("BOOTSTRAP", TenantContext.getTenantId());
+                    return new AuthService.AuthResult(
+                            "access-token",
+                            accessExp,
+                            "refresh-token",
+                            refreshExp,
+                            UUID.randomUUID(),
+                            "admin@system.local",
+                            "ADMIN");
+                });
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRemoteAddr("127.0.0.1");
+        request.addHeader(HttpHeaders.USER_AGENT, "bruno");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        var entity = controller.login(new LoginRequest("admin@system.local", "admin123"), request, response);
+
+        assertEquals(200, entity.getStatusCode().value());
+        assertEquals("acme", TenantContext.getTenantId());
     }
 
     @Test

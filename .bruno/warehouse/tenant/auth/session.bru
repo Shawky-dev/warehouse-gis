@@ -5,9 +5,13 @@ meta {
 }
 
 get {
-  url: {{URL}}/{{TENANT_SLUG}}/auth/session
+  url: {{URL}}/tenant/auth/session
   body: none
   auth: bearer
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
 }
 
 auth:bearer {

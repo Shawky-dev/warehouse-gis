@@ -23,7 +23,7 @@ export const api = axios.create({
   },
 });
 
-const AUTH_PATHS = new Set(["/auth/login", "/auth/refresh", "/auth/logout"]);
+const AUTH_PATHS = new Set(["/landlord/auth/login", "/landlord/auth/refresh", "/landlord/auth/logout"]);
 
 function isAuthPath(url?: string) {
   if (!url) {

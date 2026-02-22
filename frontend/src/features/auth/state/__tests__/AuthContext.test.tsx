@@ -36,7 +36,7 @@ function LoginProbe() {
 }
 
 describe("AuthContext", () => {
-  it("bootstraps session successfully via /auth/refresh", async () => {
+  it("bootstraps session successfully via /landlord/auth/refresh", async () => {
     renderWithRouter(
       <AuthProvider>
         <AuthProbe />
@@ -52,7 +52,7 @@ describe("AuthContext", () => {
 
   it("falls back to unauthenticated when refresh fails", async () => {
     server.use(
-      http.post(`${API_URL}/auth/refresh`, () => {
+      http.post(`${API_URL}/landlord/auth/refresh`, () => {
         return HttpResponse.json({ code: "UNAUTHORIZED" }, { status: 401 });
       })
     );
@@ -72,7 +72,7 @@ describe("AuthContext", () => {
 
   it("logs in and updates authenticated user state", async () => {
     server.use(
-      http.post(`${API_URL}/auth/refresh`, () => {
+      http.post(`${API_URL}/landlord/auth/refresh`, () => {
         return HttpResponse.json({ code: "UNAUTHORIZED" }, { status: 401 });
       })
     );

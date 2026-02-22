@@ -26,11 +26,11 @@ function LogoutProbe() {
 }
 
 describe("Auth logout flow", () => {
-  it("calls /auth/logout and clears local auth state", async () => {
+  it("calls /landlord/auth/logout and clears local auth state", async () => {
     let logoutCalled = 0;
 
     server.use(
-      http.post(`${API_URL}/auth/logout`, () => {
+      http.post(`${API_URL}/landlord/auth/logout`, () => {
         logoutCalled += 1;
         return new HttpResponse(null, { status: 204 });
       })

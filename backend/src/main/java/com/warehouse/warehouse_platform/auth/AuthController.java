@@ -1,5 +1,6 @@
 package com.warehouse.warehouse_platform.auth;
 
+import com.warehouse.warehouse_platform.multi_tenancy.util.TenantContext;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.HttpHeaders;
@@ -13,8 +14,10 @@ import java.time.Duration;
 import java.time.Instant;
 
 @RestController
-@RequestMapping("/auth")
+@RequestMapping("/landlord/auth")
 public class AuthController {
+
+    private static final String BOOTSTRAP_TENANT = "BOOTSTRAP";
 
     private final AuthService authService;
     private final RefreshCookieProperties refreshCookieProperties;
@@ -28,47 +31,52 @@ public class AuthController {
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request,
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse) {
+        return runInBootstrapContext(() -> {
+            AuthService.AuthResult result = authService.login(
+                    request,
+                    resolveClientIp(httpRequest),
+                    httpRequest.getHeader(HttpHeaders.USER_AGENT));
 
-        AuthService.AuthResult result = authService.login(
-                request,
-                resolveClientIp(httpRequest),
-                httpRequest.getHeader(HttpHeaders.USER_AGENT));
-
-        writeRefreshCookie(httpResponse, result.refreshToken(), result.refreshTokenExpiresAt());
-        return ResponseEntity.ok(AuthResponse.from(result));
+            writeRefreshCookie(httpResponse, result.refreshToken(), result.refreshTokenExpiresAt());
+            return ResponseEntity.ok(AuthResponse.from(result));
+        });
     }
 
     @PostMapping("/refresh")
     public ResponseEntity<AuthResponse> refresh(
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse) {
-        String refreshToken = extractRefreshCookie(httpRequest);
+        return runInBootstrapContext(() -> {
+            String refreshToken = extractRefreshCookie(httpRequest);
 
-        if (refreshToken == null || refreshToken.isBlank()) {
-            throw new com.warehouse.warehouse_platform.auth.session.RefreshTokenException("Missing refresh token");
-        }
+            if (refreshToken == null || refreshToken.isBlank()) {
+                throw new com.warehouse.warehouse_platform.auth.session.RefreshTokenException("Missing refresh token");
+            }
 
-        AuthService.AuthResult result = authService.refresh(
-                refreshToken,
-                resolveClientIp(httpRequest),
-                httpRequest.getHeader(HttpHeaders.USER_AGENT));
+            AuthService.AuthResult result = authService.refresh(
+                    refreshToken,
+                    resolveClientIp(httpRequest),
+                    httpRequest.getHeader(HttpHeaders.USER_AGENT));
 
-        writeRefreshCookie(httpResponse, result.refreshToken(), result.refreshTokenExpiresAt());
-        return ResponseEntity.ok(AuthResponse.from(result));
+            writeRefreshCookie(httpResponse, result.refreshToken(), result.refreshTokenExpiresAt());
+            return ResponseEntity.ok(AuthResponse.from(result));
+        });
     }
 
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse) {
-        String refreshToken = extractRefreshCookie(httpRequest);
+        return runInBootstrapContext(() -> {
+            String refreshToken = extractRefreshCookie(httpRequest);
 
-        if (refreshToken != null && !refreshToken.isBlank()) {
-            authService.logout(refreshToken);
-        }
+            if (refreshToken != null && !refreshToken.isBlank()) {
+                authService.logout(refreshToken);
+            }
 
-        clearRefreshCookie(httpResponse);
-        return ResponseEntity.noContent().build();
+            clearRefreshCookie(httpResponse);
+            return ResponseEntity.noContent().build();
+        });
     }
 
     private void writeRefreshCookie(HttpServletResponse httpResponse, String refreshToken, Instant expiresAt) {
@@ -124,5 +132,19 @@ public class AuthController {
             return forwarded.split(",")[0].trim();
         }
         return request.getRemoteAddr();
+    }
+
+    private <T> T runInBootstrapContext(java.util.function.Supplier<T> action) {
+        String previousTenant = TenantContext.getTenantId();
+        TenantContext.setTenantId(BOOTSTRAP_TENANT);
+        try {
+            return action.get();
+        } finally {
+            if (previousTenant == null) {
+                TenantContext.clear();
+            } else {
+                TenantContext.setTenantId(previousTenant);
+            }
+        }
     }
 }

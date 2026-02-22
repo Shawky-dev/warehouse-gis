@@ -15,7 +15,7 @@ spring:
     enabled: false
 
 multitenancy:
-  bootstrap-schema: public
+  bootstrap-schema: master
   schema-cache:
     maximumSize: 100
     expireAfterAccess: 10
@@ -49,6 +49,6 @@ security:
   auth:
     refresh-cookie:
       name: refresh_token
-      path: /auth
+      path: /landlord/auth
       same-site: Lax
       secure: false

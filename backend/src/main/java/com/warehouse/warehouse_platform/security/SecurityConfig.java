@@ -41,14 +41,14 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 HttpMethod.POST,
-                                "/auth/login",
-                                "/auth/refresh",
-                                "/auth/logout").permitAll()
+                                "/landlord/auth/login",
+                                "/landlord/auth/refresh",
+                                "/landlord/auth/logout").permitAll()
                         .requestMatchers(
                                 HttpMethod.POST,
-                                "/*/auth/login",
-                                "/*/auth/refresh",
-                                "/*/auth/logout").permitAll()
+                                "/tenant/auth/login",
+                                "/tenant/auth/refresh",
+                                "/tenant/auth/logout").permitAll()
                         .requestMatchers("/landlord/**")
                         .access((authentication, context) ->
                                 new org.springframework.security.authorization.AuthorizationDecision(

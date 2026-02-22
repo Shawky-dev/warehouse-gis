@@ -5,6 +5,7 @@ import com.warehouse.warehouse_platform.multi_tenancy.domain.entity.Tenant;
 import com.warehouse.warehouse_platform.multi_tenancy.repository.TenantRepository;
 import com.warehouse.warehouse_platform.multi_tenancy.util.TenantContext;
 import jakarta.servlet.http.Cookie;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -23,7 +24,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
@@ -37,13 +37,18 @@ class TenantAuthControllerTest {
     private TenantRepository tenantRepository;
     private TenantAuthController controller;
 
+    @AfterEach
+    void tearDown() {
+        TenantContext.clear();
+    }
+
     @BeforeEach
     void setUp() {
         authService = mock(AuthService.class);
         tenantRepository = mock(TenantRepository.class);
         RefreshCookieProperties cookieProperties = new RefreshCookieProperties(
                 "refresh_token",
-                "/auth",
+                "/landlord/auth",
                 "Lax",
                 false,
                 null);
@@ -52,6 +57,7 @@ class TenantAuthControllerTest {
 
     @Test
     void login_shouldUseTenantContext_andSetTenantCookiePath() {
+        TenantContext.setTenantId("acme");
         Instant accessExp = Instant.now().plusSeconds(600);
         Instant refreshExp = Instant.now().plusSeconds(1200);
         when(tenantRepository.findByTenantId("acme")).thenReturn(Optional.of(Tenant.builder().tenantId("acme").build()));
@@ -74,49 +80,67 @@ class TenantAuthControllerTest {
         request.addHeader(HttpHeaders.USER_AGENT, "bruno");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
-        var entity = controller.login("acme", new LoginRequest("admin@acme.local", "admin1234"), request, response);
+        var entity = controller.login(new LoginRequest("admin@acme.local", "admin1234"), request, response);
 
         assertEquals(200, entity.getStatusCode().value());
         assertEquals("access-token", entity.getBody().accessToken());
 
         String setCookie = response.getHeader(HttpHeaders.SET_COOKIE);
         assertTrue(setCookie.contains("refresh_token=refresh-token"));
-        assertTrue(setCookie.contains("Path=/acme/auth"));
-        assertNull(TenantContext.getTenantId());
+        assertTrue(setCookie.contains("Path=/tenant/auth"));
+        assertEquals("acme", TenantContext.getTenantId());
     }
 
     @Test
     void refresh_shouldThrow_whenRefreshCookieMissing() {
+        TenantContext.setTenantId("acme");
         when(tenantRepository.findByTenantId("acme")).thenReturn(Optional.of(Tenant.builder().tenantId("acme").build()));
         MockHttpServletRequest request = new MockHttpServletRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         RefreshTokenException ex = assertThrows(
                 RefreshTokenException.class,
-                () -> controller.refresh("acme", request, response));
+                () -> controller.refresh(request, response));
 
         assertEquals("Missing refresh token", ex.getMessage());
     }
 
     @Test
     void logout_shouldClearCookie_andRevokeTokenFamily() {
+        TenantContext.setTenantId("acme");
         when(tenantRepository.findByTenantId("acme")).thenReturn(Optional.of(Tenant.builder().tenantId("acme").build()));
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setCookies(new Cookie("refresh_token", "tenant-refresh"));
         MockHttpServletResponse response = new MockHttpServletResponse();
 
-        var entity = controller.logout("acme", request, response);
+        var entity = controller.logout(request, response);
 
         assertEquals(204, entity.getStatusCode().value());
         verify(authService).logout("tenant-refresh");
 
         String setCookie = response.getHeader(HttpHeaders.SET_COOKIE);
-        assertTrue(setCookie.contains("Path=/acme/auth"));
+        assertTrue(setCookie.contains("Path=/tenant/auth"));
         assertTrue(setCookie.contains("Max-Age=0"));
     }
 
     @Test
+    void login_shouldReturnBadRequest_whenTenantContextMissing() {
+        TenantContext.clear();
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        ResponseStatusException exception = assertThrows(
+                ResponseStatusException.class,
+                () -> controller.login(new LoginRequest("admin@acme.local", "admin1234"), request, response));
+
+        assertEquals(400, exception.getStatusCode().value());
+        assertEquals("Tenant context is required", exception.getReason());
+    }
+
+    @Test
     void login_shouldReturnNotFound_whenTenantDoesNotExist() {
+        TenantContext.setTenantId("missing");
         when(tenantRepository.findByTenantId("missing")).thenReturn(Optional.empty());
 
         MockHttpServletRequest request = new MockHttpServletRequest();
@@ -124,7 +148,7 @@ class TenantAuthControllerTest {
 
         ResponseStatusException exception = assertThrows(
                 ResponseStatusException.class,
-                () -> controller.login("missing", new LoginRequest("admin@acme.local", "admin1234"), request, response));
+                () -> controller.login(new LoginRequest("admin@acme.local", "admin1234"), request, response));
 
         assertEquals(404, exception.getStatusCode().value());
         assertEquals("Tenant not found: missing", exception.getReason());
@@ -132,11 +156,12 @@ class TenantAuthControllerTest {
 
     @Test
     void session_shouldReturnTenantSession_whenTokenTenantMatchesPath() {
+        TenantContext.setTenantId("acme");
         when(tenantRepository.findByTenantId("acme")).thenReturn(Optional.of(Tenant.builder().tenantId("acme").build()));
 
         Authentication authentication = tenantJwtAuthentication("acme", "admin@acme.local", List.of("ROLE_ADMIN"));
 
-        var entity = controller.session("acme", authentication);
+        var entity = controller.session(authentication);
 
         assertEquals(200, entity.getStatusCode().value());
         assertEquals("admin@acme.local", entity.getBody().subject());
@@ -146,27 +171,29 @@ class TenantAuthControllerTest {
 
     @Test
     void session_shouldReturnForbidden_whenTokenTenantDiffersFromPath() {
+        TenantContext.setTenantId("beta");
         when(tenantRepository.findByTenantId("beta")).thenReturn(Optional.of(Tenant.builder().tenantId("beta").build()));
 
         Authentication authentication = tenantJwtAuthentication("acme", "admin@acme.local", List.of("ROLE_ADMIN"));
 
         ResponseStatusException exception = assertThrows(
                 ResponseStatusException.class,
-                () -> controller.session("beta", authentication));
+                () -> controller.session(authentication));
 
         assertEquals(403, exception.getStatusCode().value());
-        assertEquals("Token tenant does not match path tenant", exception.getReason());
+        assertEquals("Token tenant does not match request tenant", exception.getReason());
     }
 
     @Test
     void session_shouldReturnForbidden_whenAuthenticationIsNotJwt() {
+        TenantContext.setTenantId("acme");
         when(tenantRepository.findByTenantId("acme")).thenReturn(Optional.of(Tenant.builder().tenantId("acme").build()));
 
         Authentication authentication = new TestingAuthenticationToken("admin@acme.local", "n/a", "ROLE_ADMIN");
 
         ResponseStatusException exception = assertThrows(
                 ResponseStatusException.class,
-                () -> controller.session("acme", authentication));
+                () -> controller.session(authentication));
 
         assertEquals(403, exception.getStatusCode().value());
         assertEquals("Unsupported authentication type", exception.getReason());

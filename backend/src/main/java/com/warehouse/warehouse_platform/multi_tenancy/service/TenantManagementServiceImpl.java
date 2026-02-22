@@ -2,6 +2,7 @@ package com.warehouse.warehouse_platform.multi_tenancy.service;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.UUID;
 
 import javax.sql.DataSource;
 
@@ -15,11 +16,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import com.warehouse.warehouse_platform.multi_tenancy.util.TenantContext;
 import com.warehouse.warehouse_platform.multi_tenancy.domain.entity.Tenant;
 import com.warehouse.warehouse_platform.multi_tenancy.repository.TenantRepository;
-import com.warehouse.warehouse_platform.user.User;
-import com.warehouse.warehouse_platform.user.UserRepository;
 
 import liquibase.exception.LiquibaseException;
 import liquibase.integration.spring.SpringLiquibase;
@@ -34,7 +32,6 @@ public class TenantManagementServiceImpl implements TenantManagementService {
     private final LiquibaseProperties liquibaseProperties;
     private final ResourceLoader resourceLoader;
     private final TenantRepository tenantRepository;
-    private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
     public TenantManagementServiceImpl(
@@ -43,14 +40,12 @@ public class TenantManagementServiceImpl implements TenantManagementService {
             @Qualifier("tenantLiquibaseProperties") LiquibaseProperties liquibaseProperties,
             ResourceLoader resourceLoader,
             TenantRepository tenantRepository,
-            UserRepository userRepository,
             PasswordEncoder passwordEncoder) {
         this.dataSource = dataSource;
         this.jdbcTemplate = jdbcTemplate;
         this.liquibaseProperties = liquibaseProperties;
         this.resourceLoader = resourceLoader;
         this.tenantRepository = tenantRepository;
-        this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -83,7 +78,7 @@ public class TenantManagementServiceImpl implements TenantManagementService {
         tenantRepository.save(tenant);
 
         try {
-            createTenantAdmin(tenantId, adminEmail, adminPassword);
+            createTenantAdmin(normalizedSchema, adminEmail, adminPassword);
         } catch (DataAccessException exception) {
             throw new TenantCreationException("Error when creating tenant admin for tenant: " + tenantId, exception);
         }
@@ -116,23 +111,14 @@ public class TenantManagementServiceImpl implements TenantManagementService {
         jdbcTemplate.execute((StatementCallback<Boolean>) stmt -> stmt.execute("CREATE SCHEMA " + schema));
     }
 
-    private void createTenantAdmin(String tenantId, String adminEmail, String adminPassword) {
-        String previousTenant = TenantContext.getTenantId();
-        TenantContext.setTenantId(tenantId);
-        try {
-            User admin = User.builder()
-                    .email(adminEmail)
-                    .password(passwordEncoder.encode(adminPassword))
-                    .role("ADMIN")
-                    .build();
-            userRepository.save(admin);
-        } finally {
-            if (previousTenant == null) {
-                TenantContext.clear();
-            } else {
-                TenantContext.setTenantId(previousTenant);
-            }
-        }
+    private void createTenantAdmin(String schema, String adminEmail, String adminPassword) {
+        String insertSql = "INSERT INTO " + schema + ".users (id, email, password, role) VALUES (?, ?, ?, ?)";
+        jdbcTemplate.update(
+                insertSql,
+                UUID.randomUUID(),
+                adminEmail,
+                passwordEncoder.encode(adminPassword),
+                "ADMIN");
     }
 
     private void runLiquibase(DataSource dataSource, String schema) throws LiquibaseException {

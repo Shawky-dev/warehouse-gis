@@ -5,9 +5,13 @@ meta {
 }
 
 post {
-  url: {{URL}}/{{TENANT_SLUG}}/auth/refresh
+  url: {{URL}}/tenant/auth/refresh
   body: none
   auth: inherit
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
 }
 
 settings {

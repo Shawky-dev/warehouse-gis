@@ -41,7 +41,7 @@ public class SchemaBasedMultiTenantConnectionProvider implements MultiTenantConn
             TenantRepository tenantRepository,
             @Value("${multitenancy.schema-cache.maximumSize:1000}") Long maximumSize,
             @Value("${multitenancy.schema-cache.expireAfterAccess:10}") Integer expireAfterAccess,
-            @Value("${multitenancy.bootstrap-schema:public}") String bootstrapSchema) {
+            @Value("${multitenancy.bootstrap-schema:master}") String bootstrapSchema) {
         this.dataSource = dataSource;
         this.tenantRepository = tenantRepository;
         this.maximumSize = maximumSize;

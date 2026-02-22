@@ -3,7 +3,7 @@ import { http, HttpResponse } from "msw";
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 
 export const handlers = [
-  http.post(`${API_URL}/auth/login`, () => {
+  http.post(`${API_URL}/landlord/auth/login`, () => {
     return HttpResponse.json({
       accessToken: "test-access-token",
       tokenType: "Bearer",
@@ -16,7 +16,7 @@ export const handlers = [
     });
   }),
 
-  http.post(`${API_URL}/auth/refresh`, () => {
+  http.post(`${API_URL}/landlord/auth/refresh`, () => {
     return HttpResponse.json({
       accessToken: "refreshed-access-token",
       tokenType: "Bearer",
@@ -29,7 +29,7 @@ export const handlers = [
     });
   }),
 
-  http.post(`${API_URL}/auth/logout`, () => {
+  http.post(`${API_URL}/landlord/auth/logout`, () => {
     return new HttpResponse(null, { status: 204 });
   }),
 ];
