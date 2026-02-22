@@ -41,8 +41,11 @@ class LandlordControllerTest {
 
     @Test
     void createTenant_shouldDelegateToService() {
-        controller.createTenant(new LandlordController.CreateTenantRequest("acme", "acme"));
+        controller.createTenant(new LandlordController.CreateTenantRequest(
+                "acme",
+                "acme",
+                new LandlordController.TenantAdminRequest("admin@acme.local", "admin123")));
 
-        verify(tenantManagementService).createTenant("acme", "acme");
+        verify(tenantManagementService).createTenant("acme", "acme", "admin@acme.local", "admin123");
     }
 }

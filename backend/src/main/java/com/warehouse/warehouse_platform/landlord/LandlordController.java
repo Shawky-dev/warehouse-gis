@@ -16,7 +16,10 @@ import com.warehouse.warehouse_platform.multi_tenancy.service.TenantManagementSe
 import com.warehouse.warehouse_platform.multi_tenancy.service.TenantSummary;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 @RestController
 @RequestMapping("/landlord")
@@ -39,7 +42,11 @@ public class LandlordController {
 
     @PostMapping("/tenants")
     public ResponseEntity<Void> createTenant(@Valid @RequestBody CreateTenantRequest request) {
-        tenantManagementService.createTenant(request.tenantId(), request.schema());
+        tenantManagementService.createTenant(
+                request.tenantId(),
+                request.schema(),
+                request.admin().email(),
+                request.admin().password());
         return ResponseEntity.noContent().build();
     }
 
@@ -58,7 +65,13 @@ public class LandlordController {
 
     public record CreateTenantRequest(
             @NotBlank String tenantId,
-            @NotBlank String schema) {
+            @NotBlank String schema,
+            @Valid @NotNull TenantAdminRequest admin) {
+    }
+
+    public record TenantAdminRequest(
+            @NotBlank @Email String email,
+            @NotBlank @Size(min = 8) String password) {
     }
 
     public record TenantSummaryResponse(

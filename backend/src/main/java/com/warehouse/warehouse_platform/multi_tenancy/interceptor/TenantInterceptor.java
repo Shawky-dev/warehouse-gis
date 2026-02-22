@@ -61,6 +61,7 @@ public class TenantInterceptor implements WebRequestInterceptor {
 
     @Override
     public void afterCompletion(WebRequest request, Exception ex) throws Exception {
+        TenantContext.clear();
     }
 
 }

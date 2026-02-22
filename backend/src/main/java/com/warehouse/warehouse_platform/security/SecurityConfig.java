@@ -3,7 +3,9 @@ package com.warehouse.warehouse_platform.security;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -37,8 +39,20 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/**").permitAll()
-                        .requestMatchers("/landlord/**").hasRole("ADMIN")
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/auth/login",
+                                "/auth/refresh",
+                                "/auth/logout").permitAll()
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/*/auth/login",
+                                "/*/auth/refresh",
+                                "/*/auth/logout").permitAll()
+                        .requestMatchers("/landlord/**")
+                        .access((authentication, context) ->
+                                new org.springframework.security.authorization.AuthorizationDecision(
+                                        isBootstrapAdmin(authentication.get())))
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())))
@@ -100,6 +114,25 @@ public class SecurityConfig {
 
             return new JwtAuthenticationToken(jwt, authorities, jwt.getSubject());
         };
+    }
+
+    private boolean isBootstrapAdmin(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return false;
+        }
+
+        boolean hasAdminRole = authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
+        if (!hasAdminRole) {
+            return false;
+        }
+
+        if (authentication instanceof JwtAuthenticationToken jwtAuthenticationToken) {
+            String tenant = jwtAuthenticationToken.getToken().getClaimAsString("tenant");
+            return tenant != null && "BOOTSTRAP".equalsIgnoreCase(tenant);
+        }
+
+        return false;
     }
 
 }

@@ -1,0 +1,20 @@
+meta {
+  name: session
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{URL}}/{{TENANT_SLUG}}/auth/session
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

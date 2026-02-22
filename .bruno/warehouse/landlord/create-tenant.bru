@@ -20,8 +20,12 @@ headers {
 
 body:json {
   {
-    "tenantId": "acme",
-    "schema": "acme"
+    "tenantId": "{{TENANT_SLUG}}",
+    "schema": "{{TENANT_SLUG}}",
+    "admin": {
+      "email": "{{TENANT_ADMIN_EMAIL}}",
+      "password": "{{TENANT_ADMIN_PASSWORD}}"
+    }
   }
 }
 

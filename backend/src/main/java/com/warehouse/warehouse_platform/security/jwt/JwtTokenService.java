@@ -1,5 +1,6 @@
 package com.warehouse.warehouse_platform.security.jwt;
 
+import com.warehouse.warehouse_platform.multi_tenancy.util.TenantContext;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwsHeader;
@@ -19,6 +20,7 @@ import java.util.UUID;
 public class JwtTokenService {
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final String BOOTSTRAP_TENANT = "BOOTSTRAP";
 
     private final JwtEncoder jwtEncoder;
     private final JwtProperties properties;
@@ -31,6 +33,7 @@ public class JwtTokenService {
     public AccessTokenResult createAccessToken(Authentication authentication) {
         Instant issuedAt = Instant.now();
         Instant expiresAt = issuedAt.plus(properties.accessTokenTtl());
+        String tenantId = resolveTenantId();
 
         List<String> roles = authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
@@ -44,6 +47,7 @@ public class JwtTokenService {
                 .expiresAt(expiresAt)
                 .id(UUID.randomUUID().toString())
                 .claim("roles", roles)
+                .claim("tenant", tenantId)
                 .build();
 
         JwsHeader jwsHeader = JwsHeader.with(SignatureAlgorithm.RS256)
@@ -52,6 +56,14 @@ public class JwtTokenService {
 
         String token = jwtEncoder.encode(JwtEncoderParameters.from(jwsHeader, claims)).getTokenValue();
         return new AccessTokenResult(token, expiresAt);
+    }
+
+    private static String resolveTenantId() {
+        String tenantId = TenantContext.getTenantId();
+        if (tenantId == null || tenantId.isBlank()) {
+            return BOOTSTRAP_TENANT;
+        }
+        return tenantId;
     }
 
     public String generateRefreshTokenValue() {
