@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,10 +25,8 @@ import java.time.Instant;
 import java.util.List;
 
 @RestController
-@RequestMapping("/tenant/auth")
+@RequestMapping("/{tenantSlug}/auth")
 public class TenantAuthController {
-
-    private static final String BOOTSTRAP_TENANT = "BOOTSTRAP";
 
     private final AuthService authService;
     private final RefreshCookieProperties refreshCookieProperties;
@@ -44,26 +43,28 @@ public class TenantAuthController {
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(
+            @PathVariable String tenantSlug,
             @Valid @RequestBody LoginRequest request,
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse) {
-        String tenantSlug = requireTenantContext();
+        ensureTenantExists(tenantSlug);
         return runInTenantContext(tenantSlug, () -> {
             AuthService.AuthResult result = authService.login(
                     request,
                     resolveClientIp(httpRequest),
                     httpRequest.getHeader(HttpHeaders.USER_AGENT));
 
-            writeRefreshCookie(httpResponse, result.refreshToken(), result.refreshTokenExpiresAt());
+            writeRefreshCookie(httpResponse, result.refreshToken(), result.refreshTokenExpiresAt(), tenantSlug);
             return ResponseEntity.ok(AuthResponse.from(result));
         });
     }
 
     @PostMapping("/refresh")
     public ResponseEntity<AuthResponse> refresh(
+            @PathVariable String tenantSlug,
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse) {
-        String tenantSlug = requireTenantContext();
+        ensureTenantExists(tenantSlug);
         return runInTenantContext(tenantSlug, () -> {
             String refreshToken = extractRefreshCookie(httpRequest);
 
@@ -76,16 +77,17 @@ public class TenantAuthController {
                     resolveClientIp(httpRequest),
                     httpRequest.getHeader(HttpHeaders.USER_AGENT));
 
-            writeRefreshCookie(httpResponse, result.refreshToken(), result.refreshTokenExpiresAt());
+            writeRefreshCookie(httpResponse, result.refreshToken(), result.refreshTokenExpiresAt(), tenantSlug);
             return ResponseEntity.ok(AuthResponse.from(result));
         });
     }
 
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(
+            @PathVariable String tenantSlug,
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse) {
-        String tenantSlug = requireTenantContext();
+        ensureTenantExists(tenantSlug);
         return runInTenantContext(tenantSlug, () -> {
             String refreshToken = extractRefreshCookie(httpRequest);
 
@@ -93,15 +95,16 @@ public class TenantAuthController {
                 authService.logout(refreshToken);
             }
 
-            clearRefreshCookie(httpResponse);
+            clearRefreshCookie(httpResponse, tenantSlug);
             return ResponseEntity.noContent().build();
         });
     }
 
     @GetMapping("/session")
     public ResponseEntity<TenantSessionResponse> session(
+            @PathVariable String tenantSlug,
             Authentication authentication) {
-        String tenantSlug = requireTenantContext();
+        ensureTenantExists(tenantSlug);
         ensureTokenTenantMatchesPath(authentication, tenantSlug);
 
         return runInTenantContext(tenantSlug, () -> {
@@ -121,7 +124,8 @@ public class TenantAuthController {
     private void writeRefreshCookie(
             HttpServletResponse httpResponse,
             String refreshToken,
-            Instant expiresAt) {
+            Instant expiresAt,
+            String tenantSlug) {
         long maxAgeSeconds = Math.max(0, Duration.between(Instant.now(), expiresAt).getSeconds());
 
         ResponseCookie.ResponseCookieBuilder cookieBuilder = ResponseCookie
@@ -129,7 +133,7 @@ public class TenantAuthController {
                 .httpOnly(true)
                 .secure(refreshCookieProperties.secure())
                 .sameSite(refreshCookieProperties.sameSite())
-                .path(resolveTenantRefreshPath())
+                .path(resolveTenantRefreshPath(tenantSlug))
                 .maxAge(maxAgeSeconds);
 
         if (refreshCookieProperties.domain() != null && !refreshCookieProperties.domain().isBlank()) {
@@ -139,13 +143,13 @@ public class TenantAuthController {
         httpResponse.addHeader(HttpHeaders.SET_COOKIE, cookieBuilder.build().toString());
     }
 
-    private void clearRefreshCookie(HttpServletResponse httpResponse) {
+    private void clearRefreshCookie(HttpServletResponse httpResponse, String tenantSlug) {
         ResponseCookie.ResponseCookieBuilder cookieBuilder = ResponseCookie
                 .from(refreshCookieProperties.name(), "")
                 .httpOnly(true)
                 .secure(refreshCookieProperties.secure())
                 .sameSite(refreshCookieProperties.sameSite())
-                .path(resolveTenantRefreshPath())
+                .path(resolveTenantRefreshPath(tenantSlug))
                 .maxAge(0);
 
         if (refreshCookieProperties.domain() != null && !refreshCookieProperties.domain().isBlank()) {
@@ -168,8 +172,15 @@ public class TenantAuthController {
         return null;
     }
 
-    private String resolveTenantRefreshPath() {
-        return "/tenant/auth";
+    private String resolveTenantRefreshPath(String tenantSlug) {
+        String basePath = refreshCookieProperties.path();
+        if (!basePath.startsWith("/")) {
+            basePath = "/" + basePath;
+        }
+        if (basePath.startsWith("/landlord/")) {
+            basePath = "/auth";
+        }
+        return "/" + tenantSlug + basePath;
     }
 
     private static String resolveClientIp(HttpServletRequest request) {
@@ -198,16 +209,6 @@ public class TenantAuthController {
         if (tenantRepository.findByTenantId(tenantSlug).isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Tenant not found: " + tenantSlug);
         }
-    }
-
-    private String requireTenantContext() {
-        String tenantSlug = TenantContext.getTenantId();
-        if (tenantSlug == null || tenantSlug.isBlank() || BOOTSTRAP_TENANT.equalsIgnoreCase(tenantSlug)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tenant context is required");
-        }
-
-        ensureTenantExists(tenantSlug);
-        return tenantSlug;
     }
 
     private void ensureTokenTenantMatchesPath(Authentication authentication, String tenantSlug) {

@@ -1,10 +1,9 @@
 
 export const PATHS = {
   ROOT: "/",
-  LOGIN: "/login",
-  REGISTER: "/register",
 
   LANDLORD: {
+    AUTH_LOGIN: "/landlord/auth/login",
     ROOT: "/landlord",
     DASHBOARD: "/landlord",
     WAREHOUSES: "/landlord/warehouses",
@@ -13,8 +12,11 @@ export const PATHS = {
   },
 
   TENANT: {
-    ROOT: "/tenant",
-    DASHBOARD: "/tenant",
-    WAREHOUSES: "/tenant/warehouses",
+    ROOT_PATTERN: "/:tenantSlug",
+    AUTH_LOGIN_PATTERN: "/:tenantSlug/auth/login",
+    PRODUCTS_PATTERN: "/:tenantSlug/products",
+    root: (tenantSlug: string) => `/${tenantSlug}`,
+    authLogin: (tenantSlug: string) => `/${tenantSlug}/auth/login`,
+    products: (tenantSlug: string) => `/${tenantSlug}/products`,
   },
 } as const

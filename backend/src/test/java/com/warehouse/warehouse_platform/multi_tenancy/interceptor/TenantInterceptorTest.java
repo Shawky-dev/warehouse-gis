@@ -40,8 +40,8 @@ class TenantInterceptorTest {
 
     @Test
     void preHandle_shouldUseHeaderTenantForTenantAuthPath() throws Exception {
-        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/tenant/auth/login");
-        request.addHeader("X-TENANT-ID", "acme");
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/acme/auth/login");
+        request.addHeader("X-TENANT-ID", "beta");
         request.setServerName("beta.example.com");
 
         tenantInterceptor.preHandle(new ServletWebRequest(request));

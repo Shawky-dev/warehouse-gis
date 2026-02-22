@@ -1,9 +1,10 @@
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { PATHS } from "@/shared/consts/paths";
 import type { ReactNode } from "react";
 import { AuthStatusScreen } from "@/features/auth/components/AuthStatusScreen";
 import { useI18n } from "@/i18n";
+import { parseScopeFromPathname, scopeLoginPath } from "@/features/auth/shared/scope";
 
 interface RequireRoleProps {
   role: string;
@@ -13,6 +14,7 @@ interface RequireRoleProps {
 export function RequireRole({ role, children }: RequireRoleProps) {
   const { status, hasRole } = useAuth();
   const { t } = useI18n();
+  const location = useLocation();
 
   if (status === "idle" || status === "loading") {
     return (
@@ -24,7 +26,11 @@ export function RequireRole({ role, children }: RequireRoleProps) {
   }
 
   if (!hasRole(role)) {
-    return <Navigate to={PATHS.LOGIN} replace />;
+    const scope = parseScopeFromPathname(location.pathname);
+    if (!scope) {
+      return <Navigate to={PATHS.ROOT} replace />;
+    }
+    return <Navigate to={scopeLoginPath(scope)} replace />;
   }
 
   return <>{children}</>;

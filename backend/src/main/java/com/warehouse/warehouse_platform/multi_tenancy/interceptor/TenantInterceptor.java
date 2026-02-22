@@ -88,10 +88,6 @@ public class TenantInterceptor implements WebRequestInterceptor {
             return BOOTSTRAP_TENANT;
         }
 
-        if (normalizedPath.equals("tenant") || normalizedPath.startsWith("tenant/")) {
-            return null;
-        }
-
         int separatorIndex = normalizedPath.indexOf('/');
         if (separatorIndex <= 0) {
             return null;

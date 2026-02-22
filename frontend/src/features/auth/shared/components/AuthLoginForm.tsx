@@ -1,28 +1,37 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useLogin } from "./useLogin";
-import { PATHS } from "@/shared/consts/paths";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 import { Button } from "@/shared/components/ui/button";
 import { useI18n } from "@/i18n";
+import type { LoginRequest } from "@/features/auth/shared/types";
 
-const LoginPage = () => {
-  const { doLogin, loading, error } = useLogin();
+interface AuthLoginFormProps {
+  title: string;
+  description: string;
+  placeholderEmail: string;
+  onSubmit: (payload: LoginRequest) => Promise<void>;
+}
+
+export function AuthLoginForm({ title, description, placeholderEmail, onSubmit }: AuthLoginFormProps) {
   const { t } = useI18n();
-  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError(null);
+    setLoading(true);
 
     try {
-      await doLogin({ email, password });
-      navigate(PATHS.LANDLORD.ROOT, { replace: true });
-    } catch {
-      // Error state is handled by useLogin.
+      await onSubmit({ email, password });
+    } catch (unknownError) {
+      const errorMessage = unknownError instanceof Error ? unknownError.message : t("login.fallbackError");
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -30,8 +39,8 @@ const LoginPage = () => {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>{t("login.title")}</CardTitle>
-          <CardDescription>{t("login.description")}</CardDescription>
+          <CardTitle>{title}</CardTitle>
+          <CardDescription>{description}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -42,8 +51,8 @@ const LoginPage = () => {
                 type="email"
                 value={email}
                 autoComplete="email"
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="admin@system.local"
+                onChange={(nextEvent) => setEmail(nextEvent.target.value)}
+                placeholder={placeholderEmail}
                 required
               />
             </div>
@@ -55,7 +64,7 @@ const LoginPage = () => {
                 type="password"
                 value={password}
                 autoComplete="current-password"
-                onChange={(event) => setPassword(event.target.value)}
+                onChange={(nextEvent) => setPassword(nextEvent.target.value)}
                 required
               />
             </div>
@@ -74,6 +83,4 @@ const LoginPage = () => {
       </Card>
     </div>
   );
-};
-
-export default LoginPage;
+}

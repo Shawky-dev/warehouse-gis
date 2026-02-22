@@ -46,9 +46,9 @@ public class SecurityConfig {
                                 "/landlord/auth/logout").permitAll()
                         .requestMatchers(
                                 HttpMethod.POST,
-                                "/tenant/auth/login",
-                                "/tenant/auth/refresh",
-                                "/tenant/auth/logout").permitAll()
+                                "/*/auth/login",
+                                "/*/auth/refresh",
+                                "/*/auth/logout").permitAll()
                         .requestMatchers("/landlord/**")
                         .access((authentication, context) ->
                                 new org.springframework.security.authorization.AuthorizationDecision(

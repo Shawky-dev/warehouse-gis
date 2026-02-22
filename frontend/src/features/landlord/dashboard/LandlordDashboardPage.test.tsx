@@ -6,6 +6,6 @@ import LandlordDashboardPage from "@/features/landlord/dashboard/LandlordDashboa
 describe("LandlordDashboardPage", () => {
   it("shows overview message and points user to warehouses tab", () => {
     renderWithRouter(<LandlordDashboardPage />);
-
+    expect(screen.getByText("Landlord Dashboard")).toBeInTheDocument();
   });
 });

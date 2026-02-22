@@ -39,7 +39,8 @@ describe("Auth logout flow", () => {
     renderWithRouter(
       <AuthProvider>
         <LogoutProbe />
-      </AuthProvider>
+      </AuthProvider>,
+      ["/landlord"]
     );
 
     await waitFor(() => {

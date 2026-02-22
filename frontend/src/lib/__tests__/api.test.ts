@@ -7,7 +7,7 @@ import {
   setAccessToken,
   clearAuthSessionManagerConfig,
 } from "@/features/auth/session/authSessionManager";
-import type { AuthResponse } from "@/features/auth/types";
+import type { AuthResponse, AuthScope } from "@/features/auth/shared/types";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 
@@ -38,7 +38,8 @@ describe("api auth integration", () => {
   });
 
   it("retries once after 401 using refreshed token", async () => {
-    setAccessToken("old-token");
+    let activeToken: string | null = "old-token";
+    const scope: AuthScope = { kind: "landlord" };
 
     const refreshSession = vi.fn<() => Promise<AuthResponse>>().mockResolvedValue({
       accessToken: "new-token",
@@ -52,9 +53,15 @@ describe("api auth integration", () => {
     });
 
     configureAuthSessionManager({
-      refreshSession,
-      onSessionUpdate: (session) => setAccessToken(session.accessToken),
-      onUnauthorized: () => setAccessToken(null),
+      getActiveScope: () => scope,
+      getAccessTokenForScope: () => activeToken,
+      refreshSession: () => refreshSession(),
+      onSessionUpdate: (_, session) => {
+        activeToken = session.accessToken;
+      },
+      onUnauthorized: () => {
+        activeToken = null;
+      },
     });
 
     let callCount = 0;

@@ -3,10 +3,8 @@ import {
   configureAuthSessionManager,
   refreshAccessTokenOnce,
   resetAuthSessionManager,
-  setAccessToken,
-  getAccessToken,
 } from "@/features/auth/session/authSessionManager";
-import type { AuthResponse } from "@/features/auth/types";
+import type { AuthResponse, AuthScope } from "@/features/auth/shared/types";
 
 function createSession(token: string): AuthResponse {
   return {
@@ -26,18 +24,20 @@ describe("authSessionManager", () => {
     resetAuthSessionManager();
 
     const refreshSession = vi.fn<() => Promise<AuthResponse>>().mockResolvedValue(createSession("refreshed-token"));
+    const scope: AuthScope = { kind: "landlord" };
 
     configureAuthSessionManager({
-      refreshSession,
-      onSessionUpdate: (session) => setAccessToken(session.accessToken),
-      onUnauthorized: () => setAccessToken(null),
+      getActiveScope: () => scope,
+      getAccessTokenForScope: () => "stale-token",
+      refreshSession: () => refreshSession(),
+      onSessionUpdate: () => {},
+      onUnauthorized: () => {},
     });
 
     const [first, second] = await Promise.all([refreshAccessTokenOnce(), refreshAccessTokenOnce()]);
 
     expect(first.accessToken).toBe("refreshed-token");
     expect(second.accessToken).toBe("refreshed-token");
-    expect(getAccessToken()).toBe("refreshed-token");
     expect(refreshSession).toHaveBeenCalledTimes(1);
   });
 });

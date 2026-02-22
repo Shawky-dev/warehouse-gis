@@ -4,6 +4,7 @@ import { PATHS } from "@/shared/consts/paths";
 import type { ReactNode } from "react";
 import { AuthStatusScreen } from "@/features/auth/components/AuthStatusScreen";
 import { useI18n } from "@/i18n";
+import { parseScopeFromPathname, scopeLoginPath } from "@/features/auth/shared/scope";
 
 interface RequireAuthProps {
   children: ReactNode;
@@ -24,7 +25,11 @@ export function RequireAuth({ children }: RequireAuthProps) {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to={PATHS.LOGIN} replace state={{ from: location }} />;
+    const scope = parseScopeFromPathname(location.pathname);
+    if (!scope) {
+      return <Navigate to={PATHS.ROOT} replace />;
+    }
+    return <Navigate to={scopeLoginPath(scope)} replace state={{ from: location }} />;
   }
 
   return <>{children}</>;

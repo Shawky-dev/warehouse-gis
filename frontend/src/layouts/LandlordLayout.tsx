@@ -1,11 +1,12 @@
 import { Outlet } from "react-router-dom";
-import { Navbar, Topbar } from "@/features/navigation";
+import { Topbar } from "@/features/navigation";
+import { LandlordNavbar } from "@/features/landlord/navigation/LandlordNavbar";
 
 export function LandlordLayout() {
     return (
         <div className="flex min-h-screen">
             {/* Left sidebar */}
-            <Navbar />
+            <LandlordNavbar />
 
             {/* Right column: topbar + page content */}
             <div className="flex flex-col flex-1 min-w-0">

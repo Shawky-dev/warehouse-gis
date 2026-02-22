@@ -32,7 +32,7 @@ function isGroupItem(item: NavItem): item is GroupNavItem {
   return "children" in item;
 }
 
-export function Navbar() {
+export function LandlordNavbar() {
   const { pathname } = useLocation();
   const { t } = useI18n();
 

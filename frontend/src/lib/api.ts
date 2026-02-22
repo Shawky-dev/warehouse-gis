@@ -23,7 +23,12 @@ export const api = axios.create({
   },
 });
 
-const AUTH_PATHS = new Set(["/landlord/auth/login", "/landlord/auth/refresh", "/landlord/auth/logout"]);
+const LANDLORD_AUTH_PATHS = new Set([
+  "/landlord/auth/login",
+  "/landlord/auth/refresh",
+  "/landlord/auth/logout",
+]);
+const TENANT_AUTH_PATH_PATTERN = /^\/[^/]+\/auth\/(login|refresh|logout)$/;
 
 function isAuthPath(url?: string) {
   if (!url) {
@@ -31,7 +36,7 @@ function isAuthPath(url?: string) {
   }
 
   const normalized = url.startsWith("http") ? new URL(url).pathname : url;
-  return AUTH_PATHS.has(normalized);
+  return LANDLORD_AUTH_PATHS.has(normalized) || TENANT_AUTH_PATH_PATTERN.test(normalized);
 }
 
 api.interceptors.request.use((config) => {
