@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState, type ComponentType } from "react";
+import { useMemo, useState, type ComponentType } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, Shield, Users, Warehouse } from "lucide-react";
+import { Home, List, Plus, Shield, Users, Warehouse } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import {
   Accordion,
@@ -39,7 +39,15 @@ export function LandlordNavbar() {
   const navItems = useMemo<NavItem[]>(
     () => [
       { to: PATHS.LANDLORD.ROOT, label: t("nav.home"), icon: Home, end: true },
-      { to: PATHS.LANDLORD.WAREHOUSES, label: t("nav.warehouses"), icon: Warehouse },
+      {
+        id: "warehouses-management",
+        label: t("nav.warehouses"),
+        icon: Warehouse,
+        children: [
+          { to: PATHS.LANDLORD.WAREHOUSES_CREATE, label: t("nav.warehousesCreate"), icon: Plus },
+          { to: PATHS.LANDLORD.WAREHOUSES_LIST, label: t("nav.warehousesList"), icon: List },
+        ],
+      },
       {
         id: "accounts-management",
         label: t("nav.accounts"),
@@ -62,13 +70,9 @@ export function LandlordNavbar() {
     return activeGroup && isGroupItem(activeGroup) ? activeGroup.id : "";
   }, [navItems, pathname]);
 
-  const [openGroup, setOpenGroup] = useState<string>(activeGroupFromRoute);
-
-  useEffect(() => {
-    if (activeGroupFromRoute) {
-      setOpenGroup(activeGroupFromRoute);
-    }
-  }, [activeGroupFromRoute]);
+  const [openGroups, setOpenGroups] = useState<string[]>(
+    activeGroupFromRoute ? [activeGroupFromRoute] : []
+  );
 
   return (
     <aside className="flex min-h-screen w-56 shrink-0 flex-col border-e bg-background">
@@ -112,8 +116,18 @@ export function LandlordNavbar() {
               key={item.id}
               type="single"
               collapsible
-              value={openGroup === item.id ? item.id : ""}
-              onValueChange={(value) => setOpenGroup(value)}
+              value={openGroups.includes(item.id) || activeGroupFromRoute === item.id ? item.id : ""}
+              onValueChange={(value) => {
+                setOpenGroups((previous) => {
+                  const next = new Set(previous);
+                  if (value === item.id) {
+                    next.add(item.id);
+                  } else {
+                    next.delete(item.id);
+                  }
+                  return Array.from(next);
+                });
+              }}
             >
               <AccordionItem value={item.id} className="border-none">
                 <AccordionTrigger

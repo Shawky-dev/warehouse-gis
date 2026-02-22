@@ -14,6 +14,8 @@ export const enMessages = {
   "logoutModal.confirm": "Sign out",
   "nav.home": "Home",
   "nav.warehouses": "Warehouses",
+  "nav.warehousesCreate": "Create Warehouse",
+  "nav.warehousesList": "Warehouse List",
   "nav.accounts": "Accounts",
   "nav.users": "Users",
   "nav.roles": "Roles",

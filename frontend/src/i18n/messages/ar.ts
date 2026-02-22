@@ -16,6 +16,8 @@ export const arMessages: Record<keyof typeof enMessages, string> = {
   "logoutModal.confirm": "تسجيل الخروج",
   "nav.home": "الرئيسية",
   "nav.warehouses": "المستودعات",
+  "nav.warehousesCreate": "إنشاء مستودع",
+  "nav.warehousesList": "قائمة المستودعات",
   "nav.accounts": "الحسابات",
   "nav.users": "المستخدمون",
   "nav.roles": "الأدوار",

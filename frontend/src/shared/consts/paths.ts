@@ -7,6 +7,8 @@ export const PATHS = {
     ROOT: "/landlord",
     DASHBOARD: "/landlord",
     WAREHOUSES: "/landlord/warehouses",
+    WAREHOUSES_CREATE: "/landlord/warehouses/create",
+    WAREHOUSES_LIST: "/landlord/warehouses/list",
     USERS: "/landlord/users",
     ROLES: "/landlord/roles",
   },
