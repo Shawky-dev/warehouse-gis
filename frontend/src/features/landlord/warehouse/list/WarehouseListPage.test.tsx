@@ -4,6 +4,7 @@ import { http, HttpResponse } from "msw";
 import { server } from "@/test/msw/server";
 import { renderWithRouter } from "@/test/utils/renderWithRouter";
 import WarehouseListPage from "@/features/landlord/warehouse/list/WarehouseListPage";
+import { PATHS } from "@/shared/consts/paths";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 
@@ -20,6 +21,8 @@ describe("WarehouseListPage", () => {
 
     renderWithRouter(<WarehouseListPage />);
 
+    const tenantLink = await screen.findByRole("link", { name: "Go to acme" });
+    expect(tenantLink).toHaveAttribute("href", PATHS.TENANT.root("acme"));
     expect(await screen.findByText("acme")).toBeInTheDocument();
     expect(screen.getByText("beta_schema")).toBeInTheDocument();
   });

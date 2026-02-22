@@ -77,6 +77,8 @@ export const arMessages: Record<keyof typeof enMessages, string> = {
   "warehouses.listLoadFailed": "فشل تحميل المستودعات.",
   "warehouses.listLoading": "جارٍ تحميل المستودعات...",
   "warehouses.listEmpty": "لم يتم العثور على مستودعات.",
+  "warehouses.listTenantPage": "صفحة المستأجر",
+  "warehouses.listGoToTenant": "الانتقال إلى {tenant}",
   "warehouses.createFailedFallback": "فشل إنشاء المستأجر.",
   "pages.usersTitle": "المستخدمون",
   "pages.usersDescription": "إدارة مستخدمي المؤجر.",

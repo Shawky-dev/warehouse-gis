@@ -75,6 +75,8 @@ export const enMessages = {
   "warehouses.listLoadFailed": "Failed to load warehouses.",
   "warehouses.listLoading": "Loading warehouses...",
   "warehouses.listEmpty": "No warehouses found.",
+  "warehouses.listTenantPage": "Tenant page",
+  "warehouses.listGoToTenant": "Go to {tenant}",
   "warehouses.createFailedFallback": "Failed to create tenant.",
   "pages.usersTitle": "Users",
   "pages.usersDescription": "Manage landlord users.",
