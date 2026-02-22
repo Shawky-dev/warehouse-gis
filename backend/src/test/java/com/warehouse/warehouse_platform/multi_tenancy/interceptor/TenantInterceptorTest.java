@@ -80,4 +80,69 @@ class TenantInterceptorTest {
 
         assertEquals("acme", TenantContext.getTenantId());
     }
+
+    @Test
+    void preHandle_shouldUseBootstrapForSwaggerPaths() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/swagger-ui/index.html");
+        request.addHeader("X-TENANT-ID", "acme");
+        request.setServerName("acme.example.com");
+
+        tenantInterceptor.preHandle(new ServletWebRequest(request));
+
+        assertEquals("BOOTSTRAP", TenantContext.getTenantId());
+    }
+
+    @Test
+    void preHandle_shouldUseBootstrapForOpenApiPaths() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/v3/api-docs");
+        request.addHeader("X-TENANT-ID", "acme");
+        request.setServerName("acme.example.com");
+
+        tenantInterceptor.preHandle(new ServletWebRequest(request));
+
+        assertEquals("BOOTSTRAP", TenantContext.getTenantId());
+    }
+
+    @Test
+    void preHandle_shouldUseSubdomainFallbackForApiPaths_whenHeaderMissing() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/warehouses");
+        request.setServerName("acme.example.com");
+
+        tenantInterceptor.preHandle(new ServletWebRequest(request));
+
+        assertEquals("acme", TenantContext.getTenantId());
+    }
+
+    @Test
+    void preHandle_shouldUsePathTenantForTrailingSlashPath() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/acme/");
+        request.addHeader("X-TENANT-ID", "beta");
+        request.setServerName("beta.example.com");
+
+        tenantInterceptor.preHandle(new ServletWebRequest(request));
+
+        assertEquals("acme", TenantContext.getTenantId());
+    }
+
+    @Test
+    void preHandle_shouldUsePathTenantForDoubleSlashAfterTenantSegment() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/acme//products");
+        request.addHeader("X-TENANT-ID", "beta");
+        request.setServerName("beta.example.com");
+
+        tenantInterceptor.preHandle(new ServletWebRequest(request));
+
+        assertEquals("acme", TenantContext.getTenantId());
+    }
+
+    @Test
+    void preHandle_shouldKeepTenantSegmentCaseWhenResolvedFromPath() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/Acme/products");
+        request.addHeader("X-TENANT-ID", "beta");
+        request.setServerName("beta.example.com");
+
+        tenantInterceptor.preHandle(new ServletWebRequest(request));
+
+        assertEquals("Acme", TenantContext.getTenantId());
+    }
 }
