@@ -34,7 +34,7 @@ export default function ScopeLandingPage() {
           <CardTitle>{t("landing.landlordTitle")}</CardTitle>
           <CardDescription>{t("landing.landlordDescription")}</CardDescription>
         </CardHeader>
-        <CardContent className="flex h-full items-end">
+        <CardContent className="flex h-full">
           <Button asChild className="w-full">
             <Link to={PATHS.LANDLORD.AUTH_LOGIN}>{t("landing.landlordAction")}</Link>
           </Button>
