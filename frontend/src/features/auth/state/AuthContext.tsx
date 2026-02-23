@@ -25,6 +25,9 @@ interface AuthContextValue extends AuthState {
   scope: AuthScope | null;
   isAuthenticated: boolean;
   hasRole: (role: string) => boolean;
+  hasPermission: (permission: string) => boolean;
+  hasAnyPermission: (permissions: string[]) => boolean;
+  hasAllPermissions: (permissions: string[]) => boolean;
   bootstrapSession: () => Promise<void>;
   login: (payload: LoginRequest) => Promise<void>;
   logout: () => Promise<void>;
@@ -255,6 +258,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       scope: activeScope,
       isAuthenticated: activeState.status === "authenticated" && !!activeState.accessToken,
       hasRole: (role: string) => !!activeState.user?.roles.includes(role),
+      hasPermission: (permission: string) => !!activeState.user?.permissions.includes(permission),
+      hasAnyPermission: (permissions: string[]) =>
+        permissions.some((permission) => !!activeState.user?.permissions.includes(permission)),
+      hasAllPermissions: (permissions: string[]) =>
+        permissions.every((permission) => !!activeState.user?.permissions.includes(permission)),
       bootstrapSession,
       login,
       logout,

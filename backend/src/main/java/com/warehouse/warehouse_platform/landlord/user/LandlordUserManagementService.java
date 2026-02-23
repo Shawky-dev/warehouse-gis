@@ -3,6 +3,7 @@ package com.warehouse.warehouse_platform.landlord.user;
 import com.warehouse.warehouse_platform.auth.session.RefreshTokenService;
 import com.warehouse.warehouse_platform.user.User;
 import com.warehouse.warehouse_platform.user.UserRepository;
+import com.warehouse.warehouse_platform.user.rbac.Role;
 import com.warehouse.warehouse_platform.user.rbac.RoleRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -20,6 +21,8 @@ import java.util.UUID;
 
 @Service
 public class LandlordUserManagementService {
+
+    private static final String ADMIN_ROLE = "ADMIN";
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
@@ -59,7 +62,7 @@ public class LandlordUserManagementService {
     public UserResult createUser(String email, String password, String role) {
         String normalizedEmail = normalizeEmail(email);
         String normalizedRole = normalizeRole(role);
-        validateRoleIsAssignable(normalizedRole);
+        Role targetRole = loadRoleOrThrow(normalizedRole);
 
         if (userRepository.findByEmail(normalizedEmail).isPresent()) {
             throw LandlordUserManagementException.conflict("Email already exists: " + normalizedEmail);
@@ -68,7 +71,7 @@ public class LandlordUserManagementService {
         User user = User.builder()
                 .email(normalizedEmail)
                 .password(passwordEncoder.encode(password))
-                .role(normalizedRole)
+                .role(targetRole.getCode())
                 .active(true)
                 .build();
 
@@ -82,7 +85,7 @@ public class LandlordUserManagementService {
 
         String normalizedEmail = normalizeEmail(email);
         String normalizedRole = normalizeRole(role);
-        validateRoleIsAssignable(normalizedRole);
+        Role targetRole = loadRoleOrThrow(normalizedRole);
 
         userRepository.findByEmail(normalizedEmail)
                 .filter(existingUser -> !existingUser.getId().equals(userId))
@@ -91,7 +94,7 @@ public class LandlordUserManagementService {
                 });
 
         user.setEmail(normalizedEmail);
-        user.setRole(normalizedRole);
+        user.setRole(targetRole.getCode());
 
         User savedUser = userRepository.save(user);
         return toResult(savedUser);
@@ -108,11 +111,15 @@ public class LandlordUserManagementService {
     }
 
     @Transactional
-    public void deactivateUser(UUID userId, String actorEmail) {
+    public void deactivateUser(UUID userId, String actorEmail, boolean actorIsAdmin) {
         User user = loadUserOrThrow(userId);
 
         if (user.getEmail().equalsIgnoreCase(actorEmail)) {
             throw LandlordUserManagementException.forbidden("You cannot deactivate your own account");
+        }
+
+        if (!actorIsAdmin && ADMIN_ROLE.equalsIgnoreCase(user.getRole())) {
+            throw LandlordUserManagementException.forbidden("Only admins can deactivate admin accounts");
         }
 
         if (!Boolean.FALSE.equals(user.getActive())) {
@@ -124,15 +131,53 @@ public class LandlordUserManagementService {
         refreshTokenService.revokeAllActiveForUser(userId, "DEACTIVATED");
     }
 
+    @Transactional
+    public void reactivateUser(UUID userId) {
+        User user = loadUserOrThrow(userId);
+
+        if (!Boolean.TRUE.equals(user.getActive()) || user.getDeactivatedAt() != null) {
+            user.setActive(true);
+            user.setDeactivatedAt(null);
+            userRepository.save(user);
+        }
+    }
+
     private User loadUserOrThrow(UUID userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> LandlordUserManagementException.notFound("User not found: " + userId));
     }
 
-    private void validateRoleIsAssignable(String role) {
-        if (!roleRepository.existsById(role)) {
-            throw LandlordUserManagementException.badRequest("Role not found: " + role);
+    @Transactional
+    public UserResult createUser(String email, String password, String role, boolean actorIsAdmin) {
+        String normalizedRole = normalizeRole(role);
+        Role targetRole = loadRoleOrThrow(normalizedRole);
+        if (!actorIsAdmin && isRoleLocked(targetRole)) {
+            throw LandlordUserManagementException.forbidden("Locked roles can only be assigned by admins");
         }
+        return createUser(email, password, targetRole.getCode());
+    }
+
+    @Transactional
+    public UserResult updateUser(UUID userId, String email, String role, boolean actorIsAdmin) {
+        User user = loadUserOrThrow(userId);
+        Role currentRole = loadRoleOrThrow(normalizeRole(user.getRole()));
+        Role targetRole = loadRoleOrThrow(normalizeRole(role));
+
+        if (!actorIsAdmin && (isRoleLocked(currentRole) || isRoleLocked(targetRole))) {
+            throw LandlordUserManagementException.forbidden(
+                    "Locked roles can only be assigned or removed by admins");
+        }
+
+        return updateUser(userId, email, targetRole.getCode());
+    }
+
+    private Role loadRoleOrThrow(String roleCode) {
+        return roleRepository.findById(roleCode)
+                .orElseThrow(() -> LandlordUserManagementException.badRequest("Role not found: " + roleCode));
+    }
+
+    private boolean isRoleLocked(Role role) {
+        return Boolean.TRUE.equals(role.getLocked());
     }
 
     private String normalizeRole(String role) {

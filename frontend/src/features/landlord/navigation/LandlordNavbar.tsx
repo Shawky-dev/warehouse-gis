@@ -11,6 +11,8 @@ import {
 import { cn } from "@/lib/utils";
 import { PATHS } from "@/shared/consts/paths";
 import { useI18n } from "@/i18n";
+import { useAuth } from "@/features/auth/context/AuthContext";
+import { LANDLORD_PERMISSIONS } from "@/features/auth/shared/permissions";
 
 type LeafNavItem = {
   to: string;
@@ -35,30 +37,45 @@ function isGroupItem(item: NavItem): item is GroupNavItem {
 export function LandlordNavbar() {
   const { pathname } = useLocation();
   const { t } = useI18n();
+  const { hasPermission } = useAuth();
+
+  const canViewWarehousesList = hasPermission(LANDLORD_PERMISSIONS.TENANTS_VIEW);
+  const canViewWarehousesCreate = hasPermission(LANDLORD_PERMISSIONS.TENANTS_CREATE);
+  const canViewUsers = hasPermission(LANDLORD_PERMISSIONS.USERS_VIEW);
+  const canViewRoles = hasPermission(LANDLORD_PERMISSIONS.ROLES_EDIT);
 
   const navItems = useMemo<NavItem[]>(
-    () => [
-      { to: PATHS.LANDLORD.ROOT, label: t("nav.home"), icon: Home, end: true },
-      {
-        id: "warehouses-management",
-        label: t("nav.warehouses"),
-        icon: Warehouse,
-        children: [
-          { to: PATHS.LANDLORD.WAREHOUSES_CREATE, label: t("nav.warehousesCreate"), icon: Plus },
-          { to: PATHS.LANDLORD.WAREHOUSES_LIST, label: t("nav.warehousesList"), icon: List },
-        ],
-      },
-      {
-        id: "accounts-management",
-        label: t("nav.accounts"),
-        icon: Users,
-        children: [
-          { to: PATHS.LANDLORD.USERS, label: t("nav.users"), icon: Users },
-          { to: PATHS.LANDLORD.ROLES, label: t("nav.roles"), icon: Shield },
-        ],
-      },
-    ],
-    [t]
+    () =>
+      [
+        { to: PATHS.LANDLORD.ROOT, label: t("nav.home"), icon: Home, end: true },
+        {
+          id: "warehouses-management",
+          label: t("nav.warehouses"),
+          icon: Warehouse,
+          children: [
+            ...(canViewWarehousesCreate
+              ? [{ to: PATHS.LANDLORD.WAREHOUSES_CREATE, label: t("nav.warehousesCreate"), icon: Plus }]
+              : []),
+            ...(canViewWarehousesList
+              ? [{ to: PATHS.LANDLORD.WAREHOUSES_LIST, label: t("nav.warehousesList"), icon: List }]
+              : []),
+          ],
+        },
+        {
+          id: "accounts-management",
+          label: t("nav.accounts"),
+          icon: Users,
+          children: [
+            ...(canViewUsers
+              ? [{ to: PATHS.LANDLORD.USERS, label: t("nav.users"), icon: Users }]
+              : []),
+            ...(canViewRoles
+              ? [{ to: PATHS.LANDLORD.ROLES, label: t("nav.roles"), icon: Shield }]
+              : []),
+          ],
+        },
+      ].filter((item) => !isGroupItem(item) || item.children.length > 0),
+    [canViewRoles, canViewUsers, canViewWarehousesCreate, canViewWarehousesList, t]
   );
 
   const activeGroupFromRoute = useMemo(() => {

@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { render, screen } from "@testing-library/react";
 import { RequireAuth } from "@/features/auth/guards/RequireAuth";
 import { RequireRole } from "@/features/auth/guards/RequireRole";
+import { RequirePermission } from "@/features/auth/guards/RequirePermission";
 import { PublicOnly } from "@/features/auth/guards/PublicOnly";
 import { I18nProvider } from "@/i18n";
 
@@ -63,7 +64,24 @@ describe("Auth guards", () => {
     );
 
     expect(screen.queryByText("admin-content")).not.toBeInTheDocument();
-    expect(screen.getByText("login-page")).toBeInTheDocument();
+    expect(screen.getByText("Access denied")).toBeInTheDocument();
+  });
+
+  it("RequirePermission blocks users without permission", () => {
+    mockUseAuth.mockReturnValue({
+      status: "authenticated",
+      hasPermission: () => false,
+    });
+
+    renderGuard(
+      "/landlord/users",
+      <RequirePermission permission="landlord.users.view">
+        <p>users-content</p>
+      </RequirePermission>
+    );
+
+    expect(screen.queryByText("users-content")).not.toBeInTheDocument();
+    expect(screen.getByText("Access denied")).toBeInTheDocument();
   });
 
   it("PublicOnly redirects authenticated users away from login", () => {

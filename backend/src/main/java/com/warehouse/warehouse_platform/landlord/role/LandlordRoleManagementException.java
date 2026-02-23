@@ -25,6 +25,10 @@ public class LandlordRoleManagementException extends RuntimeException {
         return new LandlordRoleManagementException(HttpStatus.CONFLICT, "CONFLICT", message);
     }
 
+    public static LandlordRoleManagementException forbidden(String message) {
+        return new LandlordRoleManagementException(HttpStatus.FORBIDDEN, "FORBIDDEN", message);
+    }
+
     public HttpStatus getStatus() {
         return status;
     }

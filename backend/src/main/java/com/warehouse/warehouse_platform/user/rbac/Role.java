@@ -28,4 +28,8 @@ public class Role {
 
     @Column(length = 255)
     private String description;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean locked = false;
 }

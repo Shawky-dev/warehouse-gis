@@ -2,6 +2,7 @@ package com.warehouse.warehouse_platform.landlord.role;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.authentication.TestingAuthenticationToken;
 
 import java.util.List;
 
@@ -26,19 +27,22 @@ class LandlordRoleControllerTest {
                 "AUDITOR",
                 "Auditor",
                 "Read only",
-                java.util.Set.of("landlord.users.view")))
+                java.util.Set.of("landlord.users.view"),
+                false))
                 .thenReturn(new LandlordRoleManagementService.RoleDetails(
                         "AUDITOR",
                         "Auditor",
                         "Read only",
-                        List.of("landlord.users.view")));
+                        List.of("landlord.users.view"),
+                        false));
 
         var response = controller.createRole(
                 new LandlordRoleController.CreateRoleRequest(
                         "AUDITOR",
                         "Auditor",
                         "Read only",
-                        java.util.Set.of("landlord.users.view")));
+                        java.util.Set.of("landlord.users.view"),
+                        false));
 
         assertEquals(200, response.getStatusCode().value());
         assertEquals("AUDITOR", response.getBody().code());
@@ -65,19 +69,29 @@ class LandlordRoleControllerTest {
                 "MANAGER",
                 "Operations Manager",
                 "Ops scope",
-                java.util.Set.of("landlord.users.view")))
+                java.util.Set.of("landlord.users.view"),
+                true,
+                true))
                 .thenReturn(new LandlordRoleManagementService.RoleDetails(
                         "MANAGER",
                         "Operations Manager",
                         "Ops scope",
-                        List.of("landlord.users.view")));
+                        List.of("landlord.users.view"),
+                        true));
+
+        TestingAuthenticationToken authentication = new TestingAuthenticationToken(
+                "admin@system.local",
+                "n/a",
+                "ROLE_ADMIN");
 
         var response = controller.updateRole(
                 "MANAGER",
                 new LandlordRoleController.UpdateRoleRequest(
                         "Operations Manager",
                         "Ops scope",
-                        java.util.Set.of("landlord.users.view")));
+                        java.util.Set.of("landlord.users.view"),
+                        true),
+                authentication);
 
         assertEquals(200, response.getStatusCode().value());
         assertEquals("MANAGER", response.getBody().code());

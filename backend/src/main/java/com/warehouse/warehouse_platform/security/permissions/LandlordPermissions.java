@@ -9,6 +9,8 @@ public final class LandlordPermissions {
     public static final String USERS_EDIT = "landlord.users.edit";
     public static final String USERS_RESET_PASSWORD = "landlord.users.reset_password";
     public static final String USERS_DEACTIVATE = "landlord.users.deactivate";
+    public static final String USERS_REACTIVATE = "landlord.users.reactivate";
+    public static final String ROLES_EDIT = "landlord.roles.edit";
 
     private LandlordPermissions() {
     }

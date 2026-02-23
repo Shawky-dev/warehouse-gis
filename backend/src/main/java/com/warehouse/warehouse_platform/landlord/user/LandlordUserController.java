@@ -45,22 +45,26 @@ public class LandlordUserController {
     @PostMapping
     @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.LandlordPermissions).USERS_CREATE)")
     public ResponseEntity<LandlordUserManagementService.UserResult> createUser(
-            @Valid @RequestBody CreateUserRequest request) {
+            @Valid @RequestBody CreateUserRequest request,
+            Authentication authentication) {
         return ResponseEntity.ok(landlordUserManagementService.createUser(
                 request.email(),
                 request.password(),
-                request.role()));
+                request.role(),
+                isAdmin(authentication)));
     }
 
     @PutMapping("/{userId}")
     @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.LandlordPermissions).USERS_EDIT)")
     public ResponseEntity<LandlordUserManagementService.UserResult> updateUser(
             @PathVariable UUID userId,
-            @Valid @RequestBody UpdateUserRequest request) {
+            @Valid @RequestBody UpdateUserRequest request,
+            Authentication authentication) {
         return ResponseEntity.ok(landlordUserManagementService.updateUser(
                 userId,
                 request.email(),
-                request.role()));
+                request.role(),
+                isAdmin(authentication)));
     }
 
     @PostMapping("/{userId}/reset-password")
@@ -77,7 +81,14 @@ public class LandlordUserController {
     public ResponseEntity<Void> deactivateUser(
             @PathVariable UUID userId,
             Authentication authentication) {
-        landlordUserManagementService.deactivateUser(userId, authentication.getName());
+        landlordUserManagementService.deactivateUser(userId, authentication.getName(), isAdmin(authentication));
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{userId}/reactivate")
+    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.LandlordPermissions).USERS_REACTIVATE)")
+    public ResponseEntity<Void> reactivateUser(@PathVariable UUID userId) {
+        landlordUserManagementService.reactivateUser(userId);
         return ResponseEntity.noContent().build();
     }
 
@@ -94,5 +105,13 @@ public class LandlordUserController {
 
     public record ResetPasswordRequest(
             @NotBlank @Size(min = 8) String newPassword) {
+    }
+
+    private boolean isAdmin(Authentication authentication) {
+        if (authentication == null || authentication.getAuthorities() == null) {
+            return false;
+        }
+        return authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
     }
 }

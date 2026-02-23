@@ -13,3 +13,17 @@ databaseChangeLog:
         - sqlFile:
             path: db/migration/master/V2__add_rbac_and_user_lifecycle.sql
             relativeToChangelogFile: false
+  - changeSet:
+      id: master-role-locking-3
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/master/V3__add_role_locking.sql
+            relativeToChangelogFile: false
+  - changeSet:
+      id: master-rbac-permissions-4
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/master/V4__add_rbac_permissions_for_reactivation_and_role_edit.sql
+            relativeToChangelogFile: false

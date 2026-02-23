@@ -57,12 +57,14 @@ class LandlordRoleManagementServiceTest {
                 "auditor",
                 "Auditor",
                 "Read only reporting role",
-                Set.of("landlord.users.view", "landlord.users.create"));
+                Set.of("landlord.users.view", "landlord.users.create"),
+                false);
 
         assertEquals("AUDITOR", result.code());
         assertEquals("Auditor", result.name());
         assertEquals("Read only reporting role", result.description());
         assertEquals(List.of("landlord.users.create", "landlord.users.view"), result.permissionCodes());
+        assertEquals(false, result.locked());
 
         ArgumentCaptor<Role> roleCaptor = ArgumentCaptor.forClass(Role.class);
         verify(roleRepository).save(roleCaptor.capture());
@@ -81,7 +83,8 @@ class LandlordRoleManagementServiceTest {
                         "ADMIN",
                         "Admin",
                         "System role",
-                        Set.of("landlord.users.view")));
+                        Set.of("landlord.users.view"),
+                        true));
 
         assertEquals("CONFLICT", exception.getCode());
     }
@@ -107,12 +110,15 @@ class LandlordRoleManagementServiceTest {
                 "manager",
                 "Operations Manager",
                 "Manages user operations",
-                Set.of("landlord.users.view", "landlord.users.create"));
+                Set.of("landlord.users.view", "landlord.users.create"),
+                true,
+                true);
 
         assertEquals("MANAGER", result.code());
         assertEquals("Operations Manager", result.name());
         assertEquals("Manages user operations", result.description());
         assertEquals(List.of("landlord.users.create", "landlord.users.view"), result.permissionCodes());
+        assertEquals(true, result.locked());
 
         verify(roleRepository).save(managerRole);
         verify(rolePermissionRepository).deleteByRole_Code("MANAGER");
@@ -139,7 +145,9 @@ class LandlordRoleManagementServiceTest {
                         "MANAGER",
                         "Manager",
                         "",
-                        Set.of("landlord.users.view", "landlord.users.unknown")));
+                        Set.of("landlord.users.view", "landlord.users.unknown"),
+                        false,
+                        true));
 
         assertEquals("BAD_REQUEST", exception.getCode());
     }
@@ -153,5 +161,127 @@ class LandlordRoleManagementServiceTest {
                 () -> service.getRole("missing"));
 
         assertEquals("NOT_FOUND", exception.getCode());
+    }
+
+    @Test
+    void createRole_shouldRejectUnlockedAdminRole() {
+        when(roleRepository.existsById("ADMIN")).thenReturn(false);
+        when(permissionRepository.findAllById(Set.of("landlord.users.view")))
+                .thenReturn(List.of(Permission.builder().code("landlord.users.view").build()));
+
+        LandlordRoleManagementException exception = assertThrows(
+                LandlordRoleManagementException.class,
+                () -> service.createRole(
+                        "ADMIN",
+                        "Administrator",
+                        "Full access",
+                        Set.of("landlord.users.view"),
+                        false));
+
+        assertEquals("BAD_REQUEST", exception.getCode());
+    }
+
+    @Test
+    void updateRole_shouldRejectUnlockedAdminRole() {
+        Role adminRole = Role.builder()
+                .code("ADMIN")
+                .name("Administrator")
+                .description("Full access")
+                .locked(true)
+                .build();
+
+        when(roleRepository.findById("ADMIN")).thenReturn(Optional.of(adminRole));
+        when(permissionRepository.findAllById(Set.of("landlord.users.view")))
+                .thenReturn(List.of(Permission.builder().code("landlord.users.view").build()));
+
+        LandlordRoleManagementException exception = assertThrows(
+                LandlordRoleManagementException.class,
+                () -> service.updateRole(
+                        "ADMIN",
+                        "Administrator",
+                        "Full access",
+                        Set.of("landlord.users.view"),
+                        false,
+                        true));
+
+        assertEquals("BAD_REQUEST", exception.getCode());
+    }
+
+    @Test
+    void updateRole_shouldRejectNonAdminWhenCurrentRoleIsLocked() {
+        Role lockedRole = Role.builder()
+                .code("SUPERVISOR")
+                .name("Supervisor")
+                .locked(true)
+                .build();
+
+        when(roleRepository.findById("SUPERVISOR")).thenReturn(Optional.of(lockedRole));
+        when(permissionRepository.findAllById(Set.of("landlord.users.view")))
+                .thenReturn(List.of(Permission.builder().code("landlord.users.view").build()));
+
+        LandlordRoleManagementException exception = assertThrows(
+                LandlordRoleManagementException.class,
+                () -> service.updateRole(
+                        "SUPERVISOR",
+                        "Supervisor",
+                        "Locked role",
+                        Set.of("landlord.users.view"),
+                        true,
+                        false));
+
+        assertEquals("FORBIDDEN", exception.getCode());
+    }
+
+    @Test
+    void updateRole_shouldRejectNonAdminWhenChangingLockedFlag() {
+        Role managerRole = Role.builder()
+                .code("MANAGER")
+                .name("Manager")
+                .locked(false)
+                .build();
+
+        when(roleRepository.findById("MANAGER")).thenReturn(Optional.of(managerRole));
+        when(permissionRepository.findAllById(Set.of("landlord.users.view")))
+                .thenReturn(List.of(Permission.builder().code("landlord.users.view").build()));
+
+        LandlordRoleManagementException exception = assertThrows(
+                LandlordRoleManagementException.class,
+                () -> service.updateRole(
+                        "MANAGER",
+                        "Manager",
+                        "Ops",
+                        Set.of("landlord.users.view"),
+                        true,
+                        false));
+
+        assertEquals("FORBIDDEN", exception.getCode());
+    }
+
+    @Test
+    void updateRole_shouldAllowNonAdminWhenRoleIsUnlockedAndLockStateUnchanged() {
+        Role managerRole = Role.builder()
+                .code("MANAGER")
+                .name("Manager")
+                .description("Legacy")
+                .locked(false)
+                .build();
+
+        when(roleRepository.findById("MANAGER")).thenReturn(Optional.of(managerRole));
+        when(permissionRepository.findAllById(Set.of("landlord.users.view")))
+                .thenReturn(List.of(Permission.builder().code("landlord.users.view").build()));
+        when(rolePermissionRepository.findPermissionCodesByRoleCode("MANAGER"))
+                .thenReturn(List.of("landlord.users.view"));
+
+        LandlordRoleManagementService.RoleDetails result = service.updateRole(
+                "MANAGER",
+                "Manager",
+                "Updated by editor",
+                Set.of("landlord.users.view"),
+                false,
+                false);
+
+        assertEquals("MANAGER", result.code());
+        assertEquals("Updated by editor", result.description());
+        assertEquals(false, result.locked());
     }
 }

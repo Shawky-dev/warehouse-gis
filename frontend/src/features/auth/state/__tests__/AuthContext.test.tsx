@@ -65,6 +65,19 @@ function ScopeIsolationProbe() {
   );
 }
 
+function PermissionProbe() {
+  const { hasPermission, hasAnyPermission, hasAllPermissions } = useAuth();
+
+  return (
+    <div>
+      <p data-testid="has-users-view">{String(hasPermission("landlord.users.view"))}</p>
+      <p data-testid="has-any">{String(hasAnyPermission(["landlord.users.view", "landlord.users.edit"]))}</p>
+      <p data-testid="has-all">{String(hasAllPermissions(["landlord.users.view", "landlord.users.create"]))}</p>
+      <p data-testid="missing-all">{String(hasAllPermissions(["landlord.users.view", "landlord.missing"]))}</p>
+    </div>
+  );
+}
+
 describe("AuthContext", () => {
   it("bootstraps session successfully via /landlord/auth/refresh", async () => {
     renderWithRouter(
@@ -133,6 +146,7 @@ describe("AuthContext", () => {
             id: "00000000-0000-0000-0000-000000000002",
             email: "admin@acme.local",
             roles: ["ROLE_ADMIN"],
+            permissions: ["landlord.tenants.view"],
           },
         });
       })
@@ -169,6 +183,11 @@ describe("AuthContext", () => {
             id: "00000000-0000-0000-0000-000000000001",
             email: "admin@system.local",
             roles: ["ROLE_ADMIN"],
+            permissions: [
+              "landlord.tenants.view",
+              "landlord.tenants.create",
+              "landlord.users.view",
+            ],
           },
         });
       }),
@@ -181,6 +200,7 @@ describe("AuthContext", () => {
             id: "00000000-0000-0000-0000-000000000002",
             email: "admin@acme.local",
             roles: ["ROLE_ADMIN"],
+            permissions: ["landlord.tenants.view"],
           },
         });
       }),
@@ -229,6 +249,22 @@ describe("AuthContext", () => {
     await waitFor(() => {
       expect(screen.getByTestId("tenant-email")).toHaveTextContent("none");
       expect(screen.getByTestId("landlord-email")).toHaveTextContent("admin@system.local");
+    });
+  });
+
+  it("exposes permission helpers from authenticated state", async () => {
+    renderWithRouter(
+      <AuthProvider>
+        <PermissionProbe />
+      </AuthProvider>,
+      ["/landlord"]
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("has-users-view")).toHaveTextContent("true");
+      expect(screen.getByTestId("has-any")).toHaveTextContent("true");
+      expect(screen.getByTestId("has-all")).toHaveTextContent("true");
+      expect(screen.getByTestId("missing-all")).toHaveTextContent("false");
     });
   });
 });

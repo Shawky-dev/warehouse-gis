@@ -29,6 +29,7 @@ describe("AvatarMenu language switch", () => {
       user: {
         email: "admin@system.local",
         roles: ["ROLE_ADMIN"],
+        permissions: [],
       },
       logout: vi.fn(),
     });

@@ -1,16 +1,16 @@
-import { useAuth } from "@/features/auth/context/AuthContext";
 import type { ReactNode } from "react";
+import { useAuth } from "@/features/auth/context/AuthContext";
+import { AccessDeniedScreen } from "@/features/auth/components/AccessDeniedScreen";
 import { AuthStatusScreen } from "@/features/auth/components/AuthStatusScreen";
 import { useI18n } from "@/i18n";
-import { AccessDeniedScreen } from "@/features/auth/components/AccessDeniedScreen";
 
-interface RequireRoleProps {
-  role: string;
+interface RequirePermissionProps {
+  permission: string;
   children: ReactNode;
 }
 
-export function RequireRole({ role, children }: RequireRoleProps) {
-  const { status, hasRole } = useAuth();
+export function RequirePermission({ permission, children }: RequirePermissionProps) {
+  const { status, hasPermission } = useAuth();
   const { t } = useI18n();
 
   if (status === "idle" || status === "loading") {
@@ -22,7 +22,7 @@ export function RequireRole({ role, children }: RequireRoleProps) {
     );
   }
 
-  if (!hasRole(role)) {
+  if (!hasPermission(permission)) {
     return <AccessDeniedScreen />;
   }
 

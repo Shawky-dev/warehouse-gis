@@ -5,6 +5,8 @@ import CreateWarehousePage from "./warehouse/create/CreateWarehousePage";
 import WarehouseListPage from "./warehouse/list/WarehouseListPage";
 import UserPage from "./user/UserPage";
 import RolesPage from "./roles/RolesPage";
+import { RequirePermission } from "@/features/auth/guards/RequirePermission";
+import { LANDLORD_PERMISSIONS } from "@/features/auth/shared/permissions";
 
 export const landlordRoutes = [
   {
@@ -17,18 +19,34 @@ export const landlordRoutes = [
   },
   {
     path: PATHS.LANDLORD.WAREHOUSES_CREATE,
-    element: <CreateWarehousePage />,
+    element: (
+      <RequirePermission permission={LANDLORD_PERMISSIONS.TENANTS_CREATE}>
+        <CreateWarehousePage />
+      </RequirePermission>
+    ),
   },
   {
     path: PATHS.LANDLORD.WAREHOUSES_LIST,
-    element: <WarehouseListPage />,
+    element: (
+      <RequirePermission permission={LANDLORD_PERMISSIONS.TENANTS_VIEW}>
+        <WarehouseListPage />
+      </RequirePermission>
+    ),
   },
   {
     path: PATHS.LANDLORD.USERS,
-    element: <UserPage />,
+    element: (
+      <RequirePermission permission={LANDLORD_PERMISSIONS.USERS_VIEW}>
+        <UserPage />
+      </RequirePermission>
+    ),
   },
   {
     path: PATHS.LANDLORD.ROLES,
-    element: <RolesPage />,
+    element: (
+      <RequirePermission permission={LANDLORD_PERMISSIONS.ROLES_EDIT}>
+        <RolesPage />
+      </RequirePermission>
+    ),
   },
 ];

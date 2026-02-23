@@ -15,6 +15,7 @@ function createSession(token: string): AuthResponse {
       id: "00000000-0000-0000-0000-000000000001",
       email: "admin@system.local",
       roles: ["ROLE_ADMIN"],
+      permissions: ["landlord.tenants.view"],
     },
   };
 }

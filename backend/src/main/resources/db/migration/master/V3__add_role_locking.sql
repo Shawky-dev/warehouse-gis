@@ -1,0 +1,6 @@
+ALTER TABLE master.roles
+    ADD COLUMN IF NOT EXISTS locked BOOLEAN NOT NULL DEFAULT FALSE;
+
+UPDATE master.roles
+SET locked = TRUE
+WHERE code = 'ADMIN';

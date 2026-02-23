@@ -23,6 +23,7 @@ import java.util.regex.Pattern;
 @Service
 public class LandlordRoleManagementService {
 
+    private static final String ADMIN_ROLE = "ADMIN";
     private static final Pattern ROLE_CODE_PATTERN = Pattern.compile("^[A-Z0-9_]{2,50}$");
 
     private final RoleRepository roleRepository;
@@ -46,7 +47,8 @@ public class LandlordRoleManagementService {
                         role.getCode(),
                         role.getName(),
                         role.getDescription(),
-                        rolePermissionRepository.findPermissionCodesByRoleCode(role.getCode())))
+                        rolePermissionRepository.findPermissionCodesByRoleCode(role.getCode()),
+                        isLocked(role)))
                 .toList();
     }
 
@@ -69,7 +71,8 @@ public class LandlordRoleManagementService {
             String roleCode,
             String name,
             String description,
-            Set<String> permissionCodes) {
+            Set<String> permissionCodes,
+            Boolean locked) {
         String normalizedRoleCode = normalizeRoleCode(roleCode);
         if (roleRepository.existsById(normalizedRoleCode)) {
             throw LandlordRoleManagementException.conflict("Role already exists: " + normalizedRoleCode);
@@ -77,11 +80,14 @@ public class LandlordRoleManagementService {
 
         Set<String> normalizedPermissionCodes = normalizePermissionCodes(permissionCodes);
         Map<String, Permission> permissionsByCode = resolvePermissionsByCode(normalizedPermissionCodes);
+        boolean normalizedLocked = normalizeLocked(locked);
+        ensureAdminRoleRemainsLocked(normalizedRoleCode, normalizedLocked);
 
         Role role = Role.builder()
                 .code(normalizedRoleCode)
                 .name(normalizeName(name))
                 .description(normalizeDescription(description))
+                .locked(normalizedLocked)
                 .build();
         roleRepository.save(role);
 
@@ -94,13 +100,23 @@ public class LandlordRoleManagementService {
             String roleCode,
             String name,
             String description,
-            Set<String> permissionCodes) {
+            Set<String> permissionCodes,
+            Boolean locked,
+            boolean actorIsAdmin) {
         Role role = loadRole(roleCode);
         Set<String> normalizedPermissionCodes = normalizePermissionCodes(permissionCodes);
         Map<String, Permission> permissionsByCode = resolvePermissionsByCode(normalizedPermissionCodes);
+        boolean normalizedLocked = normalizeLocked(locked);
+
+        if (!actorIsAdmin && (isLocked(role) || normalizedLocked != isLocked(role))) {
+            throw LandlordRoleManagementException.forbidden("Locked roles can only be changed by admins");
+        }
+
+        ensureAdminRoleRemainsLocked(role.getCode(), normalizedLocked);
 
         role.setName(normalizeName(name));
         role.setDescription(normalizeDescription(description));
+        role.setLocked(normalizedLocked);
         roleRepository.save(role);
 
         replaceRolePermissions(role, normalizedPermissionCodes, permissionsByCode);
@@ -113,7 +129,8 @@ public class LandlordRoleManagementService {
                 role.getCode(),
                 role.getName(),
                 role.getDescription(),
-                rolePermissionRepository.findPermissionCodesByRoleCode(role.getCode()));
+                rolePermissionRepository.findPermissionCodesByRoleCode(role.getCode()),
+                isLocked(role));
     }
 
     private Role loadRole(String roleCode) {
@@ -167,6 +184,23 @@ public class LandlordRoleManagementService {
         return normalized;
     }
 
+    private boolean normalizeLocked(Boolean locked) {
+        if (locked == null) {
+            throw LandlordRoleManagementException.badRequest("locked must not be null");
+        }
+        return locked;
+    }
+
+    private void ensureAdminRoleRemainsLocked(String roleCode, boolean locked) {
+        if (ADMIN_ROLE.equals(roleCode) && !locked) {
+            throw LandlordRoleManagementException.badRequest("ADMIN role must remain locked");
+        }
+    }
+
+    private boolean isLocked(Role role) {
+        return Boolean.TRUE.equals(role.getLocked());
+    }
+
     private Map<String, Permission> resolvePermissionsByCode(Set<String> normalizedPermissionCodes) {
         if (normalizedPermissionCodes.isEmpty()) {
             return Map.of();
@@ -210,7 +244,8 @@ public class LandlordRoleManagementService {
             String code,
             String name,
             String description,
-            List<String> permissionCodes) {
+            List<String> permissionCodes,
+            boolean locked) {
     }
 
     public record PermissionOption(
