@@ -16,6 +16,7 @@ import { useI18n } from "@/i18n";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Input } from "@/shared/components/ui/input";
+import { PasswordInput } from "@/shared/components/ui/password-input";
 import { Label } from "@/shared/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -468,11 +469,12 @@ const UserPage = () => {
             </div>
             <div className="space-y-1">
               <Label htmlFor="create-user-password">{t("users.passwordLabel")}</Label>
-              <Input
+              <PasswordInput
                 id="create-user-password"
-                type="password"
                 value={createPassword}
                 onChange={(event) => setCreatePassword(event.target.value)}
+                showLabel={t("common.showPassword")}
+                hideLabel={t("common.hidePassword")}
               />
             </div>
             <div className="space-y-1">
@@ -575,11 +577,12 @@ const UserPage = () => {
           <div className="space-y-3">
             <div className="space-y-1">
               <Label htmlFor="reset-user-password">{t("users.passwordLabel")}</Label>
-              <Input
+              <PasswordInput
                 id="reset-user-password"
-                type="password"
                 value={newPassword}
                 onChange={(event) => setNewPassword(event.target.value)}
+                showLabel={t("common.showPassword")}
+                hideLabel={t("common.hidePassword")}
               />
             </div>
             {dialogError ? <p className="text-xs text-destructive">{dialogError}</p> : null}

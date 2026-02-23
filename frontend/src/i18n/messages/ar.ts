@@ -5,6 +5,8 @@ export const arMessages: Record<keyof typeof enMessages, string> = {
   "common.language": "اللغة",
   "common.english": "الإنجليزية",
   "common.arabic": "العربية",
+  "common.showPassword": "إظهار كلمة المرور",
+  "common.hidePassword": "إخفاء كلمة المرور",
   "avatarMenu.profile": "الملف الشخصي",
   "avatarMenu.settings": "الإعدادات",
   "avatarMenu.lightMode": "الوضع الفاتح",

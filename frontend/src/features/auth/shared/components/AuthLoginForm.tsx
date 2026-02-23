@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Input } from "@/shared/components/ui/input";
+import { PasswordInput } from "@/shared/components/ui/password-input";
 import { Label } from "@/shared/components/ui/label";
 import { Button } from "@/shared/components/ui/button";
 import { useI18n } from "@/i18n";
@@ -59,12 +60,13 @@ export function AuthLoginForm({ title, description, placeholderEmail, onSubmit }
 
             <div className="space-y-1.5">
               <Label htmlFor="password">{t("login.password")}</Label>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
                 value={password}
                 autoComplete="current-password"
                 onChange={(nextEvent) => setPassword(nextEvent.target.value)}
+                showLabel={t("common.showPassword")}
+                hideLabel={t("common.hidePassword")}
                 required
               />
             </div>

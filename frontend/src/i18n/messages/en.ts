@@ -3,6 +3,8 @@ export const enMessages = {
   "common.language": "Language",
   "common.english": "English",
   "common.arabic": "Arabic",
+  "common.showPassword": "Show password",
+  "common.hidePassword": "Hide password",
   "avatarMenu.profile": "Profile",
   "avatarMenu.settings": "Settings",
   "avatarMenu.lightMode": "Light mode",

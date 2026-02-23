@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Input } from "@/shared/components/ui/input";
+import { PasswordInput } from "@/shared/components/ui/password-input";
 import { Label } from "@/shared/components/ui/label";
 import { Badge } from "@/shared/components/ui/badge";
 import { createTenant, extractTenantErrorMessage } from "@/features/landlord/api/tenantApi";
@@ -138,12 +139,13 @@ const CreateWarehousePage = () => {
 
               <div className="space-y-1.5">
                 <Label htmlFor="warehouse-admin-password">{t("warehouses.adminPassword")}</Label>
-                <Input
+                <PasswordInput
                   id="warehouse-admin-password"
-                  type="password"
                   value={adminPassword}
                   onChange={(event) => setAdminPassword(event.target.value)}
                   autoComplete="new-password"
+                  showLabel={t("common.showPassword")}
+                  hideLabel={t("common.hidePassword")}
                   required
                 />
               </div>
