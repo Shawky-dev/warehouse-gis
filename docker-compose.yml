@@ -1,35 +1,92 @@
-version: "3.9"
-
 services:
-
   db:
     image: postgis/postgis:15-3.4
     container_name: warehouse-db
-    restart: always
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: warehouse
-      POSTGRES_USER: warehouse
-      POSTGRES_PASSWORD: warehouse
-    ports:
-      - "5432:5432"
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    secrets:
+      - postgres_password
+    networks:
+      - warehouse-backend
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U warehouse -d warehouse"]
-      interval: 5s
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 10s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: warehouse-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD_FILE: /run/secrets/postgres_password
+      SECURITY_JWT_ISSUER: ${SECURITY_JWT_ISSUER}
+      SECURITY_JWT_AUDIENCE: ${SECURITY_JWT_AUDIENCE}
+      SECURITY_JWT_ACCESS_TOKEN_TTL: ${SECURITY_JWT_ACCESS_TOKEN_TTL}
+      SECURITY_JWT_REFRESH_TOKEN_TTL: ${SECURITY_JWT_REFRESH_TOKEN_TTL}
+      SECURITY_JWT_KEY_ID: ${SECURITY_JWT_KEY_ID}
+      SECURITY_JWT_PRIVATE_KEY: file:/run/secrets/jwt_private_key
+      SECURITY_JWT_PUBLIC_KEY: file:/run/secrets/jwt_public_key
+      SECURITY_AUTH_REFRESH_COOKIE_NAME: ${SECURITY_AUTH_REFRESH_COOKIE_NAME}
+      SECURITY_AUTH_REFRESH_COOKIE_PATH: ${SECURITY_AUTH_REFRESH_COOKIE_PATH}
+      SECURITY_AUTH_REFRESH_COOKIE_SAME_SITE: ${SECURITY_AUTH_REFRESH_COOKIE_SAME_SITE}
+      SECURITY_AUTH_REFRESH_COOKIE_SECURE: ${SECURITY_AUTH_REFRESH_COOKIE_SECURE}
+      SECURITY_AUTH_REFRESH_COOKIE_DOMAIN: ${SECURITY_AUTH_REFRESH_COOKIE_DOMAIN}
+      SECURITY_CORS_ALLOWED_ORIGIN_PATTERNS: ${SECURITY_CORS_ALLOWED_ORIGIN_PATTERNS}
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
+      JAVA_OPTS: ${JAVA_OPTS}
+    secrets:
+      - postgres_password
+      - jwt_private_key
+      - jwt_public_key
+    expose:
+      - "8080"
+    networks:
+      - warehouse-backend
+      - warehouse-frontend
 
   frontend:
-    image: node:20
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL}
     container_name: warehouse-frontend
-    working_dir: /app
-    volumes:
-      - ./frontend:/app
+    restart: unless-stopped
+    depends_on:
+      - backend
     ports:
-      - "3000:3000"
-    environment:
-      CHOKIDAR_USEPOLLING: "true"
-    command: sh -c "npm install && npm run dev -- --host"
+      - "${FRONTEND_PORT}:8080"
+    networks:
+      - warehouse-frontend
+
+networks:
+  warehouse-backend:
+    driver: bridge
+  warehouse-frontend:
+    driver: bridge
+
 volumes:
   postgres_data:
+
+secrets:
+  postgres_password:
+    file: ${POSTGRES_PASSWORD_FILE}
+  jwt_private_key:
+    file: ${JWT_PRIVATE_KEY_FILE}
+  jwt_public_key:
+    file: ${JWT_PUBLIC_KEY_FILE}

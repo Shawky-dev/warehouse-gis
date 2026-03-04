@@ -54,7 +54,7 @@ public class TenantAuthController {
                     resolveClientIp(httpRequest),
                     httpRequest.getHeader(HttpHeaders.USER_AGENT));
 
-            writeRefreshCookie(httpResponse, result.refreshToken(), result.refreshTokenExpiresAt(), tenantSlug);
+            writeRefreshCookie(httpRequest, httpResponse, result.refreshToken(), result.refreshTokenExpiresAt(), tenantSlug);
             return ResponseEntity.ok(AuthResponse.from(result));
         });
     }
@@ -77,7 +77,7 @@ public class TenantAuthController {
                     resolveClientIp(httpRequest),
                     httpRequest.getHeader(HttpHeaders.USER_AGENT));
 
-            writeRefreshCookie(httpResponse, result.refreshToken(), result.refreshTokenExpiresAt(), tenantSlug);
+            writeRefreshCookie(httpRequest, httpResponse, result.refreshToken(), result.refreshTokenExpiresAt(), tenantSlug);
             return ResponseEntity.ok(AuthResponse.from(result));
         });
     }
@@ -95,7 +95,7 @@ public class TenantAuthController {
                 authService.logout(refreshToken);
             }
 
-            clearRefreshCookie(httpResponse, tenantSlug);
+            clearRefreshCookie(httpRequest, httpResponse, tenantSlug);
             return ResponseEntity.noContent().build();
         });
     }
@@ -122,6 +122,7 @@ public class TenantAuthController {
     }
 
     private void writeRefreshCookie(
+            HttpServletRequest httpRequest,
             HttpServletResponse httpResponse,
             String refreshToken,
             Instant expiresAt,
@@ -133,7 +134,7 @@ public class TenantAuthController {
                 .httpOnly(true)
                 .secure(refreshCookieProperties.secure())
                 .sameSite(refreshCookieProperties.sameSite())
-                .path(resolveTenantRefreshPath(tenantSlug))
+                .path(resolveCookiePath(httpRequest, resolveTenantRefreshPath(tenantSlug)))
                 .maxAge(maxAgeSeconds);
 
         if (refreshCookieProperties.domain() != null && !refreshCookieProperties.domain().isBlank()) {
@@ -143,13 +144,13 @@ public class TenantAuthController {
         httpResponse.addHeader(HttpHeaders.SET_COOKIE, cookieBuilder.build().toString());
     }
 
-    private void clearRefreshCookie(HttpServletResponse httpResponse, String tenantSlug) {
+    private void clearRefreshCookie(HttpServletRequest httpRequest, HttpServletResponse httpResponse, String tenantSlug) {
         ResponseCookie.ResponseCookieBuilder cookieBuilder = ResponseCookie
                 .from(refreshCookieProperties.name(), "")
                 .httpOnly(true)
                 .secure(refreshCookieProperties.secure())
                 .sameSite(refreshCookieProperties.sameSite())
-                .path(resolveTenantRefreshPath(tenantSlug))
+                .path(resolveCookiePath(httpRequest, resolveTenantRefreshPath(tenantSlug)))
                 .maxAge(0);
 
         if (refreshCookieProperties.domain() != null && !refreshCookieProperties.domain().isBlank()) {
@@ -181,6 +182,20 @@ public class TenantAuthController {
             basePath = "/auth";
         }
         return "/" + tenantSlug + basePath;
+    }
+
+    private String resolveCookiePath(HttpServletRequest request, String cookiePath) {
+        String forwardedPrefix = request.getHeader("X-Forwarded-Prefix");
+        if (forwardedPrefix == null || forwardedPrefix.isBlank() || "/".equals(forwardedPrefix)) {
+            return cookiePath;
+        }
+
+        String normalizedPrefix = forwardedPrefix.startsWith("/") ? forwardedPrefix : "/" + forwardedPrefix;
+        if (normalizedPrefix.endsWith("/")) {
+            normalizedPrefix = normalizedPrefix.substring(0, normalizedPrefix.length() - 1);
+        }
+
+        return normalizedPrefix + cookiePath;
     }
 
     private static String resolveClientIp(HttpServletRequest request) {

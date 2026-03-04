@@ -1,17 +1,27 @@
-# JWT Dev Keys
+# JWT Key Material
 
-This folder stores local development RSA keys for JWT signing (`RS256`).
+Do not commit real private keys to the repository.
 
-Files:
-- `jwt-private.pem` (never commit)
-- `jwt-public.pem`
+## Production (recommended)
 
-Generate/rotate locally:
+Use Docker secrets and provide key files from outside git:
+
+- `./secrets/jwt-private.pem`
+- `./secrets/jwt-public.pem`
+
+`docker-compose.yml` mounts them at runtime as:
+
+- `/run/secrets/jwt_private_key`
+- `/run/secrets/jwt_public_key`
+
+## Generate / rotate keys
+
+Run from the repository root:
 
 ```bash
-openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 -out keys/jwt-private.pem
-openssl rsa -pubout -in keys/jwt-private.pem -out keys/jwt-public.pem
+mkdir -p secrets
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 -out secrets/jwt-private.pem
+openssl rsa -pubout -in secrets/jwt-private.pem -out secrets/jwt-public.pem
 ```
 
-After rotating keys, update `security.jwt.key-id` in `src/main/resources/application.yaml`.
-In production, key material should come from a secure secret manager or KMS.
+After rotating keys, update `SECURITY_JWT_KEY_ID` in `.env`.

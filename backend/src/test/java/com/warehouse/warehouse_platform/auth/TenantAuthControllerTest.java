@@ -83,6 +83,35 @@ class TenantAuthControllerTest {
     }
 
     @Test
+    void login_shouldPrefixTenantCookiePath_whenForwardedPrefixHeaderIsPresent() {
+        Instant accessExp = Instant.now().plusSeconds(600);
+        Instant refreshExp = Instant.now().plusSeconds(1200);
+        when(tenantRepository.findByTenantId("acme")).thenReturn(Optional.of(Tenant.builder().tenantId("acme").build()));
+
+        when(authService.login(eq(new LoginRequest("admin@acme.local", "admin1234")), eq("127.0.0.1"), eq("bruno")))
+                .thenReturn(new AuthService.AuthResult(
+                        "access-token",
+                        accessExp,
+                        "refresh-token",
+                        refreshExp,
+                        UUID.randomUUID(),
+                        "admin@acme.local",
+                        List.of("ROLE_ADMIN"),
+                        List.of("landlord.users.view")));
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRemoteAddr("127.0.0.1");
+        request.addHeader(HttpHeaders.USER_AGENT, "bruno");
+        request.addHeader("X-Forwarded-Prefix", "/api");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        controller.login("acme", new LoginRequest("admin@acme.local", "admin1234"), request, response);
+
+        String setCookie = response.getHeader(HttpHeaders.SET_COOKIE);
+        assertTrue(setCookie.contains("Path=/api/acme/auth"));
+    }
+
+    @Test
     void refresh_shouldThrow_whenRefreshCookieMissing() {
         when(tenantRepository.findByTenantId("acme")).thenReturn(Optional.of(Tenant.builder().tenantId("acme").build()));
         MockHttpServletRequest request = new MockHttpServletRequest();

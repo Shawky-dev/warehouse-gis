@@ -37,7 +37,7 @@ public class AuthController {
                     resolveClientIp(httpRequest),
                     httpRequest.getHeader(HttpHeaders.USER_AGENT));
 
-            writeRefreshCookie(httpResponse, result.refreshToken(), result.refreshTokenExpiresAt());
+            writeRefreshCookie(httpRequest, httpResponse, result.refreshToken(), result.refreshTokenExpiresAt());
             return ResponseEntity.ok(AuthResponse.from(result));
         });
     }
@@ -58,7 +58,7 @@ public class AuthController {
                     resolveClientIp(httpRequest),
                     httpRequest.getHeader(HttpHeaders.USER_AGENT));
 
-            writeRefreshCookie(httpResponse, result.refreshToken(), result.refreshTokenExpiresAt());
+            writeRefreshCookie(httpRequest, httpResponse, result.refreshToken(), result.refreshTokenExpiresAt());
             return ResponseEntity.ok(AuthResponse.from(result));
         });
     }
@@ -74,12 +74,16 @@ public class AuthController {
                 authService.logout(refreshToken);
             }
 
-            clearRefreshCookie(httpResponse);
+            clearRefreshCookie(httpRequest, httpResponse);
             return ResponseEntity.noContent().build();
         });
     }
 
-    private void writeRefreshCookie(HttpServletResponse httpResponse, String refreshToken, Instant expiresAt) {
+    private void writeRefreshCookie(
+            HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse,
+            String refreshToken,
+            Instant expiresAt) {
         long maxAgeSeconds = Math.max(0, Duration.between(Instant.now(), expiresAt).getSeconds());
 
         ResponseCookie.ResponseCookieBuilder cookieBuilder = ResponseCookie
@@ -87,7 +91,7 @@ public class AuthController {
                 .httpOnly(true)
                 .secure(refreshCookieProperties.secure())
                 .sameSite(refreshCookieProperties.sameSite())
-                .path(refreshCookieProperties.path())
+                .path(resolveCookiePath(httpRequest, refreshCookieProperties.path()))
                 .maxAge(maxAgeSeconds);
 
         if (refreshCookieProperties.domain() != null && !refreshCookieProperties.domain().isBlank()) {
@@ -97,13 +101,13 @@ public class AuthController {
         httpResponse.addHeader(HttpHeaders.SET_COOKIE, cookieBuilder.build().toString());
     }
 
-    private void clearRefreshCookie(HttpServletResponse httpResponse) {
+    private void clearRefreshCookie(HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
         ResponseCookie.ResponseCookieBuilder cookieBuilder = ResponseCookie
                 .from(refreshCookieProperties.name(), "")
                 .httpOnly(true)
                 .secure(refreshCookieProperties.secure())
                 .sameSite(refreshCookieProperties.sameSite())
-                .path(refreshCookieProperties.path())
+                .path(resolveCookiePath(httpRequest, refreshCookieProperties.path()))
                 .maxAge(0);
 
         if (refreshCookieProperties.domain() != null && !refreshCookieProperties.domain().isBlank()) {
@@ -111,6 +115,22 @@ public class AuthController {
         }
 
         httpResponse.addHeader(HttpHeaders.SET_COOKIE, cookieBuilder.build().toString());
+    }
+
+    private String resolveCookiePath(HttpServletRequest request, String configuredPath) {
+        String normalizedPath = configuredPath.startsWith("/") ? configuredPath : "/" + configuredPath;
+        String forwardedPrefix = request.getHeader("X-Forwarded-Prefix");
+
+        if (forwardedPrefix == null || forwardedPrefix.isBlank() || "/".equals(forwardedPrefix)) {
+            return normalizedPath;
+        }
+
+        String normalizedPrefix = forwardedPrefix.startsWith("/") ? forwardedPrefix : "/" + forwardedPrefix;
+        if (normalizedPrefix.endsWith("/")) {
+            normalizedPrefix = normalizedPrefix.substring(0, normalizedPrefix.length() - 1);
+        }
+
+        return normalizedPrefix + normalizedPath;
     }
 
     private String extractRefreshCookie(HttpServletRequest request) {

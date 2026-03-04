@@ -1,0 +1,10 @@
+# Local environment and secret material
+.env
+.env.local
+.env.production
+secrets/*
+!secrets/README.md
+!secrets/.gitkeep
+
+# Backend local key files (legacy/dev)
+backend/keys/*.pem
