@@ -1,0 +1,29 @@
+session_name: warehouse-prod
+start_directory: .
+
+windows:
+  - window_name: infra
+    layout: even-vertical
+    panes:
+      - docker compose up -d
+      - watch -n 3 docker compose ps
+
+  - window_name: logs
+    layout: tiled
+    panes:
+      - docker compose logs -f --tail=200 backend
+      - docker compose logs -f --tail=200 frontend
+      - docker compose logs -f --tail=200 db
+
+  - window_name: ngrok
+    panes:
+      - >
+        bash -lc '
+        if [ -n "${NGROK_AUTHTOKEN:-}" ]; then
+          ngrok config add-authtoken "$NGROK_AUTHTOKEN" >/dev/null 2>&1 || true;
+        fi;
+        if [ -n "${NGROK_DOMAIN:-}" ]; then
+          exec ngrok http --domain="$NGROK_DOMAIN" 80;
+        else
+          exec ngrok http 80;
+        fi'

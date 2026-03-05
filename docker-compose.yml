@@ -61,6 +61,8 @@ services:
     networks:
       - warehouse-backend
       - warehouse-frontend
+    ports:
+      - "3000:8080"
 
   frontend:
     build:
