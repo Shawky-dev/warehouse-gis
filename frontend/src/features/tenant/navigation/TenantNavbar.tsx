@@ -1,11 +1,13 @@
-import type { ComponentType } from "react";
+import { useMemo, type ComponentType } from "react";
 import { NavLink, useParams } from "react-router-dom";
-import { Home, Box, Warehouse } from "lucide-react";
+import { Home, Box, Shield, Users, Warehouse } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { PATHS } from "@/shared/consts/paths";
 import { useI18n } from "@/i18n";
 import { normalizeTenantSlug } from "@/features/auth/shared/scope";
+import { useAuth } from "@/features/auth/context/AuthContext";
+import { TENANT_PERMISSIONS } from "@/features/auth/shared/permissions";
 
 type TenantNavItem = {
   to: string;
@@ -16,22 +18,48 @@ type TenantNavItem = {
 
 export function TenantNavbar() {
   const { t } = useI18n();
+  const { hasPermission } = useAuth();
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
   const normalizedSlug = normalizeTenantSlug(tenantSlug ?? "");
 
-  const navItems: TenantNavItem[] = [
-    {
-      to: PATHS.TENANT.root(normalizedSlug),
-      label: t("tenant.nav.dashboard"),
-      icon: Home,
-      end: true,
-    },
-    {
-      to: PATHS.TENANT.products(normalizedSlug),
-      label: t("tenant.nav.products"),
-      icon: Box,
-    },
-  ];
+  const canViewUsers = hasPermission(TENANT_PERMISSIONS.USERS_VIEW);
+  const canViewRoles = hasPermission(TENANT_PERMISSIONS.ROLES_EDIT);
+
+  const navItems = useMemo<TenantNavItem[]>(
+    () =>
+      [
+        {
+          to: PATHS.TENANT.root(normalizedSlug),
+          label: t("tenant.nav.dashboard"),
+          icon: Home,
+          end: true,
+        },
+        {
+          to: PATHS.TENANT.products(normalizedSlug),
+          label: t("tenant.nav.products"),
+          icon: Box,
+        },
+        ...(canViewUsers
+          ? [
+              {
+                to: PATHS.TENANT.users(normalizedSlug),
+                label: t("tenant.nav.users"),
+                icon: Users,
+              },
+            ]
+          : []),
+        ...(canViewRoles
+          ? [
+              {
+                to: PATHS.TENANT.roles(normalizedSlug),
+                label: t("tenant.nav.roles"),
+                icon: Shield,
+              },
+            ]
+          : []),
+      ],
+    [canViewRoles, canViewUsers, normalizedSlug, t]
+  );
 
   return (
     <aside className="flex min-h-screen w-56 shrink-0 flex-col border-e bg-background">
