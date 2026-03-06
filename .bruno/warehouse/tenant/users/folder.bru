@@ -1,0 +1,24 @@
+meta {
+  name: users
+  seq: 3
+}
+
+auth {
+  mode: inherit
+}
+
+vars:pre-request {
+  TENANT_USER_ID: 00000000-0000-0000-0000-000000000001
+  TENANT_USER_EMAIL: manager@acme.local
+  TENANT_USER_PASSWORD: manager1234
+  TENANT_USER_ROLE: MANAGER
+  TENANT_USER_UPDATED_EMAIL: manager.updated@acme.local
+  TENANT_USER_UPDATED_ROLE: ADMIN
+  TENANT_USER_NEW_PASSWORD: manager12345
+  TENANT_ROLE_CODE: MANAGER
+  TENANT_NEW_ROLE_CODE: AUDITOR
+  TENANT_NEW_ROLE_NAME: Auditor
+  TENANT_NEW_ROLE_DESCRIPTION: Read-only tenant role
+  TENANT_NEW_ROLE_LOCKED: false
+  TENANT_ROLE_LOCKED: false
+}

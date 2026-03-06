@@ -1,0 +1,247 @@
+package com.warehouse.warehouse_platform.rbac.role;
+
+import com.warehouse.warehouse_platform.user.rbac.Permission;
+import com.warehouse.warehouse_platform.user.rbac.PermissionRepository;
+import com.warehouse.warehouse_platform.user.rbac.Role;
+import com.warehouse.warehouse_platform.user.rbac.RolePermission;
+import com.warehouse.warehouse_platform.user.rbac.RolePermissionId;
+import com.warehouse.warehouse_platform.user.rbac.RolePermissionRepository;
+import com.warehouse.warehouse_platform.user.rbac.RoleRepository;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.regex.Pattern;
+
+public class RoleManagementCoreService {
+
+    private static final String ADMIN_ROLE = "ADMIN";
+    private static final Pattern ROLE_CODE_PATTERN = Pattern.compile("^[A-Z0-9_]{2,50}$");
+
+    private final RoleRepository roleRepository;
+    private final PermissionRepository permissionRepository;
+    private final RolePermissionRepository rolePermissionRepository;
+
+    public RoleManagementCoreService(
+            RoleRepository roleRepository,
+            PermissionRepository permissionRepository,
+            RolePermissionRepository rolePermissionRepository) {
+        this.roleRepository = roleRepository;
+        this.permissionRepository = permissionRepository;
+        this.rolePermissionRepository = rolePermissionRepository;
+    }
+
+    public List<RoleDetails> listRoles() {
+        return roleRepository.findAll().stream()
+                .sorted(Comparator.comparing(Role::getCode))
+                .map(role -> new RoleDetails(
+                        role.getCode(),
+                        role.getName(),
+                        role.getDescription(),
+                        rolePermissionRepository.findPermissionCodesByRoleCode(role.getCode()),
+                        isLocked(role)))
+                .toList();
+    }
+
+    public RoleDetails getRole(String roleCode) {
+        Role role = loadRole(roleCode);
+        return toDetails(role);
+    }
+
+    public List<PermissionOption> listPermissions() {
+        return permissionRepository.findAll().stream()
+                .sorted(Comparator.comparing(Permission::getCode))
+                .map(permission -> new PermissionOption(permission.getCode(), permission.getDescription()))
+                .toList();
+    }
+
+    public RoleDetails createRole(
+            String roleCode,
+            String name,
+            String description,
+            Set<String> permissionCodes,
+            Boolean locked) {
+        String normalizedRoleCode = normalizeRoleCode(roleCode);
+        if (roleRepository.existsById(normalizedRoleCode)) {
+            throw RoleManagementCoreException.conflict("Role already exists: " + normalizedRoleCode);
+        }
+
+        Set<String> normalizedPermissionCodes = normalizePermissionCodes(permissionCodes);
+        Map<String, Permission> permissionsByCode = resolvePermissionsByCode(normalizedPermissionCodes);
+        boolean normalizedLocked = normalizeLocked(locked);
+        ensureAdminRoleRemainsLocked(normalizedRoleCode, normalizedLocked);
+
+        Role role = Role.builder()
+                .code(normalizedRoleCode)
+                .name(normalizeName(name))
+                .description(normalizeDescription(description))
+                .locked(normalizedLocked)
+                .build();
+        roleRepository.save(role);
+
+        replaceRolePermissions(role, normalizedPermissionCodes, permissionsByCode);
+        return toDetails(role);
+    }
+
+    public RoleDetails updateRole(
+            String roleCode,
+            String name,
+            String description,
+            Set<String> permissionCodes,
+            Boolean locked,
+            boolean actorIsAdmin) {
+        Role role = loadRole(roleCode);
+        Set<String> normalizedPermissionCodes = normalizePermissionCodes(permissionCodes);
+        Map<String, Permission> permissionsByCode = resolvePermissionsByCode(normalizedPermissionCodes);
+        boolean normalizedLocked = normalizeLocked(locked);
+
+        if (!actorIsAdmin && (isLocked(role) || normalizedLocked != isLocked(role))) {
+            throw RoleManagementCoreException.forbidden("Locked roles can only be changed by admins");
+        }
+
+        ensureAdminRoleRemainsLocked(role.getCode(), normalizedLocked);
+
+        role.setName(normalizeName(name));
+        role.setDescription(normalizeDescription(description));
+        role.setLocked(normalizedLocked);
+        roleRepository.save(role);
+
+        replaceRolePermissions(role, normalizedPermissionCodes, permissionsByCode);
+
+        return toDetails(role);
+    }
+
+    private RoleDetails toDetails(Role role) {
+        return new RoleDetails(
+                role.getCode(),
+                role.getName(),
+                role.getDescription(),
+                rolePermissionRepository.findPermissionCodesByRoleCode(role.getCode()),
+                isLocked(role));
+    }
+
+    private Role loadRole(String roleCode) {
+        String normalizedRoleCode = normalizeRoleCode(roleCode);
+        return roleRepository.findById(normalizedRoleCode)
+                .orElseThrow(() -> RoleManagementCoreException.notFound("Role not found: " + normalizedRoleCode));
+    }
+
+    private String normalizeRoleCode(String roleCode) {
+        if (roleCode == null || roleCode.isBlank()) {
+            throw RoleManagementCoreException.badRequest("roleCode must not be blank");
+        }
+        String normalizedRoleCode = roleCode.trim().toUpperCase(Locale.ROOT);
+        if (!ROLE_CODE_PATTERN.matcher(normalizedRoleCode).matches()) {
+            throw RoleManagementCoreException.badRequest(
+                    "roleCode must contain only letters, numbers, or underscore (2-50 chars)");
+        }
+        return normalizedRoleCode;
+    }
+
+    private String normalizeName(String name) {
+        if (name == null || name.isBlank()) {
+            throw RoleManagementCoreException.badRequest("name must not be blank");
+        }
+        return name.trim();
+    }
+
+    private String normalizeDescription(String description) {
+        if (description == null) {
+            return null;
+        }
+        String normalized = description.trim();
+        return normalized.isBlank() ? null : normalized;
+    }
+
+    private Set<String> normalizePermissionCodes(Set<String> permissionCodes) {
+        if (permissionCodes == null) {
+            throw RoleManagementCoreException.badRequest("permissionCodes must not be null");
+        }
+
+        Set<String> normalized = permissionCodes.stream()
+                .map(code -> code == null ? "" : code.trim())
+                .map(code -> code.toLowerCase(Locale.ROOT))
+                .filter(code -> !code.isBlank())
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+
+        if (normalized.size() != permissionCodes.size()) {
+            throw RoleManagementCoreException.badRequest("permissionCodes must not contain blank values");
+        }
+
+        return normalized;
+    }
+
+    private boolean normalizeLocked(Boolean locked) {
+        if (locked == null) {
+            throw RoleManagementCoreException.badRequest("locked must not be null");
+        }
+        return locked;
+    }
+
+    private void ensureAdminRoleRemainsLocked(String roleCode, boolean locked) {
+        if (ADMIN_ROLE.equals(roleCode) && !locked) {
+            throw RoleManagementCoreException.badRequest("ADMIN role must remain locked");
+        }
+    }
+
+    private boolean isLocked(Role role) {
+        return Boolean.TRUE.equals(role.getLocked());
+    }
+
+    private Map<String, Permission> resolvePermissionsByCode(Set<String> normalizedPermissionCodes) {
+        if (normalizedPermissionCodes.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<String, Permission> permissionsByCode = permissionRepository.findAllById(normalizedPermissionCodes).stream()
+                .collect(java.util.stream.Collectors.toMap(Permission::getCode, Function.identity()));
+
+        if (permissionsByCode.size() != normalizedPermissionCodes.size()) {
+            Set<String> missing = new java.util.TreeSet<>(normalizedPermissionCodes);
+            missing.removeAll(permissionsByCode.keySet());
+            throw RoleManagementCoreException.badRequest("Unknown permission codes: " + String.join(", ", missing));
+        }
+
+        return permissionsByCode;
+    }
+
+    private void replaceRolePermissions(
+            Role role,
+            Set<String> normalizedPermissionCodes,
+            Map<String, Permission> permissionsByCode) {
+        rolePermissionRepository.deleteByRole_Code(role.getCode());
+
+        if (normalizedPermissionCodes.isEmpty()) {
+            return;
+        }
+
+        List<RolePermission> rolePermissions = new ArrayList<>();
+        for (String permissionCode : normalizedPermissionCodes) {
+            Permission permission = permissionsByCode.get(permissionCode);
+            rolePermissions.add(RolePermission.builder()
+                    .id(new RolePermissionId(role.getCode(), permissionCode))
+                    .role(role)
+                    .permission(permission)
+                    .build());
+        }
+        rolePermissionRepository.saveAll(rolePermissions);
+    }
+
+    public record RoleDetails(
+            String code,
+            String name,
+            String description,
+            List<String> permissionCodes,
+            boolean locked) {
+    }
+
+    public record PermissionOption(
+            String code,
+            String description) {
+    }
+}

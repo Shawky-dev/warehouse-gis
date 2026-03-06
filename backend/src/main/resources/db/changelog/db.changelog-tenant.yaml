@@ -27,3 +27,10 @@ databaseChangeLog:
         - sqlFile:
             path: db/migration/tenant/V4__add_rbac_permissions_for_reactivation_and_role_edit.sql
             relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-rbac-namespace-5
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V5__replace_landlord_permissions_with_tenant_permissions.sql
+            relativeToChangelogFile: false

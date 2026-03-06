@@ -1,0 +1,31 @@
+meta {
+  name: update-user
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{URL}}/{{TENANT_SLUG}}/users/{{TENANT_USER_ID}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+body:json {
+  {
+    "email": "{{TENANT_USER_UPDATED_EMAIL}}",
+    "role": "{{TENANT_USER_UPDATED_ROLE}}"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

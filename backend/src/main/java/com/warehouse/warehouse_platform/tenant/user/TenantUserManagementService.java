@@ -1,4 +1,4 @@
-package com.warehouse.warehouse_platform.landlord.user;
+package com.warehouse.warehouse_platform.tenant.user;
 
 import com.warehouse.warehouse_platform.auth.session.RefreshTokenService;
 import com.warehouse.warehouse_platform.rbac.user.UserManagementCoreException;
@@ -14,11 +14,11 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
-public class LandlordUserManagementService {
+public class TenantUserManagementService {
 
     private final UserManagementCoreService userManagementCoreService;
 
-    public LandlordUserManagementService(
+    public TenantUserManagementService(
             UserRepository userRepository,
             RoleRepository roleRepository,
             PasswordEncoder passwordEncoder,
@@ -35,52 +35,7 @@ public class LandlordUserManagementService {
         try {
             return toResult(userManagementCoreService.listUsers(page, size, search, active));
         } catch (UserManagementCoreException exception) {
-            throw toLandlordException(exception);
-        }
-    }
-
-    @Transactional
-    public UserResult createUser(String email, String password, String role) {
-        try {
-            return toResult(userManagementCoreService.createUser(email, password, role));
-        } catch (UserManagementCoreException exception) {
-            throw toLandlordException(exception);
-        }
-    }
-
-    @Transactional
-    public UserResult updateUser(UUID userId, String email, String role) {
-        try {
-            return toResult(userManagementCoreService.updateUser(userId, email, role));
-        } catch (UserManagementCoreException exception) {
-            throw toLandlordException(exception);
-        }
-    }
-
-    @Transactional
-    public void resetPassword(UUID userId, String newPassword) {
-        try {
-            userManagementCoreService.resetPassword(userId, newPassword);
-        } catch (UserManagementCoreException exception) {
-            throw toLandlordException(exception);
-        }
-    }
-
-    @Transactional
-    public void deactivateUser(UUID userId, String actorEmail, boolean actorIsAdmin) {
-        try {
-            userManagementCoreService.deactivateUser(userId, actorEmail, actorIsAdmin);
-        } catch (UserManagementCoreException exception) {
-            throw toLandlordException(exception);
-        }
-    }
-
-    @Transactional
-    public void reactivateUser(UUID userId) {
-        try {
-            userManagementCoreService.reactivateUser(userId);
-        } catch (UserManagementCoreException exception) {
-            throw toLandlordException(exception);
+            throw toTenantException(exception);
         }
     }
 
@@ -89,7 +44,7 @@ public class LandlordUserManagementService {
         try {
             return toResult(userManagementCoreService.createUser(email, password, role, actorIsAdmin));
         } catch (UserManagementCoreException exception) {
-            throw toLandlordException(exception);
+            throw toTenantException(exception);
         }
     }
 
@@ -98,7 +53,34 @@ public class LandlordUserManagementService {
         try {
             return toResult(userManagementCoreService.updateUser(userId, email, role, actorIsAdmin));
         } catch (UserManagementCoreException exception) {
-            throw toLandlordException(exception);
+            throw toTenantException(exception);
+        }
+    }
+
+    @Transactional
+    public void resetPassword(UUID userId, String newPassword) {
+        try {
+            userManagementCoreService.resetPassword(userId, newPassword);
+        } catch (UserManagementCoreException exception) {
+            throw toTenantException(exception);
+        }
+    }
+
+    @Transactional
+    public void deactivateUser(UUID userId, String actorEmail, boolean actorIsAdmin) {
+        try {
+            userManagementCoreService.deactivateUser(userId, actorEmail, actorIsAdmin);
+        } catch (UserManagementCoreException exception) {
+            throw toTenantException(exception);
+        }
+    }
+
+    @Transactional
+    public void reactivateUser(UUID userId) {
+        try {
+            userManagementCoreService.reactivateUser(userId);
+        } catch (UserManagementCoreException exception) {
+            throw toTenantException(exception);
         }
     }
 
@@ -122,12 +104,12 @@ public class LandlordUserManagementService {
                 result.totalPages());
     }
 
-    private LandlordUserManagementException toLandlordException(UserManagementCoreException exception) {
+    private TenantUserManagementException toTenantException(UserManagementCoreException exception) {
         return switch (exception.getCode()) {
-            case "NOT_FOUND" -> LandlordUserManagementException.notFound(exception.getMessage());
-            case "CONFLICT" -> LandlordUserManagementException.conflict(exception.getMessage());
-            case "FORBIDDEN" -> LandlordUserManagementException.forbidden(exception.getMessage());
-            default -> LandlordUserManagementException.badRequest(exception.getMessage());
+            case "NOT_FOUND" -> TenantUserManagementException.notFound(exception.getMessage());
+            case "CONFLICT" -> TenantUserManagementException.conflict(exception.getMessage());
+            case "FORBIDDEN" -> TenantUserManagementException.forbidden(exception.getMessage());
+            default -> TenantUserManagementException.badRequest(exception.getMessage());
         };
     }
 

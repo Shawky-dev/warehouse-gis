@@ -64,7 +64,7 @@ class TenantAuthControllerTest {
                             UUID.randomUUID(),
                             "admin@acme.local",
                             List.of("ROLE_ADMIN"),
-                            List.of("landlord.users.view"));
+                            List.of("tenant.users.view"));
                 });
 
         MockHttpServletRequest request = new MockHttpServletRequest();
@@ -97,7 +97,7 @@ class TenantAuthControllerTest {
                         UUID.randomUUID(),
                         "admin@acme.local",
                         List.of("ROLE_ADMIN"),
-                        List.of("landlord.users.view")));
+                        List.of("tenant.users.view")));
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRemoteAddr("127.0.0.1");

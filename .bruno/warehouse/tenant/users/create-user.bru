@@ -1,0 +1,32 @@
+meta {
+  name: create-user
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{URL}}/{{TENANT_SLUG}}/users
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+body:json {
+  {
+    "email": "{{TENANT_USER_EMAIL}}",
+    "password": "{{TENANT_USER_PASSWORD}}",
+    "role": "{{TENANT_USER_ROLE}}"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

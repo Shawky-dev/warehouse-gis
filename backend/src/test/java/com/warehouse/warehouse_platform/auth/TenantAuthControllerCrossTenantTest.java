@@ -131,7 +131,7 @@ class TenantAuthControllerCrossTenantTest {
                     UUID.fromString("00000000-0000-0000-0000-000000000001"),
                     "admin@" + tokenTenant + ".local",
                     java.util.List.of("ROLE_ADMIN"),
-                    java.util.List.of("landlord.users.view"));
+                    java.util.List.of("tenant.users.view"));
         }
     }
 }

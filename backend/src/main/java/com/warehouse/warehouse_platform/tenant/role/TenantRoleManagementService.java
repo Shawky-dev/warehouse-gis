@@ -1,4 +1,4 @@
-package com.warehouse.warehouse_platform.landlord.role;
+package com.warehouse.warehouse_platform.tenant.role;
 
 import com.warehouse.warehouse_platform.rbac.role.RoleManagementCoreException;
 import com.warehouse.warehouse_platform.rbac.role.RoleManagementCoreService;
@@ -12,11 +12,11 @@ import java.util.List;
 import java.util.Set;
 
 @Service
-public class LandlordRoleManagementService {
+public class TenantRoleManagementService {
 
     private final RoleManagementCoreService roleManagementCoreService;
 
-    public LandlordRoleManagementService(
+    public TenantRoleManagementService(
             RoleRepository roleRepository,
             PermissionRepository permissionRepository,
             RolePermissionRepository rolePermissionRepository) {
@@ -33,7 +33,7 @@ public class LandlordRoleManagementService {
                     .map(this::toDetails)
                     .toList();
         } catch (RoleManagementCoreException exception) {
-            throw toLandlordException(exception);
+            throw toTenantException(exception);
         }
     }
 
@@ -42,7 +42,7 @@ public class LandlordRoleManagementService {
         try {
             return toDetails(roleManagementCoreService.getRole(roleCode));
         } catch (RoleManagementCoreException exception) {
-            throw toLandlordException(exception);
+            throw toTenantException(exception);
         }
     }
 
@@ -53,7 +53,7 @@ public class LandlordRoleManagementService {
                     .map(this::toOption)
                     .toList();
         } catch (RoleManagementCoreException exception) {
-            throw toLandlordException(exception);
+            throw toTenantException(exception);
         }
     }
 
@@ -67,7 +67,7 @@ public class LandlordRoleManagementService {
         try {
             return toDetails(roleManagementCoreService.createRole(roleCode, name, description, permissionCodes, locked));
         } catch (RoleManagementCoreException exception) {
-            throw toLandlordException(exception);
+            throw toTenantException(exception);
         }
     }
 
@@ -88,7 +88,7 @@ public class LandlordRoleManagementService {
                     locked,
                     actorIsAdmin));
         } catch (RoleManagementCoreException exception) {
-            throw toLandlordException(exception);
+            throw toTenantException(exception);
         }
     }
 
@@ -105,12 +105,12 @@ public class LandlordRoleManagementService {
         return new PermissionOption(option.code(), option.description());
     }
 
-    private LandlordRoleManagementException toLandlordException(RoleManagementCoreException exception) {
+    private TenantRoleManagementException toTenantException(RoleManagementCoreException exception) {
         return switch (exception.getCode()) {
-            case "NOT_FOUND" -> LandlordRoleManagementException.notFound(exception.getMessage());
-            case "CONFLICT" -> LandlordRoleManagementException.conflict(exception.getMessage());
-            case "FORBIDDEN" -> LandlordRoleManagementException.forbidden(exception.getMessage());
-            default -> LandlordRoleManagementException.badRequest(exception.getMessage());
+            case "NOT_FOUND" -> TenantRoleManagementException.notFound(exception.getMessage());
+            case "CONFLICT" -> TenantRoleManagementException.conflict(exception.getMessage());
+            case "FORBIDDEN" -> TenantRoleManagementException.forbidden(exception.getMessage());
+            default -> TenantRoleManagementException.badRequest(exception.getMessage());
         };
     }
 
