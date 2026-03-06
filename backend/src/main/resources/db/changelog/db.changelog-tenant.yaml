@@ -34,3 +34,10 @@ databaseChangeLog:
         - sqlFile:
             path: db/migration/tenant/V5__replace_landlord_permissions_with_tenant_permissions.sql
             relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-manager-defaults-6
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V6__align_manager_default_permissions_with_landlord.sql
+            relativeToChangelogFile: false
