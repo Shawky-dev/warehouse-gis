@@ -2,6 +2,7 @@ package com.warehouse.warehouse_platform.tenant.role;
 
 import com.warehouse.warehouse_platform.rbac.role.RoleManagementCoreException;
 import com.warehouse.warehouse_platform.rbac.role.RoleManagementCoreService;
+import com.warehouse.warehouse_platform.tenant.audit.TenantAuditService;
 import com.warehouse.warehouse_platform.user.rbac.PermissionRepository;
 import com.warehouse.warehouse_platform.user.rbac.RolePermissionRepository;
 import com.warehouse.warehouse_platform.user.rbac.RoleRepository;
@@ -15,15 +16,18 @@ import java.util.Set;
 public class TenantRoleManagementService {
 
     private final RoleManagementCoreService roleManagementCoreService;
+    private final TenantAuditService tenantAuditService;
 
     public TenantRoleManagementService(
             RoleRepository roleRepository,
             PermissionRepository permissionRepository,
-            RolePermissionRepository rolePermissionRepository) {
+            RolePermissionRepository rolePermissionRepository,
+            TenantAuditService tenantAuditService) {
         this.roleManagementCoreService = new RoleManagementCoreService(
                 roleRepository,
                 permissionRepository,
                 rolePermissionRepository);
+        this.tenantAuditService = tenantAuditService;
     }
 
     @Transactional(readOnly = true)
@@ -65,7 +69,14 @@ public class TenantRoleManagementService {
             Set<String> permissionCodes,
             Boolean locked) {
         try {
-            return toDetails(roleManagementCoreService.createRole(roleCode, name, description, permissionCodes, locked));
+            RoleDetails created = toDetails(roleManagementCoreService.createRole(
+                    roleCode,
+                    name,
+                    description,
+                    permissionCodes,
+                    locked));
+            tenantAuditService.record("ROLE_CREATE", "ROLE", created.code(), null, created);
+            return created;
         } catch (RoleManagementCoreException exception) {
             throw toTenantException(exception);
         }
@@ -80,13 +91,16 @@ public class TenantRoleManagementService {
             Boolean locked,
             boolean actorIsAdmin) {
         try {
-            return toDetails(roleManagementCoreService.updateRole(
+            RoleDetails before = toDetails(roleManagementCoreService.getRole(roleCode));
+            RoleDetails after = toDetails(roleManagementCoreService.updateRole(
                     roleCode,
                     name,
                     description,
                     permissionCodes,
                     locked,
                     actorIsAdmin));
+            tenantAuditService.record("ROLE_UPDATE", "ROLE", after.code(), before, after);
+            return after;
         } catch (RoleManagementCoreException exception) {
             throw toTenantException(exception);
         }

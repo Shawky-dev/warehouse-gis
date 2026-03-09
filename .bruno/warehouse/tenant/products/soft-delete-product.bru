@@ -1,0 +1,24 @@
+meta {
+  name: soft-delete-product
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{URL}}/{{TENANT_SLUG}}/products/{{TENANT_PRODUCT_ID}}/soft-delete
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

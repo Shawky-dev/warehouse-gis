@@ -1,0 +1,14 @@
+meta {
+  name: audit
+  seq: 7
+}
+
+auth {
+  mode: inherit
+}
+
+vars:pre-request {
+  TENANT_AUDIT_ACTION: PRODUCT_CREATE
+  TENANT_AUDIT_ENTITY_TYPE: PRODUCT
+  TENANT_AUDIT_ENTITY_ID: 00000000-0000-0000-0000-000000000301
+}

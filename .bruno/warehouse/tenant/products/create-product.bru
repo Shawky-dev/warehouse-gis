@@ -1,0 +1,39 @@
+meta {
+  name: create-product
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{URL}}/{{TENANT_SLUG}}/products
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+body:json {
+  {
+    "sku": "{{TENANT_PRODUCT_SKU}}",
+    "name": "{{TENANT_PRODUCT_NAME}}",
+    "description": "{{TENANT_PRODUCT_DESCRIPTION}}",
+    "baseUomId": "{{TENANT_PRODUCT_BASE_UOM_ID}}",
+    "trackLot": {{TENANT_PRODUCT_TRACK_LOT}},
+    "trackExpiry": {{TENANT_PRODUCT_TRACK_EXPIRY}},
+    "supplierIds": [
+      "{{TENANT_PRODUCT_SUPPLIER_ID}}"
+    ],
+    "primarySupplierId": "{{TENANT_PRODUCT_SUPPLIER_ID}}"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

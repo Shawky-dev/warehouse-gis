@@ -41,3 +41,17 @@ databaseChangeLog:
         - sqlFile:
             path: db/migration/tenant/V6__align_manager_default_permissions_with_landlord.sql
             relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-f0-schema-7
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V7__create_f0_master_data_and_audit_tables.sql
+            relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-f0-permissions-8
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V8__seed_f0_permissions_and_manager_defaults.sql
+            relativeToChangelogFile: false

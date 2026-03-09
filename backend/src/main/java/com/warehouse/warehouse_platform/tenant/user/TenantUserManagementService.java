@@ -3,6 +3,7 @@ package com.warehouse.warehouse_platform.tenant.user;
 import com.warehouse.warehouse_platform.auth.session.RefreshTokenService;
 import com.warehouse.warehouse_platform.rbac.user.UserManagementCoreException;
 import com.warehouse.warehouse_platform.rbac.user.UserManagementCoreService;
+import com.warehouse.warehouse_platform.tenant.audit.TenantAuditService;
 import com.warehouse.warehouse_platform.user.UserRepository;
 import com.warehouse.warehouse_platform.user.rbac.RoleRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -17,17 +18,20 @@ import java.util.UUID;
 public class TenantUserManagementService {
 
     private final UserManagementCoreService userManagementCoreService;
+    private final TenantAuditService tenantAuditService;
 
     public TenantUserManagementService(
             UserRepository userRepository,
             RoleRepository roleRepository,
             PasswordEncoder passwordEncoder,
-            RefreshTokenService refreshTokenService) {
+            RefreshTokenService refreshTokenService,
+            TenantAuditService tenantAuditService) {
         this.userManagementCoreService = new UserManagementCoreService(
                 userRepository,
                 roleRepository,
                 passwordEncoder,
                 refreshTokenService);
+        this.tenantAuditService = tenantAuditService;
     }
 
     @Transactional(readOnly = true)
@@ -42,7 +46,9 @@ public class TenantUserManagementService {
     @Transactional
     public UserResult createUser(String email, String password, String role, boolean actorIsAdmin) {
         try {
-            return toResult(userManagementCoreService.createUser(email, password, role, actorIsAdmin));
+            UserResult created = toResult(userManagementCoreService.createUser(email, password, role, actorIsAdmin));
+            tenantAuditService.record("USER_CREATE", "USER", created.id().toString(), null, created);
+            return created;
         } catch (UserManagementCoreException exception) {
             throw toTenantException(exception);
         }
@@ -51,7 +57,10 @@ public class TenantUserManagementService {
     @Transactional
     public UserResult updateUser(UUID userId, String email, String role, boolean actorIsAdmin) {
         try {
-            return toResult(userManagementCoreService.updateUser(userId, email, role, actorIsAdmin));
+            UserResult before = toResult(userManagementCoreService.getUser(userId));
+            UserResult after = toResult(userManagementCoreService.updateUser(userId, email, role, actorIsAdmin));
+            tenantAuditService.record("USER_UPDATE", "USER", userId.toString(), before, after);
+            return after;
         } catch (UserManagementCoreException exception) {
             throw toTenantException(exception);
         }
@@ -60,7 +69,10 @@ public class TenantUserManagementService {
     @Transactional
     public void resetPassword(UUID userId, String newPassword) {
         try {
+            UserResult before = toResult(userManagementCoreService.getUser(userId));
             userManagementCoreService.resetPassword(userId, newPassword);
+            UserResult after = toResult(userManagementCoreService.getUser(userId));
+            tenantAuditService.record("USER_RESET_PASSWORD", "USER", userId.toString(), before, after);
         } catch (UserManagementCoreException exception) {
             throw toTenantException(exception);
         }
@@ -69,7 +81,10 @@ public class TenantUserManagementService {
     @Transactional
     public void deactivateUser(UUID userId, String actorEmail, boolean actorIsAdmin) {
         try {
+            UserResult before = toResult(userManagementCoreService.getUser(userId));
             userManagementCoreService.deactivateUser(userId, actorEmail, actorIsAdmin);
+            UserResult after = toResult(userManagementCoreService.getUser(userId));
+            tenantAuditService.record("USER_DEACTIVATE", "USER", userId.toString(), before, after);
         } catch (UserManagementCoreException exception) {
             throw toTenantException(exception);
         }
@@ -78,7 +93,10 @@ public class TenantUserManagementService {
     @Transactional
     public void reactivateUser(UUID userId) {
         try {
+            UserResult before = toResult(userManagementCoreService.getUser(userId));
             userManagementCoreService.reactivateUser(userId);
+            UserResult after = toResult(userManagementCoreService.getUser(userId));
+            tenantAuditService.record("USER_REACTIVATE", "USER", userId.toString(), before, after);
         } catch (UserManagementCoreException exception) {
             throw toTenantException(exception);
         }

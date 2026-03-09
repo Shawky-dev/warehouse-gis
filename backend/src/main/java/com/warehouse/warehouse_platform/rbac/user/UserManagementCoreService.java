@@ -54,6 +54,10 @@ public class UserManagementCoreService {
                 userPage.getTotalPages());
     }
 
+    public UserResult getUser(UUID userId) {
+        return toResult(loadUserOrThrow(userId));
+    }
+
     public UserResult createUser(String email, String password, String role) {
         String normalizedEmail = normalizeEmail(email);
         String normalizedRole = normalizeRole(role);

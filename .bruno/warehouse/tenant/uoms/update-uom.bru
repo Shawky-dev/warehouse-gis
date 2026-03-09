@@ -1,0 +1,32 @@
+meta {
+  name: update-uom
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{URL}}/{{TENANT_SLUG}}/uoms/{{TENANT_UOM_ID}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+body:json {
+  {
+    "code": "{{TENANT_UOM_UPDATED_CODE}}",
+    "name": "{{TENANT_UOM_UPDATED_NAME}}",
+    "symbol": "{{TENANT_UOM_UPDATED_SYMBOL}}"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

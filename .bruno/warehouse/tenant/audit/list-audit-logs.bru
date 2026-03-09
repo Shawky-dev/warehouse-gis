@@ -1,0 +1,24 @@
+meta {
+  name: list-audit-logs
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{URL}}/{{TENANT_SLUG}}/audit-logs?page=0&size=20&action={{TENANT_AUDIT_ACTION}}&entityType={{TENANT_AUDIT_ENTITY_TYPE}}&entityId={{TENANT_AUDIT_ENTITY_ID}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

@@ -23,13 +23,26 @@ import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
 import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
 
 import com.warehouse.warehouse_platform.auth.session.RefreshTokenSessionRepository;
+import com.warehouse.warehouse_platform.tenant.audit.AuditLogRepository;
+import com.warehouse.warehouse_platform.tenant.product.ProductRepository;
+import com.warehouse.warehouse_platform.tenant.product.ProductSupplierRepository;
+import com.warehouse.warehouse_platform.tenant.supplier.SupplierRepository;
+import com.warehouse.warehouse_platform.tenant.uom.UnitOfMeasureRepository;
 import com.warehouse.warehouse_platform.user.UserRepository;
 
 import jakarta.persistence.EntityManagerFactory;
 
 @Configuration
 @EnableJpaRepositories(
-        basePackageClasses = { UserRepository.class, RefreshTokenSessionRepository.class },
+        basePackageClasses = {
+                UserRepository.class,
+                RefreshTokenSessionRepository.class,
+                UnitOfMeasureRepository.class,
+                SupplierRepository.class,
+                ProductRepository.class,
+                ProductSupplierRepository.class,
+                AuditLogRepository.class
+        },
         entityManagerFactoryRef = "tenantEntityManagerFactory",
         transactionManagerRef = "tenantTransactionManager")
 @EnableConfigurationProperties(JpaProperties.class)

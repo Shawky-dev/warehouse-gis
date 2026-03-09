@@ -1,0 +1,35 @@
+meta {
+  name: update-supplier
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{URL}}/{{TENANT_SLUG}}/suppliers/{{TENANT_SUPPLIER_ID}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+body:json {
+  {
+    "code": "{{TENANT_SUPPLIER_UPDATED_CODE}}",
+    "name": "{{TENANT_SUPPLIER_UPDATED_NAME}}",
+    "contactName": "{{TENANT_SUPPLIER_CONTACT_NAME}}",
+    "contactEmail": "{{TENANT_SUPPLIER_CONTACT_EMAIL}}",
+    "contactPhone": "{{TENANT_SUPPLIER_CONTACT_PHONE}}",
+    "notes": "{{TENANT_SUPPLIER_NOTES}}"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
