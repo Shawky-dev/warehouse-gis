@@ -6,6 +6,7 @@ import TenantRolesPage from "@/features/tenant/roles/TenantRolesPage";
 import TenantUomsPage from "@/features/tenant/uom/TenantUomsPage";
 import TenantSuppliersPage from "@/features/tenant/supplier/TenantSuppliersPage";
 import TenantAuditLogsPage from "@/features/tenant/audit/TenantAuditLogsPage";
+import TenantCategoriesPage from "@/features/tenant/category/TenantCategoriesPage";
 import { RequirePermission } from "@/features/auth/guards/RequirePermission";
 import { TENANT_PERMISSIONS } from "@/features/auth/shared/permissions";
 
@@ -51,6 +52,14 @@ export const tenantRoutes = [
     element: (
       <RequirePermission permission={TENANT_PERMISSIONS.SUPPLIERS_VIEW}>
         <TenantSuppliersPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: PATHS.TENANT.CATEGORIES_PATTERN,
+    element: (
+      <RequirePermission permission={TENANT_PERMISSIONS.CATEGORIES_VIEW}>
+        <TenantCategoriesPage />
       </RequirePermission>
     ),
   },

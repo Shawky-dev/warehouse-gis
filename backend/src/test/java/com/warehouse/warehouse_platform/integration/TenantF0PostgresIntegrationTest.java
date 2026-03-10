@@ -19,7 +19,6 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -116,6 +115,7 @@ class TenantF0PostgresIntegrationTest {
                 "Product One",
                 "Initial",
                 uom.id(),
+                null,
                 true,
                 false,
                 Set.of(supplier.id()),
@@ -133,6 +133,7 @@ class TenantF0PostgresIntegrationTest {
                 "Product One",
                 "Updated",
                 uom.id(),
+                null,
                 true,
                 false,
                 Set.of(),

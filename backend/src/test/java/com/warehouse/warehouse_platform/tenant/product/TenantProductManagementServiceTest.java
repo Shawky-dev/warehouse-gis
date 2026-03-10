@@ -1,6 +1,7 @@
 package com.warehouse.warehouse_platform.tenant.product;
 
 import com.warehouse.warehouse_platform.tenant.audit.TenantAuditService;
+import com.warehouse.warehouse_platform.tenant.category.ProductCategoryRepository;
 import com.warehouse.warehouse_platform.tenant.supplier.Supplier;
 import com.warehouse.warehouse_platform.tenant.supplier.SupplierRepository;
 import com.warehouse.warehouse_platform.tenant.uom.UnitOfMeasure;
@@ -34,6 +35,9 @@ class TenantProductManagementServiceTest {
     private UnitOfMeasureRepository unitOfMeasureRepository;
 
     @Mock
+    private ProductCategoryRepository productCategoryRepository;
+
+    @Mock
     private SupplierRepository supplierRepository;
 
     @Mock
@@ -49,6 +53,7 @@ class TenantProductManagementServiceTest {
         service = new TenantProductManagementService(
                 productRepository,
                 unitOfMeasureRepository,
+                productCategoryRepository,
                 supplierRepository,
                 productSupplierRepository,
                 tenantAuditService);
@@ -81,6 +86,7 @@ class TenantProductManagementServiceTest {
                 "Sample Product",
                 "Desc",
                 uomId,
+                null,
                 true,
                 false,
                 Set.of(supplierA, supplierB),
@@ -115,6 +121,7 @@ class TenantProductManagementServiceTest {
                         "Updated",
                         null,
                         uomId,
+                        null,
                         false,
                         false,
                         Set.of(supplierA),

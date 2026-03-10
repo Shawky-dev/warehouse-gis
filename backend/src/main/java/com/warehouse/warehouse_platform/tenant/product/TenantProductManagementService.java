@@ -1,6 +1,8 @@
 package com.warehouse.warehouse_platform.tenant.product;
 
 import com.warehouse.warehouse_platform.tenant.audit.TenantAuditService;
+import com.warehouse.warehouse_platform.tenant.category.ProductCategory;
+import com.warehouse.warehouse_platform.tenant.category.ProductCategoryRepository;
 import com.warehouse.warehouse_platform.tenant.supplier.Supplier;
 import com.warehouse.warehouse_platform.tenant.supplier.SupplierRepository;
 import com.warehouse.warehouse_platform.tenant.uom.UnitOfMeasure;
@@ -30,6 +32,7 @@ public class TenantProductManagementService {
 
     private final ProductRepository productRepository;
     private final UnitOfMeasureRepository unitOfMeasureRepository;
+    private final ProductCategoryRepository productCategoryRepository;
     private final SupplierRepository supplierRepository;
     private final ProductSupplierRepository productSupplierRepository;
     private final TenantAuditService tenantAuditService;
@@ -37,11 +40,13 @@ public class TenantProductManagementService {
     public TenantProductManagementService(
             ProductRepository productRepository,
             UnitOfMeasureRepository unitOfMeasureRepository,
+            ProductCategoryRepository productCategoryRepository,
             SupplierRepository supplierRepository,
             ProductSupplierRepository productSupplierRepository,
             TenantAuditService tenantAuditService) {
         this.productRepository = productRepository;
         this.unitOfMeasureRepository = unitOfMeasureRepository;
+        this.productCategoryRepository = productCategoryRepository;
         this.supplierRepository = supplierRepository;
         this.productSupplierRepository = productSupplierRepository;
         this.tenantAuditService = tenantAuditService;
@@ -54,10 +59,11 @@ public class TenantProductManagementService {
             String search,
             Boolean active,
             UUID baseUomId,
-            UUID supplierId) {
+            UUID supplierId,
+            UUID categoryId) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "sku"));
         Page<Product> products = productRepository.findAll(
-                buildSpecification(search, active, baseUomId, supplierId),
+                buildSpecification(search, active, baseUomId, supplierId, categoryId),
                 pageable);
 
         Map<UUID, List<ProductSupplier>> mappingsByProductId;
@@ -95,6 +101,7 @@ public class TenantProductManagementService {
             String name,
             String description,
             UUID baseUomId,
+            UUID categoryId,
             Boolean trackLot,
             Boolean trackExpiry,
             Set<UUID> supplierIds,
@@ -111,6 +118,7 @@ public class TenantProductManagementService {
                 });
 
         UnitOfMeasure baseUom = loadBaseUom(baseUomId);
+        ProductCategory category = loadCategoryIfProvided(categoryId);
         SupplierResolution supplierResolution = resolveSuppliers(supplierIds, primarySupplierId);
 
         Product product = Product.builder()
@@ -118,6 +126,7 @@ public class TenantProductManagementService {
                 .name(normalizedName)
                 .description(normalizedDescription)
                 .baseUom(baseUom)
+                .category(category)
                 .trackLot(normalizedTrackLot)
                 .trackExpiry(normalizedTrackExpiry)
                 .active(true)
@@ -138,6 +147,7 @@ public class TenantProductManagementService {
             String name,
             String description,
             UUID baseUomId,
+            UUID categoryId,
             Boolean trackLot,
             Boolean trackExpiry,
             Set<UUID> supplierIds,
@@ -155,12 +165,14 @@ public class TenantProductManagementService {
                 });
 
         UnitOfMeasure baseUom = loadBaseUom(baseUomId);
+        ProductCategory category = loadCategoryIfProvided(categoryId);
         SupplierResolution supplierResolution = resolveSuppliers(supplierIds, primarySupplierId);
 
         existing.setSku(normalizedSku);
         existing.setName(normalizedName);
         existing.setDescription(normalizeOptional(description, 1000, "description"));
         existing.setBaseUom(baseUom);
+        existing.setCategory(category);
         existing.setTrackLot(normalizeBoolean(trackLot, false));
         existing.setTrackExpiry(normalizeBoolean(trackExpiry, false));
 
@@ -231,6 +243,14 @@ public class TenantProductManagementService {
                 .orElseThrow(() -> TenantProductManagementException.badRequest("Base UOM not found: " + baseUomId));
     }
 
+    private ProductCategory loadCategoryIfProvided(UUID categoryId) {
+        if (categoryId == null) {
+            return null;
+        }
+        return productCategoryRepository.findById(categoryId)
+                .orElseThrow(() -> TenantProductManagementException.badRequest("Category not found: " + categoryId));
+    }
+
     private SupplierResolution resolveSuppliers(Set<UUID> supplierIds, UUID primarySupplierId) {
         Set<UUID> normalizedSupplierIds = normalizeSupplierIds(supplierIds);
 
@@ -297,7 +317,8 @@ public class TenantProductManagementService {
             String search,
             Boolean active,
             UUID baseUomId,
-            UUID supplierId) {
+            UUID supplierId,
+            UUID categoryId) {
         String normalizedSearch = normalizeSearch(search);
         return (root, query, criteriaBuilder) -> {
             List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
@@ -307,6 +328,9 @@ public class TenantProductManagementService {
             }
             if (baseUomId != null) {
                 predicates.add(criteriaBuilder.equal(root.get("baseUom").get("id"), baseUomId));
+            }
+            if (categoryId != null) {
+                predicates.add(criteriaBuilder.equal(root.get("category").get("id"), categoryId));
             }
             if (normalizedSearch != null) {
                 String value = "%" + normalizedSearch.toLowerCase(Locale.ROOT) + "%";
@@ -386,6 +410,8 @@ public class TenantProductManagementService {
                         Boolean.TRUE.equals(mapping.getPrimary())))
                 .toList();
 
+        ProductCategory category = product.getCategory();
+
         return new ProductResult(
                 product.getId(),
                 product.getSku(),
@@ -394,6 +420,8 @@ public class TenantProductManagementService {
                 product.getBaseUom().getId(),
                 product.getBaseUom().getCode(),
                 product.getBaseUom().getName(),
+                category != null ? category.getId() : null,
+                category != null ? category.getName() : null,
                 !Boolean.FALSE.equals(product.getTrackLot()),
                 !Boolean.FALSE.equals(product.getTrackExpiry()),
                 !Boolean.FALSE.equals(product.getActive()),
@@ -421,6 +449,8 @@ public class TenantProductManagementService {
             UUID baseUomId,
             String baseUomCode,
             String baseUomName,
+            UUID categoryId,
+            String categoryName,
             boolean trackLot,
             boolean trackExpiry,
             boolean active,

@@ -36,6 +36,12 @@ export const TENANT_PERMISSIONS = {
   PRODUCTS_SOFT_DELETE: "tenant.products.soft_delete",
   PRODUCTS_RESTORE: "tenant.products.restore",
   PRODUCTS_HARD_DELETE: "tenant.products.hard_delete",
+  CATEGORIES_VIEW: "tenant.categories.view",
+  CATEGORIES_CREATE: "tenant.categories.create",
+  CATEGORIES_EDIT: "tenant.categories.edit",
+  CATEGORIES_SOFT_DELETE: "tenant.categories.soft_delete",
+  CATEGORIES_RESTORE: "tenant.categories.restore",
+  CATEGORIES_HARD_DELETE: "tenant.categories.hard_delete",
   AUDIT_VIEW: "tenant.audit.view",
 } as const;
 

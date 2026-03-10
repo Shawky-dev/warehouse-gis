@@ -55,3 +55,17 @@ databaseChangeLog:
         - sqlFile:
             path: db/migration/tenant/V8__seed_f0_permissions_and_manager_defaults.sql
             relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-categories-9
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V9__add_product_categories.sql
+            relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-category-permissions-10
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V10__seed_category_permissions.sql
+            relativeToChangelogFile: false

@@ -1,13 +1,8 @@
-package com.warehouse.warehouse_platform.tenant.product;
+package com.warehouse.warehouse_platform.tenant.category;
 
-import com.warehouse.warehouse_platform.tenant.category.ProductCategory;
-import com.warehouse.warehouse_platform.tenant.uom.UnitOfMeasure;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -21,41 +16,22 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "products")
+@Table(name = "product_categories")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Product {
+public class ProductCategory {
 
     @Id
     private UUID id;
 
-    @Column(nullable = false, length = 60)
-    private String sku;
-
-    @Column(nullable = false, length = 200)
+    @Column(nullable = false, length = 120)
     private String name;
 
-    @Column(length = 1000)
+    @Column(length = 500)
     private String description;
-
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "base_uom_id", nullable = false)
-    private UnitOfMeasure baseUom;
-
-    @ManyToOne(fetch = FetchType.LAZY, optional = true)
-    @JoinColumn(name = "category_id", nullable = true)
-    private ProductCategory category;
-
-    @Column(name = "track_lot", nullable = false)
-    @Builder.Default
-    private Boolean trackLot = false;
-
-    @Column(name = "track_expiry", nullable = false)
-    @Builder.Default
-    private Boolean trackExpiry = false;
 
     @Column(nullable = false)
     @Builder.Default
@@ -80,12 +56,6 @@ public class Product {
         updatedAt = now;
         if (active == null) {
             active = true;
-        }
-        if (trackLot == null) {
-            trackLot = false;
-        }
-        if (trackExpiry == null) {
-            trackExpiry = false;
         }
     }
 

@@ -13,4 +13,6 @@ public interface ProductRepository extends JpaRepository<Product, UUID>, JpaSpec
     Optional<Product> findBySkuIgnoreCase(String sku);
 
     long countByBaseUom_Id(UUID baseUomId);
+
+    long countByCategory_Id(UUID categoryId);
 }

@@ -24,6 +24,7 @@ import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
 
 import com.warehouse.warehouse_platform.auth.session.RefreshTokenSessionRepository;
 import com.warehouse.warehouse_platform.tenant.audit.AuditLogRepository;
+import com.warehouse.warehouse_platform.tenant.category.ProductCategoryRepository;
 import com.warehouse.warehouse_platform.tenant.product.ProductRepository;
 import com.warehouse.warehouse_platform.tenant.product.ProductSupplierRepository;
 import com.warehouse.warehouse_platform.tenant.supplier.SupplierRepository;
@@ -41,6 +42,7 @@ import jakarta.persistence.EntityManagerFactory;
                 SupplierRepository.class,
                 ProductRepository.class,
                 ProductSupplierRepository.class,
+                ProductCategoryRepository.class,
                 AuditLogRepository.class
         },
         entityManagerFactoryRef = "tenantEntityManagerFactory",

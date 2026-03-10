@@ -3,11 +3,15 @@ import { normalizeTenantSlug } from "@/features/auth/shared/scope";
 import { api } from "@/lib/api";
 import type {
   AuditPageResult,
+  CategoryPageResult,
+  CategoryResult,
+  CreateCategoryRequest,
   CreateProductRequest,
   CreateSupplierRequest,
   CreateUomRequest,
   F0ErrorResponse,
   ListAuditLogsParams,
+  ListCategoriesParams,
   ListProductsParams,
   ListSuppliersParams,
   ListUomsParams,
@@ -17,6 +21,7 @@ import type {
   SupplierResult,
   UomPageResult,
   UomResult,
+  UpdateCategoryRequest,
   UpdateProductRequest,
   UpdateSupplierRequest,
   UpdateUomRequest,
@@ -196,6 +201,62 @@ export async function restoreProduct(tenantSlug: string, productId: string): Pro
 
 export async function hardDeleteProduct(tenantSlug: string, productId: string): Promise<void> {
   await api.delete(`${tenantBasePath(tenantSlug)}/products/${productId}`, {
+    headers: tenantHeaders(tenantSlug),
+  });
+}
+
+// ── Category ──────────────────────────────────────────────────────────────────
+
+export async function listCategories(
+  tenantSlug: string,
+  params: ListCategoriesParams
+): Promise<CategoryPageResult> {
+  const response = await api.get<CategoryPageResult>(
+    `${tenantBasePath(tenantSlug)}/categories`,
+    { params, headers: tenantHeaders(tenantSlug) }
+  );
+  return response.data;
+}
+
+export async function createCategory(
+  tenantSlug: string,
+  payload: CreateCategoryRequest
+): Promise<CategoryResult> {
+  const response = await api.post<CategoryResult>(
+    `${tenantBasePath(tenantSlug)}/categories`,
+    payload,
+    { headers: tenantHeaders(tenantSlug) }
+  );
+  return response.data;
+}
+
+export async function updateCategory(
+  tenantSlug: string,
+  categoryId: string,
+  payload: UpdateCategoryRequest
+): Promise<CategoryResult> {
+  const response = await api.put<CategoryResult>(
+    `${tenantBasePath(tenantSlug)}/categories/${categoryId}`,
+    payload,
+    { headers: tenantHeaders(tenantSlug) }
+  );
+  return response.data;
+}
+
+export async function softDeleteCategory(tenantSlug: string, categoryId: string): Promise<void> {
+  await api.post(`${tenantBasePath(tenantSlug)}/categories/${categoryId}/soft-delete`, undefined, {
+    headers: tenantHeaders(tenantSlug),
+  });
+}
+
+export async function restoreCategory(tenantSlug: string, categoryId: string): Promise<void> {
+  await api.post(`${tenantBasePath(tenantSlug)}/categories/${categoryId}/restore`, undefined, {
+    headers: tenantHeaders(tenantSlug),
+  });
+}
+
+export async function hardDeleteCategory(tenantSlug: string, categoryId: string): Promise<void> {
+  await api.delete(`${tenantBasePath(tenantSlug)}/categories/${categoryId}`, {
     headers: tenantHeaders(tenantSlug),
   });
 }

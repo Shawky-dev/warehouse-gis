@@ -27,6 +27,12 @@ public final class TenantPermissions {
     public static final String PRODUCTS_SOFT_DELETE = "tenant.products.soft_delete";
     public static final String PRODUCTS_RESTORE = "tenant.products.restore";
     public static final String PRODUCTS_HARD_DELETE = "tenant.products.hard_delete";
+    public static final String CATEGORIES_VIEW = "tenant.categories.view";
+    public static final String CATEGORIES_CREATE = "tenant.categories.create";
+    public static final String CATEGORIES_EDIT = "tenant.categories.edit";
+    public static final String CATEGORIES_SOFT_DELETE = "tenant.categories.soft_delete";
+    public static final String CATEGORIES_RESTORE = "tenant.categories.restore";
+    public static final String CATEGORIES_HARD_DELETE = "tenant.categories.hard_delete";
     public static final String AUDIT_VIEW = "tenant.audit.view";
 
     private TenantPermissions() {

@@ -1,0 +1,31 @@
+meta {
+  name: create-category
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{URL}}/{{TENANT_SLUG}}/categories
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+body:json {
+  {
+    "name": "{{TENANT_CATEGORY_NAME}}",
+    "description": "{{TENANT_CATEGORY_DESCRIPTION}}"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

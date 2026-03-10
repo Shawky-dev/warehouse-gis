@@ -83,6 +83,41 @@ export interface UpdateSupplierRequest {
   notes?: string | null;
 }
 
+export interface CategoryResult {
+  id: string;
+  name: string;
+  description: string | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+  deactivatedAt: string | null;
+}
+
+export interface CategoryPageResult {
+  content: CategoryResult[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
+export interface ListCategoriesParams {
+  page?: number;
+  size?: number;
+  search?: string;
+  active?: boolean;
+}
+
+export interface CreateCategoryRequest {
+  name: string;
+  description?: string | null;
+}
+
+export interface UpdateCategoryRequest {
+  name: string;
+  description?: string | null;
+}
+
 export interface ProductSupplierResult {
   supplierId: string;
   supplierCode: string;
@@ -98,6 +133,8 @@ export interface ProductResult {
   baseUomId: string;
   baseUomCode: string;
   baseUomName: string;
+  categoryId: string | null;
+  categoryName: string | null;
   trackLot: boolean;
   trackExpiry: boolean;
   active: boolean;
@@ -122,6 +159,7 @@ export interface ListProductsParams {
   active?: boolean;
   baseUomId?: string;
   supplierId?: string;
+  categoryId?: string;
 }
 
 export interface CreateProductRequest {
@@ -129,6 +167,7 @@ export interface CreateProductRequest {
   name: string;
   description?: string | null;
   baseUomId: string;
+  categoryId?: string | null;
   trackLot?: boolean | null;
   trackExpiry?: boolean | null;
   supplierIds?: string[];
@@ -140,6 +179,7 @@ export interface UpdateProductRequest {
   name: string;
   description?: string | null;
   baseUomId: string;
+  categoryId?: string | null;
   trackLot?: boolean | null;
   trackExpiry?: boolean | null;
   supplierIds?: string[];

@@ -20,6 +20,7 @@ export const PATHS = {
     ROLES_PATTERN: "/:tenantSlug/roles",
     UOMS_PATTERN: "/:tenantSlug/uoms",
     SUPPLIERS_PATTERN: "/:tenantSlug/suppliers",
+    CATEGORIES_PATTERN: "/:tenantSlug/categories",
     AUDIT_LOGS_PATTERN: "/:tenantSlug/audit-logs",
     root: (tenantSlug: string) => `/${tenantSlug}`,
     authLogin: (tenantSlug: string) => `/${tenantSlug}/auth/login`,
@@ -28,6 +29,7 @@ export const PATHS = {
     roles: (tenantSlug: string) => `/${tenantSlug}/roles`,
     uoms: (tenantSlug: string) => `/${tenantSlug}/uoms`,
     suppliers: (tenantSlug: string) => `/${tenantSlug}/suppliers`,
+    categories: (tenantSlug: string) => `/${tenantSlug}/categories`,
     auditLogs: (tenantSlug: string) => `/${tenantSlug}/audit-logs`,
   },
 } as const;

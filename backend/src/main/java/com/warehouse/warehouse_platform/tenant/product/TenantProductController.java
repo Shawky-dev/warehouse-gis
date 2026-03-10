@@ -49,15 +49,11 @@ public class TenantProductController {
             @RequestParam(required = false) Boolean active,
             @RequestParam(required = false) UUID baseUomId,
             @RequestParam(required = false) UUID supplierId,
+            @RequestParam(required = false) UUID categoryId,
             Authentication authentication) {
         tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
         return ResponseEntity.ok(tenantProductManagementService.listProducts(
-                page,
-                size,
-                search,
-                active,
-                baseUomId,
-                supplierId));
+                page, size, search, active, baseUomId, supplierId, categoryId));
     }
 
     @GetMapping("/{productId}")
@@ -82,6 +78,7 @@ public class TenantProductController {
                 request.name(),
                 request.description(),
                 request.baseUomId(),
+                request.categoryId(),
                 request.trackLot(),
                 request.trackExpiry(),
                 request.supplierIds(),
@@ -102,6 +99,7 @@ public class TenantProductController {
                 request.name(),
                 request.description(),
                 request.baseUomId(),
+                request.categoryId(),
                 request.trackLot(),
                 request.trackExpiry(),
                 request.supplierIds(),
@@ -146,6 +144,7 @@ public class TenantProductController {
             @NotBlank @Size(max = 200) String name,
             @Size(max = 1000) String description,
             @NotNull UUID baseUomId,
+            UUID categoryId,
             Boolean trackLot,
             Boolean trackExpiry,
             Set<UUID> supplierIds,
@@ -157,6 +156,7 @@ public class TenantProductController {
             @NotBlank @Size(max = 200) String name,
             @Size(max = 1000) String description,
             @NotNull UUID baseUomId,
+            UUID categoryId,
             Boolean trackLot,
             Boolean trackExpiry,
             Set<UUID> supplierIds,

@@ -8,6 +8,7 @@ import {
   createProduct,
   extractF0ErrorMessage,
   hardDeleteProduct,
+  listCategories,
   listProducts,
   listSuppliers,
   listUoms,
@@ -15,7 +16,7 @@ import {
   softDeleteProduct,
   updateProduct,
 } from "@/features/tenant/api/f0Api";
-import type { ProductResult, SupplierResult, UomResult } from "@/features/tenant/types/f0";
+import type { CategoryResult, ProductResult, SupplierResult, UomResult } from "@/features/tenant/types/f0";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Input } from "@/shared/components/ui/input";
@@ -69,15 +70,18 @@ export default function TenantProductsPage() {
 
   const [allUoms, setAllUoms] = useState<UomResult[]>([]);
   const [allSuppliers, setAllSuppliers] = useState<SupplierResult[]>([]);
+  const [allCategories, setAllCategories] = useState<CategoryResult[]>([]);
 
   const [pendingSearch, setPendingSearch] = useState("");
   const [pendingActive, setPendingActive] = useState<FilterActive>("all");
   const [pendingBaseUomId, setPendingBaseUomId] = useState("");
   const [pendingSupplierId, setPendingSupplierId] = useState("");
+  const [pendingCategoryId, setPendingCategoryId] = useState("");
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterActive>("all");
   const [baseUomId, setBaseUomId] = useState("");
   const [supplierId, setSupplierId] = useState("");
+  const [categoryId, setCategoryId] = useState("");
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<ProductResult | null>(null);
@@ -85,6 +89,7 @@ export default function TenantProductsPage() {
   const [formName, setFormName] = useState("");
   const [formDescription, setFormDescription] = useState("");
   const [formBaseUomId, setFormBaseUomId] = useState("");
+  const [formCategoryId, setFormCategoryId] = useState("");
   const [formTrackLot, setFormTrackLot] = useState(false);
   const [formTrackExpiry, setFormTrackExpiry] = useState(false);
   const [formSupplierIds, setFormSupplierIds] = useState<string[]>([]);
@@ -96,12 +101,14 @@ export default function TenantProductsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const loadLookups = useCallback(async (applyFirstUom = false) => {
     try {
-      const [uomsResult, suppliersResult] = await Promise.all([
+      const [uomsResult, suppliersResult, categoriesResult] = await Promise.all([
         listUoms(slug, { size: 100, active: true }),
         listSuppliers(slug, { size: 100, active: true }),
+        listCategories(slug, { size: 100, active: true }),
       ]);
       setAllUoms(uomsResult.content);
       setAllSuppliers(suppliersResult.content);
+      setAllCategories(categoriesResult.content);
       if (applyFirstUom && uomsResult.content.length > 0) {
         setFormBaseUomId((prev) => prev || uomsResult.content[0].id);
       }
@@ -111,7 +118,7 @@ export default function TenantProductsPage() {
   }, [slug]);
 
   const loadData = useCallback(
-    async (pg: number, srch: string, act: FilterActive, uomId: string, supId: string) => {
+    async (pg: number, srch: string, act: FilterActive, uomId: string, supId: string, catId: string) => {
       setIsLoading(true);
       setPageError(null);
       try {
@@ -122,6 +129,7 @@ export default function TenantProductsPage() {
           active: toActiveParam(act),
           baseUomId: uomId || undefined,
           supplierId: supId || undefined,
+          categoryId: catId || undefined,
         });
         setProducts(result.content);
         setTotalElements(result.totalElements);
@@ -138,7 +146,7 @@ export default function TenantProductsPage() {
 
   useEffect(() => {
     void loadLookups();
-    void loadData(0, search, activeFilter, baseUomId, supplierId);
+    void loadData(0, search, activeFilter, baseUomId, supplierId, categoryId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadLookups, loadData]);
 
@@ -147,7 +155,8 @@ export default function TenantProductsPage() {
     setActiveFilter(pendingActive);
     setBaseUomId(pendingBaseUomId);
     setSupplierId(pendingSupplierId);
-    void loadData(0, pendingSearch, pendingActive, pendingBaseUomId, pendingSupplierId);
+    setCategoryId(pendingCategoryId);
+    void loadData(0, pendingSearch, pendingActive, pendingBaseUomId, pendingSupplierId, pendingCategoryId);
   };
 
   const openCreate = () => {
@@ -156,6 +165,7 @@ export default function TenantProductsPage() {
     setFormName("");
     setFormDescription("");
     setFormBaseUomId(allUoms[0]?.id ?? "");
+    setFormCategoryId("");
     setFormTrackLot(false);
     setFormTrackExpiry(false);
     setFormSupplierIds([]);
@@ -172,6 +182,7 @@ export default function TenantProductsPage() {
     setFormName(product.name);
     setFormDescription(product.description ?? "");
     setFormBaseUomId(product.baseUomId);
+    setFormCategoryId(product.categoryId ?? "");
     setFormTrackLot(product.trackLot);
     setFormTrackExpiry(product.trackExpiry);
     const ids = product.suppliers.map((s) => s.supplierId);
@@ -212,6 +223,7 @@ export default function TenantProductsPage() {
         name: formName.trim(),
         description: formDescription.trim() || null,
         baseUomId: formBaseUomId,
+        categoryId: formCategoryId || null,
         trackLot: formTrackLot,
         trackExpiry: formTrackExpiry,
         supplierIds: formSupplierIds,
@@ -223,7 +235,7 @@ export default function TenantProductsPage() {
         await createProduct(slug, payload);
       }
       setIsFormOpen(false);
-      void loadData(0, search, activeFilter, baseUomId, supplierId);
+      void loadData(0, search, activeFilter, baseUomId, supplierId, categoryId);
     } catch (error) {
       setFormError(extractF0ErrorMessage(error) ?? t("products.actionFailed"));
     } finally {
@@ -234,7 +246,7 @@ export default function TenantProductsPage() {
   const handleSoftDelete = async (product: ProductResult) => {
     try {
       await softDeleteProduct(slug, product.id);
-      void loadData(page, search, activeFilter, baseUomId, supplierId);
+      void loadData(page, search, activeFilter, baseUomId, supplierId, categoryId);
     } catch (error) {
       setPageError(extractF0ErrorMessage(error) ?? t("products.actionFailed"));
     }
@@ -243,7 +255,7 @@ export default function TenantProductsPage() {
   const handleRestore = async (product: ProductResult) => {
     try {
       await restoreProduct(slug, product.id);
-      void loadData(page, search, activeFilter, baseUomId, supplierId);
+      void loadData(page, search, activeFilter, baseUomId, supplierId, categoryId);
     } catch (error) {
       setPageError(extractF0ErrorMessage(error) ?? t("products.actionFailed"));
     }
@@ -255,7 +267,7 @@ export default function TenantProductsPage() {
     try {
       await hardDeleteProduct(slug, hardDeleteTarget.id);
       setHardDeleteTarget(null);
-      void loadData(0, search, activeFilter, baseUomId, supplierId);
+      void loadData(0, search, activeFilter, baseUomId, supplierId, categoryId);
     } catch (error) {
       setPageError(extractF0ErrorMessage(error) ?? t("products.actionFailed"));
     } finally {
@@ -318,6 +330,19 @@ export default function TenantProductsPage() {
                 </option>
               ))}
             </select>
+            <select
+              className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={pendingCategoryId}
+              onChange={(e) => setPendingCategoryId(e.target.value)}
+              aria-label={t("products.categoryFilterLabel")}
+            >
+              <option value="">{t("products.categoryFilterAll")}</option>
+              {allCategories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
             <Button variant="outline" onClick={applyFilters}>
               {t("products.applyFilters")}
             </Button>
@@ -351,6 +376,7 @@ export default function TenantProductsPage() {
                     <th className="py-2 pe-4 text-start font-medium">{t("products.tableSku")}</th>
                     <th className="py-2 pe-4 text-start font-medium">{t("products.tableName")}</th>
                     <th className="py-2 pe-4 text-start font-medium">{t("products.tableUom")}</th>
+                    <th className="py-2 pe-4 text-start font-medium">{t("products.tableCategory")}</th>
                     <th className="py-2 pe-4 text-start font-medium">{t("products.tableStatus")}</th>
                     <th className="py-2 text-start font-medium">{t("products.tableActions")}</th>
                   </tr>
@@ -362,6 +388,9 @@ export default function TenantProductsPage() {
                       <td className="py-2 pe-4">{product.name}</td>
                       <td className="py-2 pe-4 text-muted-foreground">
                         {product.baseUomCode}
+                      </td>
+                      <td className="py-2 pe-4 text-muted-foreground">
+                        {product.categoryName ?? "—"}
                       </td>
                       <td className="py-2 pe-4">
                         <span
@@ -426,7 +455,7 @@ export default function TenantProductsPage() {
                 onClick={() => {
                   const prev = page - 1;
                   setPage(prev);
-                  void loadData(prev, search, activeFilter, baseUomId, supplierId);
+                  void loadData(prev, search, activeFilter, baseUomId, supplierId, categoryId);
                 }}
               >
                 {t("products.paginationPrevious")}
@@ -444,7 +473,7 @@ export default function TenantProductsPage() {
                 onClick={() => {
                   const next = page + 1;
                   setPage(next);
-                  void loadData(next, search, activeFilter, baseUomId, supplierId);
+                  void loadData(next, search, activeFilter, baseUomId, supplierId, categoryId);
                 }}
               >
                 {t("products.paginationNext")}
@@ -504,6 +533,22 @@ export default function TenantProductsPage() {
                 {allUoms.map((uom) => (
                   <option key={uom.id} value={uom.id}>
                     {uom.code} – {uom.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="product-category">{t("products.categoryLabel")}</Label>
+              <select
+                id="product-category"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={formCategoryId}
+                onChange={(e) => setFormCategoryId(e.target.value)}
+              >
+                <option value="">{t("products.categoryPlaceholder")}</option>
+                {allCategories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
                   </option>
                 ))}
               </select>
