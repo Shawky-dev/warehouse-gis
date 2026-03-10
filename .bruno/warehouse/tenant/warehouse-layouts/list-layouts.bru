@@ -1,0 +1,24 @@
+meta {
+  name: list-layouts
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{URL}}/{{TENANT_SLUG}}/warehouse-layouts?page=0&size=20
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

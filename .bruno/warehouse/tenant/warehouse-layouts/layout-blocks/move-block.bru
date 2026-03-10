@@ -1,0 +1,31 @@
+meta {
+  name: move-block
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{URL}}/{{TENANT_SLUG}}/warehouse-layouts/{{LAYOUT_ID}}/blocks/{{BLOCK_ID}}/move
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+body:json {
+  {
+    "parentId": null,
+    "position": 1
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

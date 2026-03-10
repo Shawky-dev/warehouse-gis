@@ -1,0 +1,35 @@
+meta {
+  name: create-template-custom-sides
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{URL}}/{{TENANT_SLUG}}/block-templates
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+body:json {
+  {
+    "name": "Zone",
+    "identifierFormat": "CUSTOM",
+    "sideConfig": "CUSTOM",
+    "sideOptions": ["North", "South", "East", "West"],
+    "required": false,
+    "description": "Custom zone with compass directions"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

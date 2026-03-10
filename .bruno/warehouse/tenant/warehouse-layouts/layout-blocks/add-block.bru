@@ -1,0 +1,32 @@
+meta {
+  name: add-block
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{URL}}/{{TENANT_SLUG}}/warehouse-layouts/{{LAYOUT_ID}}/blocks
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+body:json {
+  {
+    "blockTemplateId": "{{BLOCK_TEMPLATE_ID}}",
+    "parentId": null,
+    "position": null
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

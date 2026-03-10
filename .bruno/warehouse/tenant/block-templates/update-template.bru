@@ -1,0 +1,35 @@
+meta {
+  name: update-template
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{URL}}/{{TENANT_SLUG}}/block-templates/{{BLOCK_TEMPLATE_ID}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+body:json {
+  {
+    "name": "Bay",
+    "identifierFormat": "NUMERIC",
+    "sideConfig": "NONE",
+    "sideOptions": null,
+    "required": true,
+    "description": "Bay within an aisle side"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

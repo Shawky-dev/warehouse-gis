@@ -1,0 +1,30 @@
+meta {
+  name: reassign-template
+  type: http
+  seq: 6
+}
+
+put {
+  url: {{URL}}/{{TENANT_SLUG}}/warehouse-layouts/{{LAYOUT_ID}}/blocks/{{BLOCK_ID}}/template
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+body:json {
+  {
+    "blockTemplateId": "{{BLOCK_TEMPLATE_ID}}"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

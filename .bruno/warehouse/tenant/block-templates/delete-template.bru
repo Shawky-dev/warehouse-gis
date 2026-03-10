@@ -1,0 +1,24 @@
+meta {
+  name: delete-template
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{URL}}/{{TENANT_SLUG}}/block-templates/{{BLOCK_TEMPLATE_ID}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

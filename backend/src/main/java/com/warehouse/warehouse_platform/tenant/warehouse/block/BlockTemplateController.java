@@ -1,10 +1,11 @@
-package com.warehouse.warehouse_platform.tenant.warehouse.layout;
+package com.warehouse.warehouse_platform.tenant.warehouse.block;
 
 import com.warehouse.warehouse_platform.tenant.access.TenantAccessPolicy;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -20,107 +21,88 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/{tenantSlug}/warehouse-layouts")
+@RequestMapping("/{tenantSlug}/block-templates")
 @Validated
-public class WarehouseLayoutController {
+public class BlockTemplateController {
 
     private final TenantAccessPolicy tenantAccessPolicy;
-    private final WarehouseLayoutService warehouseLayoutService;
+    private final BlockTemplateService blockTemplateService;
 
-    public WarehouseLayoutController(
+    public BlockTemplateController(
             TenantAccessPolicy tenantAccessPolicy,
-            WarehouseLayoutService warehouseLayoutService) {
+            BlockTemplateService blockTemplateService) {
         this.tenantAccessPolicy = tenantAccessPolicy;
-        this.warehouseLayoutService = warehouseLayoutService;
+        this.blockTemplateService = blockTemplateService;
     }
 
     @GetMapping
     @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_VIEW)")
-    public ResponseEntity<WarehouseLayoutService.LayoutPageResult> listLayouts(
+    public ResponseEntity<BlockTemplateService.TemplatePageResult> listTemplates(
             @PathVariable String tenantSlug,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
             @RequestParam(required = false) String search,
-            @RequestParam(required = false) Boolean active,
             Authentication authentication) {
         tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
-        return ResponseEntity.ok(warehouseLayoutService.listLayouts(page, size, search, active));
+        return ResponseEntity.ok(blockTemplateService.listTemplates(page, size, search));
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_VIEW)")
-    public ResponseEntity<WarehouseLayoutService.LayoutResult> getLayout(
+    public ResponseEntity<BlockTemplateService.TemplateResult> getTemplate(
             @PathVariable String tenantSlug,
             @PathVariable UUID id,
             Authentication authentication) {
         tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
-        return ResponseEntity.ok(warehouseLayoutService.getLayout(id));
+        return ResponseEntity.ok(blockTemplateService.getTemplate(id));
     }
 
     @PostMapping
     @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_EDIT)")
-    public ResponseEntity<WarehouseLayoutService.LayoutResult> createLayout(
+    public ResponseEntity<BlockTemplateService.TemplateResult> createTemplate(
             @PathVariable String tenantSlug,
-            @Valid @RequestBody CreateLayoutRequest request,
+            @Valid @RequestBody TemplateRequest request,
             Authentication authentication) {
         tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
-        return ResponseEntity.ok(warehouseLayoutService.createLayout(request.name(), request.description()));
+        return ResponseEntity.ok(blockTemplateService.createTemplate(
+                request.name(), request.identifierFormat(), request.sideConfig(),
+                request.sideOptions(), request.required(), request.description()));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_EDIT)")
-    public ResponseEntity<WarehouseLayoutService.LayoutResult> updateLayout(
+    public ResponseEntity<BlockTemplateService.TemplateResult> updateTemplate(
             @PathVariable String tenantSlug,
             @PathVariable UUID id,
-            @Valid @RequestBody UpdateLayoutRequest request,
+            @Valid @RequestBody TemplateRequest request,
             Authentication authentication) {
         tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
-        return ResponseEntity.ok(warehouseLayoutService.updateLayout(id, request.name(), request.description()));
-    }
-
-    @PostMapping("/{id}/activate")
-    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_EDIT)")
-    public ResponseEntity<Void> activateLayout(
-            @PathVariable String tenantSlug,
-            @PathVariable UUID id,
-            Authentication authentication) {
-        tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
-        warehouseLayoutService.activateLayout(id);
-        return ResponseEntity.noContent().build();
-    }
-
-    @PostMapping("/{id}/deactivate")
-    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_EDIT)")
-    public ResponseEntity<Void> deactivateLayout(
-            @PathVariable String tenantSlug,
-            @PathVariable UUID id,
-            Authentication authentication) {
-        tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
-        warehouseLayoutService.deactivateLayout(id);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(blockTemplateService.updateTemplate(
+                id, request.name(), request.identifierFormat(), request.sideConfig(),
+                request.sideOptions(), request.required(), request.description()));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_HARD_DELETE)")
-    public ResponseEntity<Void> deleteLayout(
+    public ResponseEntity<Void> deleteTemplate(
             @PathVariable String tenantSlug,
             @PathVariable UUID id,
             Authentication authentication) {
         tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
-        warehouseLayoutService.deleteLayout(id);
+        blockTemplateService.deleteTemplate(id);
         return ResponseEntity.noContent().build();
     }
 
-    public record CreateLayoutRequest(
-            @NotBlank @Size(max = 120) String name,
-            @Size(max = 500) String description) {
-    }
-
-    public record UpdateLayoutRequest(
-            @NotBlank @Size(max = 120) String name,
+    public record TemplateRequest(
+            @NotBlank @Size(max = 100) String name,
+            @NotNull BlockTemplate.IdentifierFormat identifierFormat,
+            BlockTemplate.SideConfig sideConfig,
+            List<String> sideOptions,
+            boolean required,
             @Size(max = 500) String description) {
     }
 }

@@ -1,0 +1,32 @@
+meta {
+  name: add-block-nested
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{URL}}/{{TENANT_SLUG}}/warehouse-layouts/{{LAYOUT_ID}}/blocks
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+body:json {
+  {
+    "blockTemplateId": "{{BLOCK_TEMPLATE_ID}}",
+    "parentId": "{{PARENT_BLOCK_ID}}",
+    "position": 0
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

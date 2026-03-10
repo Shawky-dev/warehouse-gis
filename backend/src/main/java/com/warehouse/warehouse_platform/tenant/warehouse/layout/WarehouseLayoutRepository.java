@@ -6,7 +6,12 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface WarehouseLayoutRepository extends JpaRepository<WarehouseLayout, UUID>, JpaSpecificationExecutor<WarehouseLayout> {
+public interface WarehouseLayoutRepository
+        extends JpaRepository<WarehouseLayout, UUID>, JpaSpecificationExecutor<WarehouseLayout> {
 
-    Optional<WarehouseLayout> findByCodeIgnoreCase(String code);
+    Optional<WarehouseLayout> findByNameIgnoreCase(String name);
+
+    Optional<WarehouseLayout> findByIsActiveTrue();
+
+    boolean existsByIsActiveTrue();
 }

@@ -1,0 +1,35 @@
+meta {
+  name: create-template
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{URL}}/{{TENANT_SLUG}}/block-templates
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+body:json {
+  {
+    "name": "Aisle",
+    "identifierFormat": "ALPHA",
+    "sideConfig": "LR",
+    "sideOptions": null,
+    "required": true,
+    "description": "Main warehouse aisle"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

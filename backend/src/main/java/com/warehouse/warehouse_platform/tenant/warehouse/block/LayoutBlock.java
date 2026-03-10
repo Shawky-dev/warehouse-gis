@@ -1,4 +1,4 @@
-package com.warehouse.warehouse_platform.tenant.warehouse.layout;
+package com.warehouse.warehouse_platform.tenant.warehouse.block;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -15,27 +15,38 @@ import lombok.Setter;
 import java.time.Instant;
 import java.util.UUID;
 
+/**
+ * A node in the ordered, nested tree of block templates that defines
+ * the physical structure of a warehouse layout.
+ *
+ * parentId = NULL means this is a root-level block (top of the hierarchy).
+ * position is the ordering index within the same parent (0-based).
+ */
 @Entity
-@Table(name = "warehouse_layouts")
+@Table(name = "layout_blocks")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class WarehouseLayout {
+public class LayoutBlock {
 
     @Id
     private UUID id;
 
-    @Column(nullable = false, length = 120)
-    private String name;
+    @Column(name = "layout_id", nullable = false)
+    private UUID layoutId;
 
-    @Column(length = 500)
-    private String description;
+    @Column(name = "block_template_id", nullable = false)
+    private UUID blockTemplateId;
 
-    @Column(name = "is_active", nullable = false)
-    @Builder.Default
-    private Boolean isActive = false;
+    /** NULL = root level */
+    @Column(name = "parent_id")
+    private UUID parentId;
+
+    /** 0-based ordering index within the same parent */
+    @Column(nullable = false)
+    private Integer position;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -45,15 +56,10 @@ public class WarehouseLayout {
 
     @PrePersist
     public void prePersist() {
-        if (id == null) {
-            id = UUID.randomUUID();
-        }
+        if (id == null) id = UUID.randomUUID();
         Instant now = Instant.now();
         createdAt = now;
         updatedAt = now;
-        if (isActive == null) {
-            isActive = false;
-        }
     }
 
     @PreUpdate

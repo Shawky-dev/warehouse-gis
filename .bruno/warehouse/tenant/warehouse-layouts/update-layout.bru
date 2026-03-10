@@ -1,0 +1,31 @@
+meta {
+  name: update-layout
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{URL}}/{{TENANT_SLUG}}/warehouse-layouts/{{LAYOUT_ID}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+body:json {
+  {
+    "name": "Updated Layout Name",
+    "description": "Updated description"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

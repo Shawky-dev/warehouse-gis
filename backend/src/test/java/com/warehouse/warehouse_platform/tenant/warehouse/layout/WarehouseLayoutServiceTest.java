@@ -1,9 +1,8 @@
 package com.warehouse.warehouse_platform.tenant.warehouse.layout;
 
 import com.warehouse.warehouse_platform.tenant.audit.TenantAuditService;
-import com.warehouse.warehouse_platform.tenant.warehouse.aisle.WarehouseAisleRepository;
+import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlockRepository;
 import com.warehouse.warehouse_platform.tenant.warehouse.common.WarehouseManagementException;
-import com.warehouse.warehouse_platform.tenant.warehouse.shelf.WarehouseShelfRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,143 +11,157 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
-import java.util.Collections;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class WarehouseLayoutServiceTest {
 
-    @Mock
-    private WarehouseLayoutRepository layoutRepository;
-
-    @Mock
-    private WarehouseAisleRepository aisleRepository;
-
-    @Mock
-    private WarehouseShelfRepository shelfRepository;
-
-    @Mock
-    private TenantAuditService tenantAuditService;
+    @Mock private WarehouseLayoutRepository layoutRepository;
+    @Mock private LayoutBlockRepository layoutBlockRepository;
+    @Mock private TenantAuditService tenantAuditService;
 
     private WarehouseLayoutService service;
 
     @BeforeEach
     void setUp() {
-        service = new WarehouseLayoutService(layoutRepository, aisleRepository, shelfRepository, tenantAuditService);
+        service = new WarehouseLayoutService(layoutRepository, layoutBlockRepository, tenantAuditService);
     }
 
+    // -------------------------------------------------------------------------
+    // createLayout
+    // -------------------------------------------------------------------------
+
     @Test
-    void createLayout_shouldNormalizeCodeAndAudit() {
-        when(layoutRepository.findByCodeIgnoreCase("WH1")).thenReturn(Optional.empty());
-        when(layoutRepository.save(any(WarehouseLayout.class))).thenAnswer(invocation -> {
-            WarehouseLayout saved = invocation.getArgument(0);
-            saved.setId(UUID.fromString("11111111-1111-1111-1111-111111111111"));
-            saved.setCreatedAt(Instant.parse("2026-03-01T00:00:00Z"));
-            saved.setUpdatedAt(Instant.parse("2026-03-01T00:00:00Z"));
-            return saved;
+    void createLayout_shouldSaveAndAudit() {
+        when(layoutRepository.findByNameIgnoreCase("Main Warehouse")).thenReturn(Optional.empty());
+        when(layoutRepository.save(any())).thenAnswer(inv -> {
+            WarehouseLayout l = inv.getArgument(0);
+            l.setId(UUID.fromString("11111111-1111-1111-1111-111111111111"));
+            l.setCreatedAt(Instant.parse("2026-03-01T00:00:00Z"));
+            l.setUpdatedAt(Instant.parse("2026-03-01T00:00:00Z"));
+            return l;
         });
 
-        WarehouseLayoutService.LayoutResult result = service.createLayout(" wh1 ", "Main Warehouse", null);
+        WarehouseLayoutService.LayoutResult result = service.createLayout("Main Warehouse", "A description");
 
-        assertEquals("WH1", result.code());
         assertEquals("Main Warehouse", result.name());
-        verify(tenantAuditService).record(
-                eq("WAREHOUSE_LAYOUT_CREATE"), eq("WAREHOUSE_LAYOUT"), eq(result.id().toString()), eq(null), any());
-
-        ArgumentCaptor<WarehouseLayout> captor = ArgumentCaptor.forClass(WarehouseLayout.class);
-        verify(layoutRepository).save(captor.capture());
-        assertEquals("WH1", captor.getValue().getCode());
+        assertEquals("A description", result.description());
+        assertFalse(result.isActive());
+        verify(tenantAuditService).record(eq("WAREHOUSE_LAYOUT_CREATE"), eq("WAREHOUSE_LAYOUT"),
+                eq(result.id().toString()), eq(null), any());
     }
 
     @Test
-    void createLayout_shouldRejectDuplicateCode() {
-        when(layoutRepository.findByCodeIgnoreCase("WH1"))
-                .thenReturn(Optional.of(layout(UUID.randomUUID(), "WH1", true)));
+    void createLayout_shouldRejectDuplicateName() {
+        when(layoutRepository.findByNameIgnoreCase("Dupe"))
+                .thenReturn(Optional.of(layout(UUID.randomUUID(), "Dupe", false)));
 
-        WarehouseManagementException ex = assertThrows(
-                WarehouseManagementException.class,
-                () -> service.createLayout("WH1", "Duplicate", null));
-
+        WarehouseManagementException ex = assertThrows(WarehouseManagementException.class,
+                () -> service.createLayout("Dupe", null));
         assertEquals("CONFLICT", ex.getCode());
     }
 
     @Test
-    void createLayout_shouldRejectNonAlphanumericCode() {
-        WarehouseManagementException ex = assertThrows(
-                WarehouseManagementException.class,
-                () -> service.createLayout("WH-1", "Bad Code", null));
-
+    void createLayout_shouldRejectBlankName() {
+        WarehouseManagementException ex = assertThrows(WarehouseManagementException.class,
+                () -> service.createLayout("   ", null));
         assertEquals("BAD_REQUEST", ex.getCode());
     }
 
+    // -------------------------------------------------------------------------
+    // activateLayout — one-active constraint
+    // -------------------------------------------------------------------------
+
     @Test
-    void hardDeleteLayout_shouldRejectWhenStillActive() {
-        UUID layoutId = UUID.fromString("22222222-2222-2222-2222-222222222222");
-        when(layoutRepository.findById(layoutId)).thenReturn(Optional.of(layout(layoutId, "WH1", true)));
+    void activateLayout_shouldDeactivatePreviousAndActivateNew() {
+        UUID currentActiveId = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        UUID newId = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
 
-        WarehouseManagementException ex = assertThrows(
-                WarehouseManagementException.class,
-                () -> service.hardDeleteLayout(layoutId));
+        WarehouseLayout currentActive = layout(currentActiveId, "Old", true);
+        WarehouseLayout toActivate = layout(newId, "New", false);
 
+        when(layoutRepository.findById(newId)).thenReturn(Optional.of(toActivate));
+        when(layoutRepository.findByIsActiveTrue()).thenReturn(Optional.of(currentActive));
+        when(layoutRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.activateLayout(newId);
+
+        assertFalse(currentActive.getIsActive());
+        assertTrue(toActivate.getIsActive());
+
+        ArgumentCaptor<WarehouseLayout> captor = ArgumentCaptor.forClass(WarehouseLayout.class);
+        verify(layoutRepository, org.mockito.Mockito.times(2)).save(captor.capture());
+    }
+
+    @Test
+    void activateLayout_shouldBeNoopIfAlreadyActive() {
+        UUID id = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
+        when(layoutRepository.findById(id)).thenReturn(Optional.of(layout(id, "Layout", true)));
+
+        service.activateLayout(id);
+
+        verify(layoutRepository, never()).save(any());
+    }
+
+    // -------------------------------------------------------------------------
+    // deleteLayout
+    // -------------------------------------------------------------------------
+
+    @Test
+    void deleteLayout_shouldRejectActiveLayout() {
+        UUID id = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd");
+        when(layoutRepository.findById(id)).thenReturn(Optional.of(layout(id, "Active", true)));
+
+        WarehouseManagementException ex = assertThrows(WarehouseManagementException.class,
+                () -> service.deleteLayout(id));
         assertEquals("FORBIDDEN", ex.getCode());
     }
 
     @Test
-    void hardDeleteLayout_shouldRejectWhenAislesExist() {
-        UUID layoutId = UUID.fromString("33333333-3333-3333-3333-333333333333");
-        when(layoutRepository.findById(layoutId)).thenReturn(Optional.of(layout(layoutId, "WH1", false)));
-        when(aisleRepository.countByLayout_Id(layoutId)).thenReturn(2L);
+    void deleteLayout_shouldRejectWhenBlocksExist() {
+        UUID id = UUID.fromString("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
+        when(layoutRepository.findById(id)).thenReturn(Optional.of(layout(id, "Inactive", false)));
+        when(layoutBlockRepository.countByLayoutId(id)).thenReturn(3L);
 
-        WarehouseManagementException ex = assertThrows(
-                WarehouseManagementException.class,
-                () -> service.hardDeleteLayout(layoutId));
-
+        WarehouseManagementException ex = assertThrows(WarehouseManagementException.class,
+                () -> service.deleteLayout(id));
         assertEquals("CONFLICT", ex.getCode());
     }
 
     @Test
-    void hardDeleteLayout_shouldDeleteWhenInactiveAndNoAisles() {
-        UUID layoutId = UUID.fromString("44444444-4444-4444-4444-444444444444");
-        when(layoutRepository.findById(layoutId)).thenReturn(Optional.of(layout(layoutId, "WH1", false)));
-        when(aisleRepository.countByLayout_Id(layoutId)).thenReturn(0L);
+    void deleteLayout_shouldSucceedWhenInactiveAndEmpty() {
+        UUID id = UUID.fromString("ffffffff-ffff-ffff-ffff-ffffffffffff");
+        WarehouseLayout l = layout(id, "Empty", false);
+        when(layoutRepository.findById(id)).thenReturn(Optional.of(l));
+        when(layoutBlockRepository.countByLayoutId(id)).thenReturn(0L);
 
-        service.hardDeleteLayout(layoutId);
+        service.deleteLayout(id);
 
-        verify(layoutRepository).delete(any(WarehouseLayout.class));
-        verify(tenantAuditService).record(
-                eq("WAREHOUSE_LAYOUT_HARD_DELETE"), eq("WAREHOUSE_LAYOUT"), eq(layoutId.toString()), any(), eq(null));
+        verify(layoutRepository).delete(l);
+        verify(tenantAuditService).record(eq("WAREHOUSE_LAYOUT_DELETE"), eq("WAREHOUSE_LAYOUT"),
+                eq(id.toString()), any(), eq(null));
     }
 
-    @Test
-    void updateLayout_shouldCascadeRenameWhenCodeChanges() {
-        UUID layoutId = UUID.fromString("55555555-5555-5555-5555-555555555555");
-        WarehouseLayout existing = layout(layoutId, "WH1", true);
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
 
-        when(layoutRepository.findById(layoutId)).thenReturn(Optional.of(existing));
-        when(layoutRepository.findByCodeIgnoreCase("WH2")).thenReturn(Optional.empty());
-        when(layoutRepository.save(any(WarehouseLayout.class))).thenReturn(existing);
-        when(shelfRepository.findAllByLayoutId(layoutId)).thenReturn(Collections.emptyList());
-
-        service.updateLayout(layoutId, "WH2", "Updated Warehouse", null);
-
-        verify(shelfRepository).findAllByLayoutId(layoutId);
-        verify(shelfRepository).saveAll(any());
-    }
-
-    private WarehouseLayout layout(UUID id, String code, boolean active) {
+    private WarehouseLayout layout(UUID id, String name, boolean active) {
         return WarehouseLayout.builder()
                 .id(id)
-                .code(code)
-                .name("Test Warehouse")
-                .active(active)
+                .name(name)
+                .isActive(active)
                 .createdAt(Instant.parse("2026-01-01T00:00:00Z"))
                 .updatedAt(Instant.parse("2026-01-01T00:00:00Z"))
                 .build();
