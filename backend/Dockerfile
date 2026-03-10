@@ -19,8 +19,6 @@ COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 
 RUN chmod 500 /app/docker-entrypoint.sh && chown -R app:app /app
 
-USER app
-
 EXPOSE 8080
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]

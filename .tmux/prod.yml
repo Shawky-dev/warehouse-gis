@@ -5,7 +5,7 @@ windows:
   - window_name: infra
     layout: even-vertical
     panes:
-      - docker compose up -d
+      - docker compose up -d --wait
       - watch -n 3 docker compose ps
 
   - window_name: logs
@@ -22,8 +22,9 @@ windows:
         if [ -n "${NGROK_AUTHTOKEN:-}" ]; then
           ngrok config add-authtoken "$NGROK_AUTHTOKEN" >/dev/null 2>&1 || true;
         fi;
+        APP_PORT="${FRONTEND_PORT:-8080}";
         if [ -n "${NGROK_DOMAIN:-}" ]; then
-          exec ngrok http --domain="$NGROK_DOMAIN" 80;
+          exec ngrok http --domain="$NGROK_DOMAIN" "$APP_PORT";
         else
-          exec ngrok http 80;
+          exec ngrok http "$APP_PORT";
         fi'
