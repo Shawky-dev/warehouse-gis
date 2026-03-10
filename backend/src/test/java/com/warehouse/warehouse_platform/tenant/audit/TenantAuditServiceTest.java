@@ -16,10 +16,10 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -63,7 +63,13 @@ class TenantAuditServiceTest {
         assertEquals("PRODUCT_CREATE", saved.getAction());
         assertEquals("PRODUCT", saved.getEntityType());
         assertEquals("acme", saved.getTenantId());
+        // actorRoles must be serialized as a JSON array string (valid for jsonb column)
+        assertDoesNotThrow(() -> new ObjectMapper().readTree(saved.getActorRoles()),
+                "actorRoles must be valid JSON for the jsonb column");
         assertTrue(saved.getActorRoles().contains("ROLE_ADMIN"));
+        // afterState must be valid JSON too
+        assertDoesNotThrow(() -> new ObjectMapper().readTree(saved.getAfterState()),
+                "afterState must be valid JSON for the jsonb column");
         assertTrue(saved.getAfterState().contains("SKU-1"));
     }
 

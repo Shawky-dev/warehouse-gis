@@ -22,7 +22,7 @@ function renderTenantNavbar(path = "/acme") {
 }
 
 describe("TenantNavbar RBAC", () => {
-  it("shows dashboard and products for users without tenant RBAC permissions", () => {
+  it("shows only dashboard for users without any permissions", () => {
     mockUseAuth.mockReturnValue({
       hasPermission: () => false,
     });
@@ -30,12 +30,15 @@ describe("TenantNavbar RBAC", () => {
     renderTenantNavbar();
 
     expect(screen.getByText("Dashboard")).toBeInTheDocument();
-    expect(screen.getByText("Products")).toBeInTheDocument();
+    expect(screen.queryByText("Products")).not.toBeInTheDocument();
     expect(screen.queryByText("Users")).not.toBeInTheDocument();
     expect(screen.queryByText("Roles")).not.toBeInTheDocument();
+    expect(screen.queryByText("Units of Measure")).not.toBeInTheDocument();
+    expect(screen.queryByText("Suppliers")).not.toBeInTheDocument();
+    expect(screen.queryByText("Audit Logs")).not.toBeInTheDocument();
   });
 
-  it("shows users and roles links when tenant permissions are granted", () => {
+  it("shows users and roles links when RBAC permissions are granted", () => {
     const permissions: string[] = [TENANT_PERMISSIONS.USERS_VIEW, TENANT_PERMISSIONS.ROLES_EDIT];
 
     mockUseAuth.mockReturnValue({
@@ -46,5 +49,43 @@ describe("TenantNavbar RBAC", () => {
 
     expect(screen.getByText("Users")).toBeInTheDocument();
     expect(screen.getByText("Roles")).toBeInTheDocument();
+  });
+
+  it("shows UOMs, Suppliers, Products links when F0 permissions are granted", () => {
+    const permissions: string[] = [
+      TENANT_PERMISSIONS.PRODUCTS_VIEW,
+      TENANT_PERMISSIONS.UOMS_VIEW,
+      TENANT_PERMISSIONS.SUPPLIERS_VIEW,
+    ];
+
+    mockUseAuth.mockReturnValue({
+      hasPermission: (permission: string) => permissions.includes(permission),
+    });
+
+    renderTenantNavbar();
+
+    expect(screen.getByText("Products")).toBeInTheDocument();
+    expect(screen.getByText("Units of Measure")).toBeInTheDocument();
+    expect(screen.getByText("Suppliers")).toBeInTheDocument();
+  });
+
+  it("shows Audit Logs link when audit.view permission is granted", () => {
+    mockUseAuth.mockReturnValue({
+      hasPermission: (permission: string) => permission === TENANT_PERMISSIONS.AUDIT_VIEW,
+    });
+
+    renderTenantNavbar();
+
+    expect(screen.getByText("Audit Logs")).toBeInTheDocument();
+  });
+
+  it("hides Audit Logs link when audit.view permission is missing", () => {
+    mockUseAuth.mockReturnValue({
+      hasPermission: () => false,
+    });
+
+    renderTenantNavbar();
+
+    expect(screen.queryByText("Audit Logs")).not.toBeInTheDocument();
   });
 });

@@ -1,5 +1,8 @@
 package com.warehouse.warehouse_platform.tenant.audit;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -32,6 +35,7 @@ public class AuditLog {
     @Column(name = "actor_email", nullable = false, length = 255)
     private String actorEmail;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "actor_roles", nullable = false, columnDefinition = "jsonb")
     private String actorRoles;
 
@@ -44,9 +48,11 @@ public class AuditLog {
     @Column(name = "entity_id", nullable = false, length = 80)
     private String entityId;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "before_state", columnDefinition = "jsonb")
     private String beforeState;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "after_state", columnDefinition = "jsonb")
     private String afterState;
 

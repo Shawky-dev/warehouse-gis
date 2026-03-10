@@ -1,6 +1,6 @@
 import { useMemo, type ComponentType } from "react";
 import { NavLink, useParams } from "react-router-dom";
-import { Home, Box, Shield, Users, Warehouse } from "lucide-react";
+import { Home, Box, Shield, Users, Warehouse, Ruler, Truck, ClipboardList } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { PATHS } from "@/shared/consts/paths";
@@ -24,6 +24,10 @@ export function TenantNavbar() {
 
   const canViewUsers = hasPermission(TENANT_PERMISSIONS.USERS_VIEW);
   const canViewRoles = hasPermission(TENANT_PERMISSIONS.ROLES_EDIT);
+  const canViewProducts = hasPermission(TENANT_PERMISSIONS.PRODUCTS_VIEW);
+  const canViewUoms = hasPermission(TENANT_PERMISSIONS.UOMS_VIEW);
+  const canViewSuppliers = hasPermission(TENANT_PERMISSIONS.SUPPLIERS_VIEW);
+  const canViewAudit = hasPermission(TENANT_PERMISSIONS.AUDIT_VIEW);
 
   const navItems = useMemo<TenantNavItem[]>(
     () =>
@@ -34,11 +38,33 @@ export function TenantNavbar() {
           icon: Home,
           end: true,
         },
-        {
-          to: PATHS.TENANT.products(normalizedSlug),
-          label: t("tenant.nav.products"),
-          icon: Box,
-        },
+        ...(canViewProducts
+          ? [
+              {
+                to: PATHS.TENANT.products(normalizedSlug),
+                label: t("tenant.nav.products"),
+                icon: Box,
+              },
+            ]
+          : []),
+        ...(canViewUoms
+          ? [
+              {
+                to: PATHS.TENANT.uoms(normalizedSlug),
+                label: t("tenant.nav.uoms"),
+                icon: Ruler,
+              },
+            ]
+          : []),
+        ...(canViewSuppliers
+          ? [
+              {
+                to: PATHS.TENANT.suppliers(normalizedSlug),
+                label: t("tenant.nav.suppliers"),
+                icon: Truck,
+              },
+            ]
+          : []),
         ...(canViewUsers
           ? [
               {
@@ -57,8 +83,26 @@ export function TenantNavbar() {
               },
             ]
           : []),
+        ...(canViewAudit
+          ? [
+              {
+                to: PATHS.TENANT.auditLogs(normalizedSlug),
+                label: t("tenant.nav.auditLogs"),
+                icon: ClipboardList,
+              },
+            ]
+          : []),
       ],
-    [canViewRoles, canViewUsers, normalizedSlug, t]
+    [
+      canViewAudit,
+      canViewProducts,
+      canViewRoles,
+      canViewSuppliers,
+      canViewUoms,
+      canViewUsers,
+      normalizedSlug,
+      t,
+    ]
   );
 
   return (

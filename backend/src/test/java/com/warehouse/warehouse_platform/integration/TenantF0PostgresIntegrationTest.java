@@ -2,6 +2,8 @@ package com.warehouse.warehouse_platform.integration;
 
 import com.warehouse.warehouse_platform.multi_tenancy.service.TenantManagementService;
 import com.warehouse.warehouse_platform.multi_tenancy.util.TenantContext;
+import com.warehouse.warehouse_platform.tenant.audit.AuditLog;
+import com.warehouse.warehouse_platform.tenant.audit.AuditLogRepository;
 import com.warehouse.warehouse_platform.tenant.audit.TenantAuditService;
 import com.warehouse.warehouse_platform.tenant.product.TenantProductManagementException;
 import com.warehouse.warehouse_platform.tenant.product.TenantProductManagementService;
@@ -17,10 +19,12 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -30,7 +34,7 @@ class TenantF0PostgresIntegrationTest {
 
     @Container
     @SuppressWarnings("resource")
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
+    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgis/postgis:15-3.4")
             .withDatabaseName("warehouse_test")
             .withUsername("warehouse")
             .withPassword("warehouse");
@@ -49,6 +53,9 @@ class TenantF0PostgresIntegrationTest {
 
     @Autowired
     private TenantAuditService tenantAuditService;
+
+    @Autowired
+    private AuditLogRepository auditLogRepository;
 
     @DynamicPropertySource
     static void overrideProperties(DynamicPropertyRegistry registry) {
@@ -149,6 +156,40 @@ class TenantF0PostgresIntegrationTest {
         assertTrue(actions.contains("PRODUCT_UPDATE"));
         assertTrue(actions.contains("PRODUCT_HARD_DELETE"));
         assertTrue(auditPage.content().stream().allMatch(item -> "system".equals(item.actorEmail())));
+    }
+
+    @Test
+    void auditLog_shouldPersistJsonbFieldsAndReadBack() {
+        String tenant = uniqueTenant("jsonb");
+        createTenant(tenant);
+        TenantContext.setTenantId(tenant);
+
+        UUID entityId = UUID.randomUUID();
+        AuditLog log = AuditLog.builder()
+                .actorEmail("admin@test.local")
+                .actorRoles("[\"ROLE_ADMIN\",\"ROLE_MANAGER\"]")
+                .action("UOM_CREATE")
+                .entityType("UOM")
+                .entityId(entityId.toString())
+                .beforeState(null)
+                .afterState("{\"code\":\"KG\",\"name\":\"Kilogram\"}")
+                .tenantId(tenant)
+                .requestPath("/" + tenant + "/uoms")
+                .requestMethod("POST")
+                .build();
+
+        auditLogRepository.save(log);
+
+        TenantAuditService.AuditPageResult page = tenantAuditService.listAuditLogs(
+                0, 10, null, "UOM_CREATE", "UOM", entityId.toString(), null, null);
+
+        assertEquals(1, page.totalElements());
+        TenantAuditService.AuditLogItem saved = page.content().getFirst();
+        assertNotNull(saved.actorRoles());
+        assertTrue(saved.actorRoles().contains("ROLE_ADMIN"));
+        assertTrue(saved.actorRoles().contains("ROLE_MANAGER"));
+        assertNotNull(saved.afterState());
+        assertTrue(saved.afterState().contains("KG"));
     }
 
     private void createTenant(String tenantSlug) {

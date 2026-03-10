@@ -19,6 +19,22 @@ vi.mock("@/features/tenant/roles/TenantRolesPage", () => ({
   default: () => <p>tenant-roles-page</p>,
 }));
 
+vi.mock("@/features/tenant/uom/TenantUomsPage", () => ({
+  default: () => <p>tenant-uoms-page</p>,
+}));
+
+vi.mock("@/features/tenant/supplier/TenantSuppliersPage", () => ({
+  default: () => <p>tenant-suppliers-page</p>,
+}));
+
+vi.mock("@/features/tenant/products/TenantProductsPage", () => ({
+  default: () => <p>tenant-products-page</p>,
+}));
+
+vi.mock("@/features/tenant/audit/TenantAuditLogsPage", () => ({
+  default: () => <p>tenant-audit-page</p>,
+}));
+
 function renderTenantRoute(path: string) {
   return render(
     <I18nProvider initialLocale="en" storageKey="test-locale-tenant-routes">
@@ -82,5 +98,97 @@ describe("tenant routes RBAC", () => {
     renderTenantRoute("/acme/roles");
 
     expect(screen.getByText("tenant-roles-page")).toBeInTheDocument();
+  });
+
+  it("blocks uoms route when tenant.uoms.view permission is missing", () => {
+    mockUseAuth.mockReturnValue({
+      status: "authenticated",
+      hasPermission: () => false,
+    });
+
+    renderTenantRoute("/acme/uoms");
+
+    expect(screen.queryByText("tenant-uoms-page")).not.toBeInTheDocument();
+    expect(screen.getByText("Access denied")).toBeInTheDocument();
+  });
+
+  it("renders uoms route when tenant.uoms.view permission is present", () => {
+    mockUseAuth.mockReturnValue({
+      status: "authenticated",
+      hasPermission: (permission: string) => permission === TENANT_PERMISSIONS.UOMS_VIEW,
+    });
+
+    renderTenantRoute("/acme/uoms");
+
+    expect(screen.getByText("tenant-uoms-page")).toBeInTheDocument();
+  });
+
+  it("blocks suppliers route when tenant.suppliers.view permission is missing", () => {
+    mockUseAuth.mockReturnValue({
+      status: "authenticated",
+      hasPermission: () => false,
+    });
+
+    renderTenantRoute("/acme/suppliers");
+
+    expect(screen.queryByText("tenant-suppliers-page")).not.toBeInTheDocument();
+    expect(screen.getByText("Access denied")).toBeInTheDocument();
+  });
+
+  it("renders suppliers route when tenant.suppliers.view permission is present", () => {
+    mockUseAuth.mockReturnValue({
+      status: "authenticated",
+      hasPermission: (permission: string) => permission === TENANT_PERMISSIONS.SUPPLIERS_VIEW,
+    });
+
+    renderTenantRoute("/acme/suppliers");
+
+    expect(screen.getByText("tenant-suppliers-page")).toBeInTheDocument();
+  });
+
+  it("blocks products route when tenant.products.view permission is missing", () => {
+    mockUseAuth.mockReturnValue({
+      status: "authenticated",
+      hasPermission: () => false,
+    });
+
+    renderTenantRoute("/acme/products");
+
+    expect(screen.queryByText("tenant-products-page")).not.toBeInTheDocument();
+    expect(screen.getByText("Access denied")).toBeInTheDocument();
+  });
+
+  it("renders products route when tenant.products.view permission is present", () => {
+    mockUseAuth.mockReturnValue({
+      status: "authenticated",
+      hasPermission: (permission: string) => permission === TENANT_PERMISSIONS.PRODUCTS_VIEW,
+    });
+
+    renderTenantRoute("/acme/products");
+
+    expect(screen.getByText("tenant-products-page")).toBeInTheDocument();
+  });
+
+  it("blocks audit-logs route when tenant.audit.view permission is missing", () => {
+    mockUseAuth.mockReturnValue({
+      status: "authenticated",
+      hasPermission: () => false,
+    });
+
+    renderTenantRoute("/acme/audit-logs");
+
+    expect(screen.queryByText("tenant-audit-page")).not.toBeInTheDocument();
+    expect(screen.getByText("Access denied")).toBeInTheDocument();
+  });
+
+  it("renders audit-logs route when tenant.audit.view permission is present", () => {
+    mockUseAuth.mockReturnValue({
+      status: "authenticated",
+      hasPermission: (permission: string) => permission === TENANT_PERMISSIONS.AUDIT_VIEW,
+    });
+
+    renderTenantRoute("/acme/audit-logs");
+
+    expect(screen.getByText("tenant-audit-page")).toBeInTheDocument();
   });
 });
