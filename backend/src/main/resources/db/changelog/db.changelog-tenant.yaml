@@ -69,3 +69,17 @@ databaseChangeLog:
         - sqlFile:
             path: db/migration/tenant/V10__seed_category_permissions.sql
             relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-f1-warehouse-11
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V11__create_f1_warehouse_layout_tables.sql
+            relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-f1-warehouse-permissions-12
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V12__seed_f1_warehouse_permissions.sql
+            relativeToChangelogFile: false

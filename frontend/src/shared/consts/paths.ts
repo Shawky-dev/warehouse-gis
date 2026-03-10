@@ -21,6 +21,12 @@ export const PATHS = {
     UOMS_PATTERN: "/:tenantSlug/uoms",
     SUPPLIERS_PATTERN: "/:tenantSlug/suppliers",
     CATEGORIES_PATTERN: "/:tenantSlug/categories",
+    WAREHOUSE_LAYOUTS_PATTERN: "/:tenantSlug/warehouse-layouts",
+    WAREHOUSE_AISLES_PATTERN: "/:tenantSlug/warehouse-layouts/:layoutId/aisles",
+    WAREHOUSE_SIDES_PATTERN: "/:tenantSlug/aisles/:aisleId/sides",
+    WAREHOUSE_BAYS_PATTERN: "/:tenantSlug/sides/:sideId/bays",
+    WAREHOUSE_LEVELS_PATTERN: "/:tenantSlug/bays/:bayId/levels",
+    WAREHOUSE_SHELVES_PATTERN: "/:tenantSlug/bay-levels/:levelId/shelves",
     AUDIT_LOGS_PATTERN: "/:tenantSlug/audit-logs",
     root: (tenantSlug: string) => `/${tenantSlug}`,
     authLogin: (tenantSlug: string) => `/${tenantSlug}/auth/login`,
@@ -30,6 +36,15 @@ export const PATHS = {
     uoms: (tenantSlug: string) => `/${tenantSlug}/uoms`,
     suppliers: (tenantSlug: string) => `/${tenantSlug}/suppliers`,
     categories: (tenantSlug: string) => `/${tenantSlug}/categories`,
+    warehouseLayouts: (tenantSlug: string) => `/${tenantSlug}/warehouse-layouts`,
+    warehouseAisles: (tenantSlug: string, layoutId: string) =>
+      `/${tenantSlug}/warehouse-layouts/${layoutId}/aisles`,
+    warehouseSides: (tenantSlug: string, aisleId: string) =>
+      `/${tenantSlug}/aisles/${aisleId}/sides`,
+    warehouseBays: (tenantSlug: string, sideId: string) => `/${tenantSlug}/sides/${sideId}/bays`,
+    warehouseLevels: (tenantSlug: string, bayId: string) => `/${tenantSlug}/bays/${bayId}/levels`,
+    warehouseShelves: (tenantSlug: string, levelId: string) =>
+      `/${tenantSlug}/bay-levels/${levelId}/shelves`,
     auditLogs: (tenantSlug: string) => `/${tenantSlug}/audit-logs`,
   },
-} as const;
+};

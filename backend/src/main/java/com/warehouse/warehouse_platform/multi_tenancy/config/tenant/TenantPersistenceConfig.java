@@ -29,6 +29,12 @@ import com.warehouse.warehouse_platform.tenant.product.ProductRepository;
 import com.warehouse.warehouse_platform.tenant.product.ProductSupplierRepository;
 import com.warehouse.warehouse_platform.tenant.supplier.SupplierRepository;
 import com.warehouse.warehouse_platform.tenant.uom.UnitOfMeasureRepository;
+import com.warehouse.warehouse_platform.tenant.warehouse.aisle.WarehouseAisleRepository;
+import com.warehouse.warehouse_platform.tenant.warehouse.bay.WarehouseBayRepository;
+import com.warehouse.warehouse_platform.tenant.warehouse.layout.WarehouseLayoutRepository;
+import com.warehouse.warehouse_platform.tenant.warehouse.level.WarehouseBayLevelRepository;
+import com.warehouse.warehouse_platform.tenant.warehouse.shelf.WarehouseShelfRepository;
+import com.warehouse.warehouse_platform.tenant.warehouse.side.WarehouseAisleSideRepository;
 import com.warehouse.warehouse_platform.user.UserRepository;
 
 import jakarta.persistence.EntityManagerFactory;
@@ -43,7 +49,13 @@ import jakarta.persistence.EntityManagerFactory;
                 ProductRepository.class,
                 ProductSupplierRepository.class,
                 ProductCategoryRepository.class,
-                AuditLogRepository.class
+                AuditLogRepository.class,
+                WarehouseLayoutRepository.class,
+                WarehouseAisleRepository.class,
+                WarehouseAisleSideRepository.class,
+                WarehouseBayRepository.class,
+                WarehouseBayLevelRepository.class,
+                WarehouseShelfRepository.class
         },
         entityManagerFactoryRef = "tenantEntityManagerFactory",
         transactionManagerRef = "tenantTransactionManager")

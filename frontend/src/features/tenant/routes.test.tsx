@@ -35,6 +35,30 @@ vi.mock("@/features/tenant/audit/TenantAuditLogsPage", () => ({
   default: () => <p>tenant-audit-page</p>,
 }));
 
+vi.mock("@/features/tenant/warehouse/WarehouseLayoutsPage", () => ({
+  default: () => <p>tenant-warehouse-layouts-page</p>,
+}));
+
+vi.mock("@/features/tenant/warehouse/WarehouseAislesPage", () => ({
+  default: () => <p>tenant-warehouse-aisles-page</p>,
+}));
+
+vi.mock("@/features/tenant/warehouse/WarehouseSidesPage", () => ({
+  default: () => <p>tenant-warehouse-sides-page</p>,
+}));
+
+vi.mock("@/features/tenant/warehouse/WarehouseBaysPage", () => ({
+  default: () => <p>tenant-warehouse-bays-page</p>,
+}));
+
+vi.mock("@/features/tenant/warehouse/WarehouseLevelsPage", () => ({
+  default: () => <p>tenant-warehouse-levels-page</p>,
+}));
+
+vi.mock("@/features/tenant/warehouse/WarehouseShelvesPage", () => ({
+  default: () => <p>tenant-warehouse-shelves-page</p>,
+}));
+
 function renderTenantRoute(path: string) {
   return render(
     <I18nProvider initialLocale="en" storageKey="test-locale-tenant-routes">
@@ -167,6 +191,29 @@ describe("tenant routes RBAC", () => {
     renderTenantRoute("/acme/products");
 
     expect(screen.getByText("tenant-products-page")).toBeInTheDocument();
+  });
+
+  it("blocks warehouse-layouts route when tenant.warehouse.view permission is missing", () => {
+    mockUseAuth.mockReturnValue({
+      status: "authenticated",
+      hasPermission: () => false,
+    });
+
+    renderTenantRoute("/acme/warehouse-layouts");
+
+    expect(screen.queryByText("tenant-warehouse-layouts-page")).not.toBeInTheDocument();
+    expect(screen.getByText("Access denied")).toBeInTheDocument();
+  });
+
+  it("renders warehouse-layouts route when tenant.warehouse.view permission is present", () => {
+    mockUseAuth.mockReturnValue({
+      status: "authenticated",
+      hasPermission: (permission: string) => permission === TENANT_PERMISSIONS.WAREHOUSE_VIEW,
+    });
+
+    renderTenantRoute("/acme/warehouse-layouts");
+
+    expect(screen.getByText("tenant-warehouse-layouts-page")).toBeInTheDocument();
   });
 
   it("blocks audit-logs route when tenant.audit.view permission is missing", () => {

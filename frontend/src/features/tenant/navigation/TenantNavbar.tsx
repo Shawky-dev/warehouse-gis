@@ -1,6 +1,6 @@
 import { useMemo, type ComponentType } from "react";
 import { NavLink, useParams } from "react-router-dom";
-import { Home, Box, Shield, Users, Warehouse, Ruler, Truck, Tag, ClipboardList } from "lucide-react";
+import { Home, Box, Shield, Users, Warehouse, Ruler, Truck, Tag, ClipboardList, MapPin } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { PATHS } from "@/shared/consts/paths";
@@ -28,6 +28,7 @@ export function TenantNavbar() {
   const canViewUoms = hasPermission(TENANT_PERMISSIONS.UOMS_VIEW);
   const canViewSuppliers = hasPermission(TENANT_PERMISSIONS.SUPPLIERS_VIEW);
   const canViewCategories = hasPermission(TENANT_PERMISSIONS.CATEGORIES_VIEW);
+  const canViewWarehouse = hasPermission(TENANT_PERMISSIONS.WAREHOUSE_VIEW);
   const canViewAudit = hasPermission(TENANT_PERMISSIONS.AUDIT_VIEW);
 
   const navItems = useMemo<TenantNavItem[]>(
@@ -75,6 +76,15 @@ export function TenantNavbar() {
               },
             ]
           : []),
+        ...(canViewWarehouse
+          ? [
+              {
+                to: PATHS.TENANT.warehouseLayouts(normalizedSlug),
+                label: t("tenant.nav.warehouseLayout"),
+                icon: MapPin,
+              },
+            ]
+          : []),
         ...(canViewUsers
           ? [
               {
@@ -111,6 +121,7 @@ export function TenantNavbar() {
       canViewSuppliers,
       canViewUoms,
       canViewUsers,
+      canViewWarehouse,
       normalizedSlug,
       t,
     ]

@@ -33,6 +33,11 @@ public final class TenantPermissions {
     public static final String CATEGORIES_SOFT_DELETE = "tenant.categories.soft_delete";
     public static final String CATEGORIES_RESTORE = "tenant.categories.restore";
     public static final String CATEGORIES_HARD_DELETE = "tenant.categories.hard_delete";
+    public static final String WAREHOUSE_VIEW = "tenant.warehouse.view";
+    public static final String WAREHOUSE_EDIT = "tenant.warehouse.edit";
+    public static final String WAREHOUSE_SOFT_DELETE = "tenant.warehouse.soft_delete";
+    public static final String WAREHOUSE_RESTORE = "tenant.warehouse.restore";
+    public static final String WAREHOUSE_HARD_DELETE = "tenant.warehouse.hard_delete";
     public static final String AUDIT_VIEW = "tenant.audit.view";
 
     private TenantPermissions() {

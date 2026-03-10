@@ -69,6 +69,16 @@ describe("TenantNavbar RBAC", () => {
     expect(screen.getByText("Suppliers")).toBeInTheDocument();
   });
 
+  it("shows Warehouse Layout link when warehouse.view permission is granted", () => {
+    mockUseAuth.mockReturnValue({
+      hasPermission: (permission: string) => permission === TENANT_PERMISSIONS.WAREHOUSE_VIEW,
+    });
+
+    renderTenantNavbar();
+
+    expect(screen.getByText("Warehouse Layout")).toBeInTheDocument();
+  });
+
   it("shows Audit Logs link when audit.view permission is granted", () => {
     mockUseAuth.mockReturnValue({
       hasPermission: (permission: string) => permission === TENANT_PERMISSIONS.AUDIT_VIEW,
