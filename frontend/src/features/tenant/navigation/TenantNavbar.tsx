@@ -1,7 +1,30 @@
-import { useMemo, type ComponentType } from "react";
-import { NavLink, useParams } from "react-router-dom";
-import { Home, Box, Shield, Users, Warehouse, Ruler, Truck, Tag, ClipboardList, MapPin } from "lucide-react";
+import { useMemo, useState, type ComponentType } from "react";
+import { NavLink, useLocation, useParams } from "react-router-dom";
+import {
+  Home,
+  Box,
+  Shield,
+  Users,
+  Warehouse,
+  Ruler,
+  Truck,
+  Tag,
+  ClipboardList,
+  MapPin,
+  List,
+  GitBranch,
+  Layers,
+  LayoutGrid,
+  AlignJustify,
+  BookOpen,
+} from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { cn } from "@/lib/utils";
 import { PATHS } from "@/shared/consts/paths";
 import { useI18n } from "@/i18n";
@@ -9,14 +32,28 @@ import { normalizeTenantSlug } from "@/features/auth/shared/scope";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { TENANT_PERMISSIONS } from "@/features/auth/shared/permissions";
 
-type TenantNavItem = {
+type LeafNavItem = {
   to: string;
   label: string;
   icon: ComponentType<{ className?: string }>;
   end?: boolean;
 };
 
+type GroupNavItem = {
+  id: string;
+  label: string;
+  icon: ComponentType<{ className?: string }>;
+  children: LeafNavItem[];
+};
+
+type NavItem = LeafNavItem | GroupNavItem;
+
+function isGroupItem(item: NavItem): item is GroupNavItem {
+  return "children" in item;
+}
+
 export function TenantNavbar() {
+  const { pathname } = useLocation();
   const { t } = useI18n();
   const { hasPermission } = useAuth();
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
@@ -31,7 +68,7 @@ export function TenantNavbar() {
   const canViewWarehouse = hasPermission(TENANT_PERMISSIONS.WAREHOUSE_VIEW);
   const canViewAudit = hasPermission(TENANT_PERMISSIONS.AUDIT_VIEW);
 
-  const navItems = useMemo<TenantNavItem[]>(
+  const navItems = useMemo<NavItem[]>(
     () =>
       [
         {
@@ -40,69 +77,53 @@ export function TenantNavbar() {
           icon: Home,
           end: true,
         },
-        ...(canViewProducts
-          ? [
-              {
-                to: PATHS.TENANT.products(normalizedSlug),
-                label: t("tenant.nav.products"),
-                icon: Box,
-              },
-            ]
-          : []),
-        ...(canViewUoms
-          ? [
-              {
-                to: PATHS.TENANT.uoms(normalizedSlug),
-                label: t("tenant.nav.uoms"),
-                icon: Ruler,
-              },
-            ]
-          : []),
-        ...(canViewSuppliers
-          ? [
-              {
-                to: PATHS.TENANT.suppliers(normalizedSlug),
-                label: t("tenant.nav.suppliers"),
-                icon: Truck,
-              },
-            ]
-          : []),
-        ...(canViewCategories
-          ? [
-              {
-                to: PATHS.TENANT.categories(normalizedSlug),
-                label: t("tenant.nav.categories"),
-                icon: Tag,
-              },
-            ]
-          : []),
-        ...(canViewWarehouse
-          ? [
-              {
-                to: PATHS.TENANT.warehouseLayouts(normalizedSlug),
-                label: t("tenant.nav.warehouseLayout"),
-                icon: MapPin,
-              },
-            ]
-          : []),
-        ...(canViewUsers
-          ? [
-              {
-                to: PATHS.TENANT.users(normalizedSlug),
-                label: t("tenant.nav.users"),
-                icon: Users,
-              },
-            ]
-          : []),
-        ...(canViewRoles
-          ? [
-              {
-                to: PATHS.TENANT.roles(normalizedSlug),
-                label: t("tenant.nav.roles"),
-                icon: Shield,
-              },
-            ]
-          : []),
+        {
+          id: "catalog",
+          label: t("tenant.nav.catalog"),
+          icon: BookOpen,
+          children: [
+            ...(canViewProducts
+              ? [{ to: PATHS.TENANT.products(normalizedSlug), label: t("tenant.nav.products"), icon: Box }]
+              : []),
+            ...(canViewUoms
+              ? [{ to: PATHS.TENANT.uoms(normalizedSlug), label: t("tenant.nav.uoms"), icon: Ruler }]
+              : []),
+            ...(canViewSuppliers
+              ? [{ to: PATHS.TENANT.suppliers(normalizedSlug), label: t("tenant.nav.suppliers"), icon: Truck }]
+              : []),
+            ...(canViewCategories
+              ? [{ to: PATHS.TENANT.categories(normalizedSlug), label: t("tenant.nav.categories"), icon: Tag }]
+              : []),
+          ],
+        },
+        {
+          id: "warehouse-layouts",
+          label: t("tenant.nav.warehouseLayouts"),
+          icon: Warehouse,
+          children: canViewWarehouse
+            ? [
+                { to: PATHS.TENANT.warehouseLayouts(normalizedSlug), label: t("tenant.nav.layouts"), icon: LayoutGrid },
+                { to: PATHS.TENANT.warehouseAislesGlobal(normalizedSlug), label: t("tenant.nav.aisles"), icon: AlignJustify },
+                { to: PATHS.TENANT.warehouseSidesGlobal(normalizedSlug), label: t("tenant.nav.sides"), icon: GitBranch },
+                { to: PATHS.TENANT.warehouseBaysGlobal(normalizedSlug), label: t("tenant.nav.bays"), icon: Layers },
+                { to: PATHS.TENANT.warehouseLevelsGlobal(normalizedSlug), label: t("tenant.nav.levels"), icon: List },
+                { to: PATHS.TENANT.warehouseShelvesGlobal(normalizedSlug), label: t("tenant.nav.shelves"), icon: MapPin },
+              ]
+            : [],
+        },
+        {
+          id: "accounts",
+          label: t("tenant.nav.accounts"),
+          icon: Users,
+          children: [
+            ...(canViewUsers
+              ? [{ to: PATHS.TENANT.users(normalizedSlug), label: t("tenant.nav.users"), icon: Users }]
+              : []),
+            ...(canViewRoles
+              ? [{ to: PATHS.TENANT.roles(normalizedSlug), label: t("tenant.nav.roles"), icon: Shield }]
+              : []),
+          ],
+        },
         ...(canViewAudit
           ? [
               {
@@ -112,7 +133,7 @@ export function TenantNavbar() {
               },
             ]
           : []),
-      ],
+      ].filter((item) => !isGroupItem(item) || item.children.length > 0),
     [
       canViewAudit,
       canViewCategories,
@@ -127,6 +148,18 @@ export function TenantNavbar() {
     ]
   );
 
+  const activeGroupFromRoute = useMemo(() => {
+    const activeGroup = navItems.find((item) => {
+      if (!isGroupItem(item)) return false;
+      return item.children.some((child) => pathname.startsWith(child.to));
+    });
+    return activeGroup && isGroupItem(activeGroup) ? activeGroup.id : "";
+  }, [navItems, pathname]);
+
+  const [openGroups, setOpenGroups] = useState<string[]>(
+    activeGroupFromRoute ? [activeGroupFromRoute] : []
+  );
+
   return (
     <aside className="flex min-h-screen w-56 shrink-0 flex-col border-e bg-background">
       <div className="flex h-14 shrink-0 items-center gap-2 px-5 text-sm font-semibold">
@@ -138,25 +171,91 @@ export function TenantNavbar() {
 
       <nav className="flex flex-1 flex-col gap-1 p-3">
         {navItems.map((item) => {
+          if (!isGroupItem(item)) {
+            const Icon = item.icon;
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                className={({ isActive }) =>
+                  cn(
+                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  )
+                }
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                {item.label}
+              </NavLink>
+            );
+          }
+
           const Icon = item.icon;
+          const isGroupActive = item.children.some((child) => pathname.startsWith(child.to));
 
           return (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) =>
-                cn(
-                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                )
-              }
+            <Accordion
+              key={item.id}
+              type="single"
+              collapsible
+              value={openGroups.includes(item.id) || activeGroupFromRoute === item.id ? item.id : ""}
+              onValueChange={(value) => {
+                setOpenGroups((previous) => {
+                  const next = new Set(previous);
+                  if (value === item.id) {
+                    next.add(item.id);
+                  } else {
+                    next.delete(item.id);
+                  }
+                  return Array.from(next);
+                });
+              }}
             >
-              <Icon className="h-4 w-4 shrink-0" />
-              {item.label}
-            </NavLink>
+              <AccordionItem value={item.id} className="border-none">
+                <AccordionTrigger
+                  className={cn(
+                    "rounded-md px-3 py-2 text-start",
+                    isGroupActive
+                      ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  )}
+                >
+                  <span className="flex flex-1 items-start gap-3 text-start">
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span className="leading-tight">{item.label}</span>
+                  </span>
+                </AccordionTrigger>
+
+                <AccordionContent>
+                  <div className="ms-2 flex flex-col gap-1 border-s border-border/60 ps-2">
+                    {item.children.map((child) => {
+                      const ChildIcon = child.icon;
+                      return (
+                        <NavLink
+                          key={child.to}
+                          to={child.to}
+                          end={child.end}
+                          className={({ isActive }) =>
+                            cn(
+                              "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                              isActive
+                                ? "bg-primary text-primary-foreground"
+                                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                            )
+                          }
+                        >
+                          <ChildIcon className="h-4 w-4 shrink-0" />
+                          {child.label}
+                        </NavLink>
+                      );
+                    })}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           );
         })}
       </nav>

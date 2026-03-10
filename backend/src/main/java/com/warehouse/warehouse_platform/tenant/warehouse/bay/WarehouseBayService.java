@@ -240,6 +240,36 @@ public class WarehouseBayService {
                 .orElseThrow(() -> WarehouseManagementException.notFound("Bay not found: " + bayId));
     }
 
+    @Transactional(readOnly = true)
+    public BayPageResult listBaysGlobal(UUID sideId, int page, int size, String search, Boolean active) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "code"));
+        Page<WarehouseBay> result = bayRepository.findAll(buildSpecificationGlobal(sideId, search, active), pageable);
+        return new BayPageResult(
+                result.getContent().stream().map(this::toResult).toList(),
+                result.getNumber(),
+                result.getSize(),
+                result.getTotalElements(),
+                result.getTotalPages());
+    }
+
+    private Specification<WarehouseBay> buildSpecificationGlobal(UUID sideId, String search, Boolean active) {
+        String normalizedSearch = normalizeSearch(search);
+        return (root, query, criteriaBuilder) -> {
+            List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
+            if (sideId != null) {
+                predicates.add(criteriaBuilder.equal(root.get("side").get("id"), sideId));
+            }
+            if (active != null) {
+                predicates.add(criteriaBuilder.equal(root.get("active"), active));
+            }
+            if (normalizedSearch != null) {
+                String value = "%" + normalizedSearch.toLowerCase(Locale.ROOT) + "%";
+                predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("code")), value));
+            }
+            return criteriaBuilder.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
+        };
+    }
+
     private Specification<WarehouseBay> buildSpecification(UUID sideId, String search, Boolean active) {
         String normalizedSearch = normalizeSearch(search);
         return (root, query, criteriaBuilder) -> {

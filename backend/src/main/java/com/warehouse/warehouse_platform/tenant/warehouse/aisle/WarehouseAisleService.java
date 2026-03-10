@@ -189,6 +189,39 @@ public class WarehouseAisleService {
                 .orElseThrow(() -> WarehouseManagementException.notFound("Aisle not found: " + aisleId));
     }
 
+    @Transactional(readOnly = true)
+    public AislePageResult listAislesGlobal(UUID layoutId, int page, int size, String search, Boolean active) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "code"));
+        Specification<WarehouseAisle> spec = buildSpecificationGlobal(layoutId, search, active);
+        Page<WarehouseAisle> result = aisleRepository.findAll(spec, pageable);
+        return new AislePageResult(
+                result.getContent().stream().map(this::toResult).toList(),
+                result.getNumber(),
+                result.getSize(),
+                result.getTotalElements(),
+                result.getTotalPages());
+    }
+
+    private Specification<WarehouseAisle> buildSpecificationGlobal(UUID layoutId, String search, Boolean active) {
+        String normalizedSearch = normalizeSearch(search);
+        return (root, query, criteriaBuilder) -> {
+            List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
+            if (layoutId != null) {
+                predicates.add(criteriaBuilder.equal(root.get("layout").get("id"), layoutId));
+            }
+            if (active != null) {
+                predicates.add(criteriaBuilder.equal(root.get("active"), active));
+            }
+            if (normalizedSearch != null) {
+                String value = "%" + normalizedSearch.toLowerCase(Locale.ROOT) + "%";
+                predicates.add(criteriaBuilder.or(
+                        criteriaBuilder.like(criteriaBuilder.lower(root.get("code")), value),
+                        criteriaBuilder.like(criteriaBuilder.lower(root.get("name")), value)));
+            }
+            return criteriaBuilder.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
+        };
+    }
+
     private Specification<WarehouseAisle> buildSpecification(UUID layoutId, String search, Boolean active) {
         String normalizedSearch = normalizeSearch(search);
         return (root, query, criteriaBuilder) -> {

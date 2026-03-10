@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs cat:*)",
+      "Bash(find /mnt/data/arch/Documents/coding/freelance/warehouse-gis-webapp/backend/src/main/java/com/warehouse/warehouse_platform/tenant/warehouse -type f -name *.java)",
+      "Bash(mvn -B -DskipTests clean compile)",
+      "Bash(grep -v \"^--$\")"
+    ]
+  }
+}

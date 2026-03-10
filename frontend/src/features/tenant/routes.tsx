@@ -13,6 +13,11 @@ import WarehouseSidesPage from "@/features/tenant/warehouse/WarehouseSidesPage";
 import WarehouseBaysPage from "@/features/tenant/warehouse/WarehouseBaysPage";
 import WarehouseLevelsPage from "@/features/tenant/warehouse/WarehouseLevelsPage";
 import WarehouseShelvesPage from "@/features/tenant/warehouse/WarehouseShelvesPage";
+import WarehouseAislesGlobalPage from "@/features/tenant/warehouse/WarehouseAislesGlobalPage";
+import WarehouseSidesGlobalPage from "@/features/tenant/warehouse/WarehouseSidesGlobalPage";
+import WarehouseBaysGlobalPage from "@/features/tenant/warehouse/WarehouseBaysGlobalPage";
+import WarehouseLevelsGlobalPage from "@/features/tenant/warehouse/WarehouseLevelsGlobalPage";
+import WarehouseShelvesGlobalPage from "@/features/tenant/warehouse/WarehouseShelvesGlobalPage";
 import { RequirePermission } from "@/features/auth/guards/RequirePermission";
 import { TENANT_PERMISSIONS } from "@/features/auth/shared/permissions";
 
@@ -122,6 +127,46 @@ export const tenantRoutes = [
     element: (
       <RequirePermission permission={TENANT_PERMISSIONS.AUDIT_VIEW}>
         <TenantAuditLogsPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: PATHS.TENANT.WAREHOUSE_AISLES_GLOBAL_PATTERN,
+    element: (
+      <RequirePermission permission={TENANT_PERMISSIONS.WAREHOUSE_VIEW}>
+        <WarehouseAislesGlobalPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: PATHS.TENANT.WAREHOUSE_SIDES_GLOBAL_PATTERN,
+    element: (
+      <RequirePermission permission={TENANT_PERMISSIONS.WAREHOUSE_VIEW}>
+        <WarehouseSidesGlobalPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: PATHS.TENANT.WAREHOUSE_BAYS_GLOBAL_PATTERN,
+    element: (
+      <RequirePermission permission={TENANT_PERMISSIONS.WAREHOUSE_VIEW}>
+        <WarehouseBaysGlobalPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: PATHS.TENANT.WAREHOUSE_LEVELS_GLOBAL_PATTERN,
+    element: (
+      <RequirePermission permission={TENANT_PERMISSIONS.WAREHOUSE_VIEW}>
+        <WarehouseLevelsGlobalPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: PATHS.TENANT.WAREHOUSE_SHELVES_GLOBAL_PATTERN,
+    element: (
+      <RequirePermission permission={TENANT_PERMISSIONS.WAREHOUSE_VIEW}>
+        <WarehouseShelvesGlobalPage />
       </RequirePermission>
     ),
   },

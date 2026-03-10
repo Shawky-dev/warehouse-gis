@@ -109,6 +109,63 @@ export async function hardDeleteLayout(tenantSlug: string, layoutId: string): Pr
   });
 }
 
+// ── Global list endpoints (no required parent ID) ─────────────────────────────
+
+export async function listAislesGlobal(
+  tenantSlug: string,
+  params?: { layoutId?: string; page?: number; size?: number; search?: string; active?: boolean }
+): Promise<AislePageResult> {
+  const response = await api.get<AislePageResult>(
+    `${tenantBasePath(tenantSlug)}/aisles`,
+    { params, headers: tenantHeaders(tenantSlug) }
+  );
+  return response.data;
+}
+
+export async function listSidesGlobal(
+  tenantSlug: string,
+  params?: { aisleId?: string; active?: boolean }
+): Promise<SideListResult> {
+  const response = await api.get<SideListResult>(
+    `${tenantBasePath(tenantSlug)}/sides`,
+    { params, headers: tenantHeaders(tenantSlug) }
+  );
+  return response.data;
+}
+
+export async function listBaysGlobal(
+  tenantSlug: string,
+  params?: { sideId?: string; page?: number; size?: number; search?: string; active?: boolean }
+): Promise<BayPageResult> {
+  const response = await api.get<BayPageResult>(
+    `${tenantBasePath(tenantSlug)}/bays`,
+    { params, headers: tenantHeaders(tenantSlug) }
+  );
+  return response.data;
+}
+
+export async function listLevelsGlobal(
+  tenantSlug: string,
+  params?: { bayId?: string; active?: boolean }
+): Promise<LevelListResult> {
+  const response = await api.get<LevelListResult>(
+    `${tenantBasePath(tenantSlug)}/levels`,
+    { params, headers: tenantHeaders(tenantSlug) }
+  );
+  return response.data;
+}
+
+export async function listShelvesGlobal(
+  tenantSlug: string,
+  params?: { levelId?: string; active?: boolean }
+): Promise<ShelfListResult> {
+  const response = await api.get<ShelfListResult>(
+    `${tenantBasePath(tenantSlug)}/shelves`,
+    { params, headers: tenantHeaders(tenantSlug) }
+  );
+  return response.data;
+}
+
 // ── Aisles ────────────────────────────────────────────────────────────────────
 
 export async function listAisles(

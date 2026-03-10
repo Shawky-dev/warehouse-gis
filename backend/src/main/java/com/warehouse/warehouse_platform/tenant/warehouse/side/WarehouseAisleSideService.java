@@ -43,6 +43,18 @@ public class WarehouseAisleSideService {
     }
 
     @Transactional(readOnly = true)
+    public SideListResult listSidesGlobal(UUID aisleId, Boolean active) {
+        List<WarehouseAisleSide> sides = aisleId != null
+                ? sideRepository.findAllByAisle_Id(aisleId)
+                : sideRepository.findAll();
+        List<SideResult> content = sides.stream()
+                .filter(s -> active == null || active.equals(s.getActive()))
+                .map(this::toResult)
+                .toList();
+        return new SideListResult(content);
+    }
+
+    @Transactional(readOnly = true)
     public SideResult getSide(UUID sideId) {
         return toResult(loadSide(sideId));
     }

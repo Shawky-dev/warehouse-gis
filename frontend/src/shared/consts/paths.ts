@@ -1,3 +1,13 @@
+function buildUrl(base: string, filters?: Record<string, string | undefined>): string {
+  if (!filters) return base;
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value !== undefined) params.set(key, value);
+  }
+  const qs = params.toString();
+  return qs ? `${base}?${qs}` : base;
+}
+
 export const PATHS = {
   ROOT: "/",
 
@@ -28,6 +38,12 @@ export const PATHS = {
     WAREHOUSE_LEVELS_PATTERN: "/:tenantSlug/bays/:bayId/levels",
     WAREHOUSE_SHELVES_PATTERN: "/:tenantSlug/bay-levels/:levelId/shelves",
     AUDIT_LOGS_PATTERN: "/:tenantSlug/audit-logs",
+    // Global warehouse entity routes (filter via query string)
+    WAREHOUSE_AISLES_GLOBAL_PATTERN: "/:tenantSlug/aisles",
+    WAREHOUSE_SIDES_GLOBAL_PATTERN: "/:tenantSlug/sides",
+    WAREHOUSE_BAYS_GLOBAL_PATTERN: "/:tenantSlug/bays",
+    WAREHOUSE_LEVELS_GLOBAL_PATTERN: "/:tenantSlug/levels",
+    WAREHOUSE_SHELVES_GLOBAL_PATTERN: "/:tenantSlug/shelves",
     root: (tenantSlug: string) => `/${tenantSlug}`,
     authLogin: (tenantSlug: string) => `/${tenantSlug}/auth/login`,
     products: (tenantSlug: string) => `/${tenantSlug}/products`,
@@ -46,5 +62,26 @@ export const PATHS = {
     warehouseShelves: (tenantSlug: string, levelId: string) =>
       `/${tenantSlug}/bay-levels/${levelId}/shelves`,
     auditLogs: (tenantSlug: string) => `/${tenantSlug}/audit-logs`,
+    // Global warehouse entity builder functions
+    warehouseAislesGlobal: (
+      tenantSlug: string,
+      filters?: { layoutId?: string }
+    ) => buildUrl(`/${tenantSlug}/aisles`, filters),
+    warehouseSidesGlobal: (
+      tenantSlug: string,
+      filters?: { layoutId?: string; aisleId?: string }
+    ) => buildUrl(`/${tenantSlug}/sides`, filters),
+    warehouseBaysGlobal: (
+      tenantSlug: string,
+      filters?: { layoutId?: string; aisleId?: string; sideId?: string }
+    ) => buildUrl(`/${tenantSlug}/bays`, filters),
+    warehouseLevelsGlobal: (
+      tenantSlug: string,
+      filters?: { layoutId?: string; aisleId?: string; sideId?: string; bayId?: string }
+    ) => buildUrl(`/${tenantSlug}/levels`, filters),
+    warehouseShelvesGlobal: (
+      tenantSlug: string,
+      filters?: { layoutId?: string; aisleId?: string; sideId?: string; bayId?: string; levelId?: string }
+    ) => buildUrl(`/${tenantSlug}/shelves`, filters),
   },
 };

@@ -1,24 +1,23 @@
-import { useCallback, useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useParams, useSearchParams } from "react-router-dom";
 import { normalizeTenantSlug } from "@/features/auth/shared/scope";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { TENANT_PERMISSIONS } from "@/features/auth/shared/permissions";
 import { useI18n } from "@/i18n";
 import {
-  createLayout,
+  createShelf,
   extractF1ErrorMessage,
-  hardDeleteLayout,
-  listLayouts,
-  restoreLayout,
-  softDeleteLayout,
-  updateLayout,
+  hardDeleteShelf,
+  listLevelsGlobal,
+  listShelvesGlobal,
+  restoreShelf,
+  softDeleteShelf,
 } from "@/features/tenant/api/f1Api";
-import type { LayoutResult } from "@/features/tenant/types/f1";
+import type { LevelResult, ShelfResult } from "@/features/tenant/types/f1";
 import { PATHS } from "@/shared/consts/paths";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
-import { Textarea } from "@/shared/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -38,119 +37,118 @@ import {
   AlertDialogTitle,
 } from "@/shared/components/ui/alert-dialog";
 import {
+  levelLabel,
   WarehousePageShell,
-  WarehousePagination,
   WarehouseStatusBadge,
   toActiveParam,
 } from "@/features/tenant/warehouse/shared";
-import type { FilterActive } from "@/features/tenant/warehouse/shared";
+import type { FilterActive, WarehouseBreadcrumbItem } from "@/features/tenant/warehouse/shared";
 
-export default function WarehouseLayoutsPage() {
+export default function WarehouseShelvesGlobalPage() {
   const { t } = useI18n();
   const { hasPermission } = useAuth();
+  const [searchParams] = useSearchParams();
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
   const slug = normalizeTenantSlug(tenantSlug ?? "");
+  const levelId = searchParams.get("levelId") ?? "";
+  const bayId = searchParams.get("bayId") ?? "";
+  const sideId = searchParams.get("sideId") ?? "";
+  const aisleId = searchParams.get("aisleId") ?? "";
+  const layoutId = searchParams.get("layoutId") ?? "";
 
   const canEdit = hasPermission(TENANT_PERMISSIONS.WAREHOUSE_EDIT);
   const canSoftDelete = hasPermission(TENANT_PERMISSIONS.WAREHOUSE_SOFT_DELETE);
   const canRestore = hasPermission(TENANT_PERMISSIONS.WAREHOUSE_RESTORE);
   const canHardDelete = hasPermission(TENANT_PERMISSIONS.WAREHOUSE_HARD_DELETE);
 
-  const [items, setItems] = useState<LayoutResult[]>([]);
-  const [page, setPage] = useState(0);
-  const [totalElements, setTotalElements] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
+  const [items, setItems] = useState<ShelfResult[]>([]);
+  const [activeFilter, setActiveFilter] = useState<FilterActive>("all");
+  const [pendingActive, setPendingActive] = useState<FilterActive>("all");
   const [isLoading, setIsLoading] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
 
-  const [search, setSearch] = useState("");
-  const [pendingSearch, setPendingSearch] = useState("");
-  const [activeFilter, setActiveFilter] = useState<FilterActive>("all");
-  const [pendingActive, setPendingActive] = useState<FilterActive>("all");
-
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<LayoutResult | null>(null);
-  const [formCode, setFormCode] = useState("");
-  const [formName, setFormName] = useState("");
-  const [formDescription, setFormDescription] = useState("");
+  const [formOpen, setFormOpen] = useState(false);
+  const [formShelfNum, setFormShelfNum] = useState("1");
+  const [formLevelId, setFormLevelId] = useState(levelId);
+  const [formLevels, setFormLevels] = useState<LevelResult[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  const [hardDeleteTarget, setHardDeleteTarget] = useState<LayoutResult | null>(null);
+  const [hardDeleteTarget, setHardDeleteTarget] = useState<ShelfResult | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const loadData = useCallback(
-    async (pg: number, srch: string, act: FilterActive) => {
+    async (act: FilterActive) => {
       setIsLoading(true);
       setPageError(null);
       try {
-        const result = await listLayouts(slug, {
-          page: pg,
-          size: 20,
-          search: srch || undefined,
+        const result = await listShelvesGlobal(slug, {
+          levelId: levelId || undefined,
           active: toActiveParam(act),
         });
         setItems(result.content);
-        setPage(result.page);
-        setTotalElements(result.totalElements);
-        setTotalPages(result.totalPages);
       } catch (error) {
         setPageError(extractF1ErrorMessage(error) ?? t("warehouse.loadFailed"));
       } finally {
         setIsLoading(false);
       }
     },
-    [slug, t]
+    [levelId, slug, t]
   );
 
   useEffect(() => {
-    void loadData(0, search, activeFilter);
-  }, [activeFilter, loadData, search]);
+    void loadData(activeFilter);
+  }, [activeFilter, loadData]);
 
-  const applyFilters = () => {
-    setSearch(pendingSearch);
-    setActiveFilter(pendingActive);
-  };
+  const breadcrumbs = useMemo(() => {
+    const crumbs: WarehouseBreadcrumbItem[] = [
+      {
+        label: t("warehouse.breadcrumb.levels"),
+        to: PATHS.TENANT.warehouseLevelsGlobal(slug, {
+          layoutId: layoutId || undefined,
+          aisleId: aisleId || undefined,
+          sideId: sideId || undefined,
+          bayId: bayId || undefined,
+        }),
+      },
+    ];
+    crumbs.push({ label: t("warehouse.breadcrumb.shelves") });
+    return crumbs;
+  }, [aisleId, bayId, layoutId, sideId, slug, t]);
 
-  const openCreate = () => {
-    setEditingItem(null);
-    setFormCode("");
-    setFormName("");
-    setFormDescription("");
+  const openCreate = async () => {
+    setFormShelfNum("1");
+    setFormLevelId(levelId);
     setFormError(null);
-    setIsFormOpen(true);
-  };
-
-  const openEdit = (item: LayoutResult) => {
-    setEditingItem(item);
-    setFormCode(item.code);
-    setFormName(item.name);
-    setFormDescription(item.description ?? "");
-    setFormError(null);
-    setIsFormOpen(true);
+    try {
+      const result = await listLevelsGlobal(slug, { bayId: bayId || undefined });
+      setFormLevels(result.content);
+      if (!levelId && result.content[0]) {
+        setFormLevelId(result.content[0].id);
+      }
+    } catch {
+      setFormLevels([]);
+    }
+    setFormOpen(true);
   };
 
   const handleSave = async () => {
-    if (!formCode.trim() || !formName.trim()) {
-      setFormError(t("warehouse.validationLayoutRequired"));
+    const value = Number(formShelfNum);
+    if (value < 1) {
+      setFormError(t("warehouse.validationShelfRequired"));
       return;
     }
-
+    if (!formLevelId) {
+      setFormError(t("warehouse.formParentRequired"));
+      return;
+    }
     setIsSaving(true);
     setFormError(null);
     try {
-      const payload = {
-        code: formCode.trim(),
-        name: formName.trim(),
-        description: formDescription.trim() || null,
-      };
-      if (editingItem) {
-        await updateLayout(slug, editingItem.id, payload);
-      } else {
-        await createLayout(slug, payload);
-      }
-      setIsFormOpen(false);
-      void loadData(0, search, activeFilter);
+      await createShelf(slug, formLevelId, { shelfNum: value });
+      setFormOpen(false);
+      setFormShelfNum("1");
+      void loadData(activeFilter);
     } catch (error) {
       setFormError(extractF1ErrorMessage(error) ?? t("warehouse.actionFailed"));
     } finally {
@@ -158,19 +156,19 @@ export default function WarehouseLayoutsPage() {
     }
   };
 
-  const handleSoftDelete = async (item: LayoutResult) => {
+  const handleSoftDelete = async (item: ShelfResult) => {
     try {
-      await softDeleteLayout(slug, item.id);
-      void loadData(page, search, activeFilter);
+      await softDeleteShelf(slug, item.levelId, item.id);
+      void loadData(activeFilter);
     } catch (error) {
       setPageError(extractF1ErrorMessage(error) ?? t("warehouse.actionFailed"));
     }
   };
 
-  const handleRestore = async (item: LayoutResult) => {
+  const handleRestore = async (item: ShelfResult) => {
     try {
-      await restoreLayout(slug, item.id);
-      void loadData(page, search, activeFilter);
+      await restoreShelf(slug, item.levelId, item.id);
+      void loadData(activeFilter);
     } catch (error) {
       setPageError(extractF1ErrorMessage(error) ?? t("warehouse.actionFailed"));
     }
@@ -180,9 +178,9 @@ export default function WarehouseLayoutsPage() {
     if (!hardDeleteTarget) return;
     setIsDeleting(true);
     try {
-      await hardDeleteLayout(slug, hardDeleteTarget.id);
+      await hardDeleteShelf(slug, hardDeleteTarget.levelId, hardDeleteTarget.id);
       setHardDeleteTarget(null);
-      void loadData(0, search, activeFilter);
+      void loadData(activeFilter);
     } catch (error) {
       setPageError(extractF1ErrorMessage(error) ?? t("warehouse.actionFailed"));
     } finally {
@@ -192,16 +190,12 @@ export default function WarehouseLayoutsPage() {
 
   return (
     <WarehousePageShell
-      title={t("warehouse.layouts.pageTitle")}
-      description={t("warehouse.layouts.pageDescription")}
+      title={t("warehouse.shelves.pageTitle")}
+      description={t("warehouse.shelves.pageDescription")}
+      breadcrumbs={breadcrumbs}
+      filterTitle={t("warehouse.filtersTitle")}
       filters={
         <div className="flex flex-wrap gap-3">
-          <Input
-            className="max-w-xs"
-            placeholder={t("warehouse.layouts.searchPlaceholder")}
-            value={pendingSearch}
-            onChange={(e) => setPendingSearch(e.target.value)}
-          />
           <select
             className="rounded-none border border-input bg-background px-3 py-2 text-sm"
             aria-label={t("warehouse.activeFilterLabel")}
@@ -212,33 +206,31 @@ export default function WarehouseLayoutsPage() {
             <option value="active">{t("warehouse.activeFilterActive")}</option>
             <option value="inactive">{t("warehouse.activeFilterInactive")}</option>
           </select>
-          <Button variant="outline" onClick={applyFilters}>
+          <Button variant="outline" onClick={() => setActiveFilter(pendingActive)}>
             {t("warehouse.applyFilters")}
           </Button>
           {canEdit ? (
-            <Button className="ms-auto" onClick={openCreate}>
-              {t("warehouse.layouts.createAction")}
+            <Button className="ms-auto" onClick={() => void openCreate()}>
+              {t("warehouse.shelves.createAction")}
             </Button>
           ) : null}
         </div>
       }
-      listTitle={t("warehouse.layouts.listTitle")}
-      listDescription={t("warehouse.layouts.listCount", { count: String(totalElements) })}
-      filterTitle={t("warehouse.filtersTitle")}
+      listTitle={t("warehouse.shelves.listTitle")}
+      listDescription={t("warehouse.shelves.listCount", { count: String(items.length) })}
     >
       {pageError ? <p className="mb-2 text-xs text-destructive">{pageError}</p> : null}
       {isLoading ? (
-        <p className="text-sm text-muted-foreground">{t("warehouse.layouts.loading")}</p>
+        <p className="text-sm text-muted-foreground">{t("warehouse.shelves.loading")}</p>
       ) : items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t("warehouse.layouts.empty")}</p>
+        <p className="text-sm text-muted-foreground">{t("warehouse.shelves.empty")}</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-start">
-                <th className="py-2 pe-4 text-start font-medium">{t("warehouse.layouts.tableCode")}</th>
-                <th className="py-2 pe-4 text-start font-medium">{t("warehouse.layouts.tableName")}</th>
-                <th className="py-2 pe-4 text-start font-medium">{t("warehouse.layouts.tableDescription")}</th>
+                <th className="py-2 pe-4 text-start font-medium">{t("warehouse.shelves.tableShelf")}</th>
+                <th className="py-2 pe-4 text-start font-medium">{t("warehouse.shelves.tableLocationCode")}</th>
                 <th className="py-2 pe-4 text-start font-medium">{t("warehouse.tableStatus")}</th>
                 <th className="py-2 text-start font-medium">{t("warehouse.tableActions")}</th>
               </tr>
@@ -246,9 +238,8 @@ export default function WarehouseLayoutsPage() {
             <tbody>
               {items.map((item) => (
                 <tr key={item.id} className="border-b last:border-0">
-                  <td className="py-2 pe-4 font-medium">{item.code}</td>
-                  <td className="py-2 pe-4">{item.name}</td>
-                  <td className="py-2 pe-4 text-muted-foreground">{item.description ?? "—"}</td>
+                  <td className="py-2 pe-4 font-medium">{item.shelfNum}</td>
+                  <td className="py-2 pe-4">{item.locationCode}</td>
                   <td className="py-2 pe-4">
                     <WarehouseStatusBadge
                       active={item.active}
@@ -258,18 +249,6 @@ export default function WarehouseLayoutsPage() {
                   </td>
                   <td className="py-2">
                     <div className="flex flex-wrap gap-1">
-                      <Button asChild size="sm" variant="outline">
-                        <Link
-                          to={PATHS.TENANT.warehouseAislesGlobal(slug, { layoutId: item.id })}
-                        >
-                          {t("warehouse.enterAction")}
-                        </Link>
-                      </Button>
-                      {canEdit ? (
-                        <Button size="sm" variant="outline" onClick={() => openEdit(item)}>
-                          {t("warehouse.editAction")}
-                        </Button>
-                      ) : null}
                       {canSoftDelete && item.active ? (
                         <Button size="sm" variant="outline" onClick={() => void handleSoftDelete(item)}>
                           {t("warehouse.softDeleteAction")}
@@ -294,56 +273,44 @@ export default function WarehouseLayoutsPage() {
         </div>
       )}
 
-      <WarehousePagination
-        page={page}
-        totalPages={totalPages}
-        previousLabel={t("warehouse.paginationPrevious")}
-        nextLabel={t("warehouse.paginationNext")}
-        infoLabel={t("warehouse.paginationInfo", {
-          page: String(page + 1),
-          totalPages: String(totalPages),
-        })}
-        onPrevious={() => void loadData(page - 1, search, activeFilter)}
-        onNext={() => void loadData(page + 1, search, activeFilter)}
-      />
-
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+      <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {editingItem ? t("warehouse.layouts.editDialogTitle") : t("warehouse.layouts.createDialogTitle")}
-            </DialogTitle>
-            <DialogDescription>
-              {editingItem
-                ? t("warehouse.layouts.editDialogDescription")
-                : t("warehouse.layouts.createDialogDescription")}
-            </DialogDescription>
+            <DialogTitle>{t("warehouse.shelves.createDialogTitle")}</DialogTitle>
+            <DialogDescription>{t("warehouse.shelves.createDialogDescription")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label htmlFor="layout-code">{t("warehouse.layouts.codeLabel")}</Label>
-              <Input id="layout-code" value={formCode} onChange={(e) => setFormCode(e.target.value)} />
+              <Label htmlFor="shelf-level">{t("warehouse.shelves.formLevelLabel")}</Label>
+              <select
+                id="shelf-level"
+                className="w-full rounded-none border border-input bg-background px-3 py-2 text-sm"
+                value={formLevelId}
+                onChange={(e) => setFormLevelId(e.target.value)}
+              >
+                {formLevels.map((l) => (
+                  <option key={l.id} value={l.id}>{l.bayCode} — {levelLabel(l.levelNum)}</option>
+                ))}
+              </select>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="layout-name">{t("warehouse.layouts.nameLabel")}</Label>
-              <Input id="layout-name" value={formName} onChange={(e) => setFormName(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="layout-description">{t("warehouse.layouts.descriptionLabel")}</Label>
-              <Textarea
-                id="layout-description"
-                value={formDescription}
-                onChange={(e) => setFormDescription(e.target.value)}
+              <Label htmlFor="shelf-num">{t("warehouse.shelves.shelfNumLabel")}</Label>
+              <Input
+                id="shelf-num"
+                type="number"
+                min={1}
+                value={formShelfNum}
+                onChange={(e) => setFormShelfNum(e.target.value)}
               />
             </div>
             {formError ? <p className="text-xs text-destructive">{formError}</p> : null}
           </div>
           <DialogFooter>
-            <Button variant="outline" disabled={isSaving} onClick={() => setIsFormOpen(false)}>
+            <Button variant="outline" disabled={isSaving} onClick={() => setFormOpen(false)}>
               {t("warehouse.cancelAction")}
             </Button>
             <Button disabled={isSaving} onClick={() => void handleSave()}>
-              {isSaving ? t("warehouse.saving") : editingItem ? t("warehouse.editAction") : t("warehouse.layouts.createAction")}
+              {isSaving ? t("warehouse.saving") : t("warehouse.shelves.createAction")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -352,8 +319,8 @@ export default function WarehouseLayoutsPage() {
       <AlertDialog open={hardDeleteTarget !== null} onOpenChange={(open) => !open && setHardDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("warehouse.layouts.hardDeleteDialogTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>{t("warehouse.layouts.hardDeleteDialogDescription")}</AlertDialogDescription>
+            <AlertDialogTitle>{t("warehouse.shelves.hardDeleteDialogTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("warehouse.shelves.hardDeleteDialogDescription")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isDeleting}>{t("warehouse.cancelAction")}</AlertDialogCancel>

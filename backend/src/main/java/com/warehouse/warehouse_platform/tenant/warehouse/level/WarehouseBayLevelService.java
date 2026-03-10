@@ -47,6 +47,22 @@ public class WarehouseBayLevelService {
     }
 
     @Transactional(readOnly = true)
+    public LevelListResult listLevelsGlobal(UUID bayId, Boolean active) {
+        List<WarehouseBayLevel> levels = levelRepository.findAll(
+                (root, query, cb) -> {
+                    java.util.List<jakarta.persistence.criteria.Predicate> predicates = new java.util.ArrayList<>();
+                    if (bayId != null) {
+                        predicates.add(cb.equal(root.get("bay").get("id"), bayId));
+                    }
+                    if (active != null) {
+                        predicates.add(cb.equal(root.get("active"), active));
+                    }
+                    return cb.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
+                });
+        return new LevelListResult(levels.stream().map(this::toResult).toList());
+    }
+
+    @Transactional(readOnly = true)
     public LevelResult getLevel(UUID levelId) {
         return toResult(loadLevel(levelId));
     }

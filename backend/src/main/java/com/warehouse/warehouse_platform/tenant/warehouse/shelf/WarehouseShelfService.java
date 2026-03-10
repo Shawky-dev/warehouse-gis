@@ -51,6 +51,22 @@ public class WarehouseShelfService {
     }
 
     @Transactional(readOnly = true)
+    public ShelfListResult listShelvesGlobal(UUID levelId, Boolean active) {
+        List<WarehouseShelf> shelves = shelfRepository.findAll(
+                (root, query, cb) -> {
+                    java.util.List<jakarta.persistence.criteria.Predicate> predicates = new java.util.ArrayList<>();
+                    if (levelId != null) {
+                        predicates.add(cb.equal(root.get("level").get("id"), levelId));
+                    }
+                    if (active != null) {
+                        predicates.add(cb.equal(root.get("active"), active));
+                    }
+                    return cb.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
+                });
+        return new ShelfListResult(shelves.stream().map(this::toResult).toList());
+    }
+
+    @Transactional(readOnly = true)
     public ShelfResult getShelf(UUID shelfId) {
         return toResult(loadShelf(shelfId));
     }
