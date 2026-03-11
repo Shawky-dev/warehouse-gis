@@ -361,7 +361,8 @@ public class LayoutBlockService {
                 childrenByParentId.computeIfAbsent(block.getParentId(), ignored -> new ArrayList<>()).add(block);
             }
         }
-        childrenByParentId.values().forEach(children -> children.sort(Comparator.comparingInt(LayoutBlock::getPosition)));
+        childrenByParentId.values()
+                .forEach(children -> children.sort(Comparator.comparingInt(LayoutBlock::getPosition)));
         return childrenByParentId;
     }
 
@@ -371,7 +372,8 @@ public class LayoutBlockService {
         return subtree;
     }
 
-    private void collectSubtree(Map<UUID, List<LayoutBlock>> childrenByParentId, UUID currentId, List<LayoutBlock> subtree) {
+    private void collectSubtree(Map<UUID, List<LayoutBlock>> childrenByParentId, UUID currentId,
+            List<LayoutBlock> subtree) {
         LayoutBlock current = loadBlock(currentId);
         subtree.add(current);
         for (LayoutBlock child : childrenByParentId.getOrDefault(currentId, List.of())) {
