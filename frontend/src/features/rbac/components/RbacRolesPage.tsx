@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import type {
   RbacPermissionOption,
   RbacRoleDetails,
@@ -19,6 +19,155 @@ import {
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
+
+interface PermissionGroup {
+  key: string;
+  title: string;
+  permissions: RbacPermissionOption[];
+}
+
+const TOKEN_LABELS: Record<string, string> = {
+  audit: "Audit",
+  block: "Block",
+  categories: "Categories",
+  layout: "Layout",
+  products: "Products",
+  roles: "Roles",
+  suppliers: "Suppliers",
+  template: "Template",
+  tenants: "Tenants",
+  uoms: "UOMs",
+  users: "Users",
+  warehouse: "Warehouse",
+};
+
+function toTitleCase(value: string): string {
+  return value
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function formatPermissionSegment(segment: string): string {
+  return TOKEN_LABELS[segment] ?? toTitleCase(segment);
+}
+
+function getPermissionGroupKey(permissionCode: string): string {
+  const segments = permissionCode.split(".").filter(Boolean);
+  if (segments.length <= 2) {
+    return segments.slice(0, -1).join(".") || permissionCode;
+  }
+  return segments.slice(1, -1).join(".");
+}
+
+function getPermissionGroupTitle(groupKey: string): string {
+  return groupKey
+    .split(".")
+    .filter(Boolean)
+    .map(formatPermissionSegment)
+    .join(" / ");
+}
+
+function groupPermissions(permissions: RbacPermissionOption[], query: string): PermissionGroup[] {
+  const normalizedQuery = query.trim().toLowerCase();
+  const grouped = new Map<string, PermissionGroup>();
+
+  permissions
+    .slice()
+    .sort((left, right) => left.code.localeCompare(right.code))
+    .forEach((permission) => {
+      const key = getPermissionGroupKey(permission.code);
+      const title = getPermissionGroupTitle(key);
+      const searchText = `${title} ${permission.code} ${permission.description ?? ""}`.toLowerCase();
+
+      if (normalizedQuery && !searchText.includes(normalizedQuery)) {
+        return;
+      }
+
+      if (!grouped.has(key)) {
+        grouped.set(key, { key, title, permissions: [] });
+      }
+      grouped.get(key)?.permissions.push(permission);
+    });
+
+  return Array.from(grouped.values()).sort((left, right) => left.title.localeCompare(right.title));
+}
+
+interface PermissionSelectorProps {
+  groups: PermissionGroup[];
+  query: string;
+  selectedPermissions: string[];
+  searchId: string;
+  searchLabel: string;
+  searchPlaceholder: string;
+  emptyMessage: string;
+  disabled?: boolean;
+  onQueryChange: (value: string) => void;
+  onToggle: (permissionCode: string) => void;
+}
+
+function PermissionSelector({
+  groups,
+  query,
+  selectedPermissions,
+  searchId,
+  searchLabel,
+  searchPlaceholder,
+  emptyMessage,
+  disabled = false,
+  onQueryChange,
+  onToggle,
+}: PermissionSelectorProps) {
+  return (
+    <div className="space-y-3">
+      <div className="space-y-1">
+        <Label htmlFor={searchId}>{searchLabel}</Label>
+        <Input
+          id={searchId}
+          value={query}
+          onChange={(event) => onQueryChange(event.target.value)}
+          placeholder={searchPlaceholder}
+        />
+      </div>
+      <ScrollArea className="h-72 rounded-md border p-3">
+        {groups.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+        ) : (
+          <div className="space-y-3">
+            {groups.map((group) => (
+              <section key={group.key} className="rounded-md border bg-muted/20 p-3">
+                <div className="mb-3 flex items-center justify-between gap-3 border-b pb-2">
+                  <div>
+                    <h3 className="text-sm font-semibold">{group.title}</h3>
+                    <p className="text-xs text-muted-foreground">{group.permissions.length} permissions</p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {group.permissions.map((permission) => (
+                    <label key={permission.code} className="flex items-start gap-2 text-sm">
+                      <Checkbox
+                        checked={selectedPermissions.includes(permission.code)}
+                        onCheckedChange={() => onToggle(permission.code)}
+                        disabled={disabled}
+                      />
+                      <span>
+                        <span className="font-medium">{permission.code}</span>
+                        {permission.description ? (
+                          <span className="ms-2 text-xs text-muted-foreground">{permission.description}</span>
+                        ) : null}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        )}
+      </ScrollArea>
+    </div>
+  );
+}
 
 interface RbacRolesPageProps {
   adapter: RbacRolesPageAdapter;
@@ -46,12 +195,25 @@ export default function RbacRolesPage({ adapter }: RbacRolesPageProps) {
   const [createDescription, setCreateDescription] = useState("");
   const [createLocked, setCreateLocked] = useState(false);
   const [createPermissions, setCreatePermissions] = useState<string[]>([]);
+  const [permissionSearch, setPermissionSearch] = useState("");
+  const [createPermissionSearch, setCreatePermissionSearch] = useState("");
+
+  const deferredPermissionSearch = useDeferredValue(permissionSearch);
+  const deferredCreatePermissionSearch = useDeferredValue(createPermissionSearch);
 
   const selectedRole = useMemo(
     () => roles.find((role) => role.code === selectedRoleCode) ?? null,
     [roles, selectedRoleCode]
   );
   const isAdminRole = selectedRole?.code === "ADMIN";
+  const permissionGroups = useMemo(
+    () => groupPermissions(permissions, deferredPermissionSearch),
+    [permissions, deferredPermissionSearch]
+  );
+  const createPermissionGroups = useMemo(
+    () => groupPermissions(permissions, deferredCreatePermissionSearch),
+    [permissions, deferredCreatePermissionSearch]
+  );
 
   const syncSelectedRoleForm = useCallback((role: RbacRoleDetails | null) => {
     if (!role) {
@@ -107,8 +269,13 @@ export default function RbacRolesPage({ adapter }: RbacRolesPageProps) {
     setCreateDescription("");
     setCreateLocked(false);
     setCreatePermissions([]);
+    setCreatePermissionSearch("");
     setFormError(null);
   }, [isCreateOpen]);
+
+  useEffect(() => {
+    setPermissionSearch("");
+  }, [selectedRoleCode]);
 
   const togglePermission = (permissionCode: string) => {
     setSelectedPermissions((current) =>
@@ -269,25 +436,18 @@ export default function RbacRolesPage({ adapter }: RbacRolesPageProps) {
 
                 <div className="space-y-2">
                   <Label>{t("roles.permissionsLabel")}</Label>
-                  <ScrollArea className="h-72 border p-3">
-                    <div className="space-y-2">
-                      {permissions.map((permission) => (
-                        <label key={permission.code} className="flex items-start gap-2 text-sm">
-                          <Checkbox
-                            checked={selectedPermissions.includes(permission.code)}
-                            onCheckedChange={() => togglePermission(permission.code)}
-                            disabled={isAdminRole}
-                          />
-                          <span>
-                            <span className="font-medium">{permission.code}</span>
-                            {permission.description ? (
-                              <span className="ms-2 text-xs text-muted-foreground">{permission.description}</span>
-                            ) : null}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  </ScrollArea>
+                  <PermissionSelector
+                    groups={permissionGroups}
+                    query={permissionSearch}
+                    selectedPermissions={selectedPermissions}
+                    searchId="edit-role-permission-search"
+                    searchLabel={t("roles.permissionsSearchLabel")}
+                    searchPlaceholder={t("roles.permissionsSearchPlaceholder")}
+                    emptyMessage={t("roles.permissionsEmpty")}
+                    disabled={isAdminRole}
+                    onQueryChange={setPermissionSearch}
+                    onToggle={togglePermission}
+                  />
                 </div>
 
                 {formError ? <p className="text-xs text-destructive">{formError}</p> : null}
@@ -338,19 +498,17 @@ export default function RbacRolesPage({ adapter }: RbacRolesPageProps) {
             </label>
             <div className="space-y-2">
               <Label>{t("roles.permissionsLabel")}</Label>
-              <ScrollArea className="h-64 border p-3">
-                <div className="space-y-2">
-                  {permissions.map((permission) => (
-                    <label key={permission.code} className="flex items-start gap-2 text-sm">
-                      <Checkbox
-                        checked={createPermissions.includes(permission.code)}
-                        onCheckedChange={() => toggleCreatePermission(permission.code)}
-                      />
-                      <span>{permission.code}</span>
-                    </label>
-                  ))}
-                </div>
-              </ScrollArea>
+              <PermissionSelector
+                groups={createPermissionGroups}
+                query={createPermissionSearch}
+                selectedPermissions={createPermissions}
+                searchId="create-role-permission-search"
+                searchLabel={t("roles.permissionsSearchLabel")}
+                searchPlaceholder={t("roles.permissionsSearchPlaceholder")}
+                emptyMessage={t("roles.permissionsEmpty")}
+                onQueryChange={setCreatePermissionSearch}
+                onToggle={toggleCreatePermission}
+              />
             </div>
             {formError ? <p className="text-xs text-destructive">{formError}</p> : null}
           </div>

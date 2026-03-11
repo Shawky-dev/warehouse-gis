@@ -22,6 +22,51 @@ function renderTenantRolesPage(path = "/acme/roles") {
 }
 
 describe("TenantRolesPage", () => {
+  it("groups tenant permissions and filters them with search", async () => {
+    const user = userEvent.setup();
+
+    server.use(
+      http.get(`${API_URL}/acme/roles`, () =>
+        HttpResponse.json([
+          {
+            code: "MANAGER",
+            name: "Manager",
+            description: "Operations",
+            permissionCodes: ["tenant.users.view"],
+            locked: false,
+          },
+        ])
+      ),
+      http.get(`${API_URL}/acme/permissions`, () =>
+        HttpResponse.json([
+          {
+            code: "tenant.users.view",
+            description: "View users in tenant scope",
+          },
+          {
+            code: "tenant.users.create",
+            description: "Create users in tenant scope",
+          },
+          {
+            code: "tenant.warehouse.layout.manage",
+            description: "Manage layouts in tenant scope",
+          },
+        ])
+      )
+    );
+
+    renderTenantRolesPage();
+
+    expect(await screen.findByRole("heading", { name: "Users" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Warehouse / Layout" })).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("Search permissions"), "warehouse");
+
+    expect(screen.queryByRole("heading", { name: "Users" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Warehouse / Layout" })).toBeInTheDocument();
+    expect(screen.getByText("tenant.warehouse.layout.manage")).toBeInTheDocument();
+  });
+
   it("locks ADMIN role editing in UI", async () => {
     server.use(
       http.get(`${API_URL}/acme/roles`, () =>
@@ -78,6 +123,10 @@ describe("TenantRolesPage", () => {
             code: "tenant.users.view",
             description: "View users",
           },
+          {
+            code: "tenant.warehouse.layout.manage",
+            description: "Manage layouts",
+          },
         ])
       ),
       http.post(`${API_URL}/acme/roles`, async ({ request }) => {
@@ -100,6 +149,7 @@ describe("TenantRolesPage", () => {
     const dialog = await screen.findByRole("dialog");
     await user.type(within(dialog).getByLabelText("Code"), "auditor");
     await user.type(within(dialog).getByLabelText("Name"), "Auditor");
+    await user.type(within(dialog).getByLabelText("Search permissions"), "users");
     const checkboxes = within(dialog).getAllByRole("checkbox");
     await user.click(checkboxes[0]);
     await user.click(checkboxes[1]);

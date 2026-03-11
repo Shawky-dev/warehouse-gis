@@ -9,6 +9,51 @@ import RolesPage from "@/features/landlord/roles/RolesPage";
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 
 describe("RolesPage", () => {
+  it("groups landlord permissions and filters them with search", async () => {
+    const user = userEvent.setup();
+
+    server.use(
+      http.get(`${API_URL}/landlord/roles`, () =>
+        HttpResponse.json([
+          {
+            code: "MANAGER",
+            name: "Manager",
+            description: "Operations",
+            permissionCodes: ["landlord.tenants.view"],
+            locked: false,
+          },
+        ])
+      ),
+      http.get(`${API_URL}/landlord/permissions`, () =>
+        HttpResponse.json([
+          {
+            code: "landlord.tenants.view",
+            description: "View tenants in landlord scope",
+          },
+          {
+            code: "landlord.tenants.create",
+            description: "Create tenants in landlord scope",
+          },
+          {
+            code: "landlord.users.edit",
+            description: "Edit users in landlord scope",
+          },
+        ])
+      )
+    );
+
+    renderWithRouter(<RolesPage />);
+
+    expect(await screen.findByRole("heading", { name: "Tenants" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Users" })).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("Search permissions"), "tenants");
+
+    expect(screen.getByRole("heading", { name: "Tenants" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Users" })).not.toBeInTheDocument();
+    expect(screen.getByText("landlord.tenants.create")).toBeInTheDocument();
+  });
+
   it("locks ADMIN role editing in UI", async () => {
     server.use(
       http.get(`${API_URL}/landlord/roles`, () =>
@@ -65,6 +110,10 @@ describe("RolesPage", () => {
             code: "landlord.users.view",
             description: "View users",
           },
+          {
+            code: "landlord.tenants.create",
+            description: "Create tenants",
+          },
         ])
       ),
       http.post(`${API_URL}/landlord/roles`, async ({ request }) => {
@@ -87,6 +136,7 @@ describe("RolesPage", () => {
     const dialog = await screen.findByRole("dialog");
     await user.type(within(dialog).getByLabelText("Code"), "auditor");
     await user.type(within(dialog).getByLabelText("Name"), "Auditor");
+    await user.type(within(dialog).getByLabelText("Search permissions"), "users");
     const checkboxes = within(dialog).getAllByRole("checkbox");
     await user.click(checkboxes[0]);
     await user.click(checkboxes[1]);
