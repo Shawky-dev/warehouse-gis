@@ -51,13 +51,13 @@ import type {
     WarehouseSideConfig,
     WarehouseTemplateResult,
 } from "@/features/tenant/types/warehouse";
-import { getWarehouseIcon, WAREHOUSE_ICON_OPTIONS } from "@/features/tenant/warehouse/icon-registry";
 import { useI18n } from "@/i18n";
 import { PATHS } from "@/shared/consts/paths";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
+import { LucideIconPicker } from "@/shared/components/ui/lucide-icon-picker";
 import {
     Select,
     SelectContent,
@@ -93,6 +93,11 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
+import {
+    getLucideIcon,
+    getLucideIconLabel,
+    normalizeLucideIconName,
+} from "@/shared/lib/lucide-icons";
 
 type LayoutFilter = "all" | "active" | "inactive";
 type LayoutDialogMode = "create" | "edit" | "classic" | null;
@@ -330,7 +335,6 @@ export default function WarehouseLayoutsPage() {
         () => getTemplateSideOptions(addBlockTemplate),
         [addBlockTemplate]
     );
-
     const selectableParents = useMemo(() => {
         if (!selectedFlattenedNode) {
             return flattenedNodes;
@@ -487,7 +491,7 @@ export default function WarehouseLayoutsPage() {
                 sideOptions: template.sideOptions?.join(", ") ?? "",
                 required: template.required,
                 description: template.description ?? "",
-                iconName: template.iconName ?? "LayoutGrid",
+                iconName: normalizeLucideIconName(template.iconName),
             });
             return;
         }
@@ -909,7 +913,8 @@ export default function WarehouseLayoutsPage() {
                                         </TableHeader>
                                         <TableBody>
                                             {filteredTemplates.map((template) => {
-                                                const Icon = getWarehouseIcon(template.iconName);
+                                                const Icon = getLucideIcon(template.iconName);
+                                                const iconLabel = getLucideIconLabel(template.iconName);
                                                 return (
                                                     <TableRow key={template.id}>
                                                         <TableCell>
@@ -920,7 +925,16 @@ export default function WarehouseLayoutsPage() {
                                                         </TableCell>
                                                         <TableCell>{template.identifierFormat}</TableCell>
                                                         <TableCell>{template.sideConfig}</TableCell>
-                                                        <TableCell>{template.iconName || t("warehouse.common.none")}</TableCell>
+                                                        <TableCell>
+                                                            {iconLabel ? (
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="flex size-7 items-center justify-center border bg-muted/30">
+                                                                        <Icon className="h-4 w-4 text-primary" />
+                                                                    </span>
+                                                                    <span>{iconLabel}</span>
+                                                                </div>
+                                                            ) : t("warehouse.common.none")}
+                                                        </TableCell>
                                                         <TableCell>
                                                             <div className="flex flex-wrap gap-2">
                                                                 {canEdit ? (
@@ -1022,7 +1036,7 @@ export default function WarehouseLayoutsPage() {
                                                 <div className="space-y-1">
                                                     {flattenedNodes.map((item) => {
                                                         const template = templates.find((entry) => entry.id === item.node.block.blockTemplateId);
-                                                        const Icon = getWarehouseIcon(template?.iconName);
+                                                        const Icon = getLucideIcon(template?.iconName);
                                                         const isSelected = selectedFlattenedNode?.node.block.id === item.node.block.id;
                                                         return (
                                                             <button
@@ -1064,7 +1078,7 @@ export default function WarehouseLayoutsPage() {
                                                 <>
                                                     <div className="flex items-center gap-3">
                                                         {(() => {
-                                                            const Icon = getWarehouseIcon(selectedTemplate.iconName);
+                                                            const Icon = getLucideIcon(selectedTemplate.iconName);
                                                             return <Icon className="h-5 w-5 text-primary" />;
                                                         })()}
                                                         <div>
@@ -1229,7 +1243,14 @@ export default function WarehouseLayoutsPage() {
                 </DialogContent>
             </Dialog>
 
-            <Dialog open={templateDialogMode !== null} onOpenChange={(open) => !open && setTemplateDialogMode(null)}>
+            <Dialog
+                open={templateDialogMode !== null}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setTemplateDialogMode(null);
+                    }
+                }}
+            >
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>
@@ -1249,16 +1270,14 @@ export default function WarehouseLayoutsPage() {
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="template-icon">{t("warehouse.templates.iconLabel")}</Label>
-                                <Select value={templateForm.iconName} onValueChange={(value) => setTemplateForm((current) => ({ ...current, iconName: value }))}>
-                                    <SelectTrigger id="template-icon" className="w-full">
-                                        <SelectValue placeholder={t("warehouse.templates.iconPlaceholder")} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {WAREHOUSE_ICON_OPTIONS.map((option) => (
-                                            <SelectItem key={option.name} value={option.name}>{option.label}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <LucideIconPicker
+                                    id="template-icon"
+                                    label={t("warehouse.templates.iconLabel")}
+                                    value={templateForm.iconName}
+                                    onChange={(iconName) => setTemplateForm((current) => ({ ...current, iconName }))}
+                                    placeholder={t("warehouse.templates.iconSearchPlaceholder")}
+                                    emptyMessage={t("warehouse.templates.iconEmpty")}
+                                />
                             </div>
                         </div>
 

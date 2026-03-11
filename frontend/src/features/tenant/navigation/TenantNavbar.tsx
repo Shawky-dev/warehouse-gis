@@ -24,7 +24,6 @@ import type {
   WarehouseLayoutResult,
   WarehouseTemplateResult,
 } from "@/features/tenant/types/warehouse";
-import { getWarehouseIcon } from "@/features/tenant/warehouse/icon-registry";
 import { Separator } from "@/components/ui/separator";
 import {
   Accordion,
@@ -38,6 +37,7 @@ import { useI18n } from "@/i18n";
 import { normalizeTenantSlug } from "@/features/auth/shared/scope";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { TENANT_PERMISSIONS } from "@/features/auth/shared/permissions";
+import { getLucideIcon } from "@/shared/lib/lucide-icons";
 
 type LeafNavItem = {
   to: string;
@@ -185,7 +185,7 @@ export function TenantNavbar() {
           tab: "builder",
         }),
         label: template?.name ?? t("tenant.nav.layoutBlock"),
-        icon: getWarehouseIcon(template?.iconName),
+        icon: getLucideIcon(template?.iconName),
         depth: entry.depth,
         exactMatch: true,
         iconName: template?.iconName ?? "LayoutGrid",
