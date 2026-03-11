@@ -87,6 +87,48 @@ public class LayoutBlockService {
         return result;
     }
 
+    @Transactional
+    public BatchBlockResult addBlocks(
+            UUID layoutId,
+            UUID blockTemplateId,
+            UUID parentId,
+            Integer position,
+            int count,
+            String side) {
+        assertLayoutExists(layoutId);
+        if (count < 1) {
+            throw WarehouseManagementException.badRequest("count must be >= 1");
+        }
+
+        BlockTemplate template = loadTemplate(blockTemplateId);
+
+        if (parentId != null) {
+            LayoutBlock parent = loadBlock(parentId);
+            assertBelongsToLayout(parent, layoutId);
+        }
+
+        int resolvedPosition = resolvePosition(layoutId, parentId, null, position);
+        shiftPositions(layoutId, parentId, resolvedPosition, count, null);
+
+        List<BlockResult> createdBlocks = new ArrayList<>();
+        String normalizedSide = normalizeSide(side, template);
+        for (int index = 0; index < count; index++) {
+            LayoutBlock block = LayoutBlock.builder()
+                    .layoutId(layoutId)
+                    .blockTemplateId(blockTemplateId)
+                    .parentId(parentId)
+                    .position(resolvedPosition + index)
+                    .side(normalizedSide)
+                    .build();
+            LayoutBlock saved = saveBlock(block);
+            createdBlocks.add(toResult(saved, template));
+        }
+
+        BatchBlockResult result = new BatchBlockResult(createdBlocks, createdBlocks.size(), createdBlocks.size());
+        tenantAuditService.record("LAYOUT_BLOCK_BATCH_ADD", "LAYOUT_BLOCK", layoutId.toString(), null, result);
+        return result;
+    }
+
     /**
      * Moves a block to a new parent and/or position.
      * Also supports re-parenting (changing the block's parent).
@@ -186,6 +228,59 @@ public class LayoutBlockService {
         tenantAuditService.record("LAYOUT_BLOCK_REMOVE", "LAYOUT_BLOCK", blockId.toString(), before, null);
     }
 
+    @Transactional
+    public BatchBlockResult copySubtree(
+            UUID layoutId,
+            UUID sourceBlockId,
+            UUID targetParentId,
+            Integer position,
+            int copies) {
+        assertLayoutExists(layoutId);
+        if (copies < 1) {
+            throw WarehouseManagementException.badRequest("copies must be >= 1");
+        }
+
+        LayoutBlock sourceBlock = loadBlock(sourceBlockId);
+        assertBelongsToLayout(sourceBlock, layoutId);
+
+        if (targetParentId != null) {
+            LayoutBlock targetParent = loadBlock(targetParentId);
+            assertBelongsToLayout(targetParent, layoutId);
+            assertNotDescendant(layoutId, sourceBlockId, targetParentId);
+        }
+
+        List<LayoutBlock> allBlocks = layoutBlockRepository.findByLayoutIdOrderByParentIdAscPositionAsc(layoutId);
+        Map<UUID, List<LayoutBlock>> childrenByParentId = buildChildrenByParentId(allBlocks);
+        List<LayoutBlock> subtreeBlocks = collectSubtree(childrenByParentId, sourceBlockId);
+        Map<UUID, BlockTemplate> templatesById = loadTemplateMap(subtreeBlocks);
+
+        int resolvedPosition = resolvePosition(layoutId, targetParentId, null, position);
+        shiftPositions(layoutId, targetParentId, resolvedPosition, copies, null);
+
+        List<BlockResult> createdRoots = new ArrayList<>();
+        int totalCreated = 0;
+        for (int copyIndex = 0; copyIndex < copies; copyIndex++) {
+            Map<UUID, UUID> clonedIds = new HashMap<>();
+            int rootPosition = resolvedPosition + copyIndex;
+            LayoutBlock clonedRoot = cloneBlock(sourceBlock, layoutId, targetParentId, rootPosition, clonedIds);
+            LayoutBlock savedRoot = saveBlock(clonedRoot);
+            clonedIds.put(sourceBlockId, savedRoot.getId());
+            createdRoots.add(toResult(savedRoot, requireTemplate(templatesById, savedRoot.getBlockTemplateId())));
+            totalCreated++;
+            totalCreated += cloneChildrenRecursively(
+                    childrenByParentId,
+                    templatesById,
+                    layoutId,
+                    sourceBlockId,
+                    savedRoot.getId(),
+                    clonedIds);
+        }
+
+        BatchBlockResult result = new BatchBlockResult(createdRoots, totalCreated, createdRoots.size());
+        tenantAuditService.record("LAYOUT_BLOCK_SUBTREE_COPY", "LAYOUT_BLOCK", sourceBlockId.toString(), null, result);
+        return result;
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
@@ -257,6 +352,71 @@ public class LayoutBlockService {
                 return true;
         }
         return false;
+    }
+
+    private Map<UUID, List<LayoutBlock>> buildChildrenByParentId(List<LayoutBlock> allBlocks) {
+        Map<UUID, List<LayoutBlock>> childrenByParentId = new HashMap<>();
+        for (LayoutBlock block : allBlocks) {
+            if (block.getParentId() != null) {
+                childrenByParentId.computeIfAbsent(block.getParentId(), ignored -> new ArrayList<>()).add(block);
+            }
+        }
+        childrenByParentId.values().forEach(children -> children.sort(Comparator.comparingInt(LayoutBlock::getPosition)));
+        return childrenByParentId;
+    }
+
+    private List<LayoutBlock> collectSubtree(Map<UUID, List<LayoutBlock>> childrenByParentId, UUID rootId) {
+        List<LayoutBlock> subtree = new ArrayList<>();
+        collectSubtree(childrenByParentId, rootId, subtree);
+        return subtree;
+    }
+
+    private void collectSubtree(Map<UUID, List<LayoutBlock>> childrenByParentId, UUID currentId, List<LayoutBlock> subtree) {
+        LayoutBlock current = loadBlock(currentId);
+        subtree.add(current);
+        for (LayoutBlock child : childrenByParentId.getOrDefault(currentId, List.of())) {
+            collectSubtree(childrenByParentId, child.getId(), subtree);
+        }
+    }
+
+    private LayoutBlock cloneBlock(
+            LayoutBlock source,
+            UUID layoutId,
+            UUID parentId,
+            int position,
+            Map<UUID, UUID> clonedIds) {
+        return LayoutBlock.builder()
+                .layoutId(layoutId)
+                .blockTemplateId(source.getBlockTemplateId())
+                .parentId(parentId)
+                .position(position)
+                .side(source.getSide())
+                .build();
+    }
+
+    private int cloneChildrenRecursively(
+            Map<UUID, List<LayoutBlock>> childrenByParentId,
+            Map<UUID, BlockTemplate> templatesById,
+            UUID layoutId,
+            UUID sourceParentId,
+            UUID clonedParentId,
+            Map<UUID, UUID> clonedIds) {
+        int createdCount = 0;
+        for (LayoutBlock child : childrenByParentId.getOrDefault(sourceParentId, List.of())) {
+            LayoutBlock clonedChild = cloneBlock(child, layoutId, clonedParentId, child.getPosition(), clonedIds);
+            LayoutBlock savedChild = saveBlock(clonedChild);
+            clonedIds.put(child.getId(), savedChild.getId());
+            requireTemplate(templatesById, savedChild.getBlockTemplateId());
+            createdCount++;
+            createdCount += cloneChildrenRecursively(
+                    childrenByParentId,
+                    templatesById,
+                    layoutId,
+                    child.getId(),
+                    savedChild.getId(),
+                    clonedIds);
+        }
+        return createdCount;
     }
 
     private List<BlockNode> buildTree(List<LayoutBlock> all, UUID parentId, Map<UUID, BlockTemplate> templatesById) {
@@ -435,5 +595,11 @@ public class LayoutBlockService {
     }
 
     public record BlockNode(BlockResult block, List<BlockNode> children) {
+    }
+
+    public record BatchBlockResult(
+            List<BlockResult> createdBlocks,
+            int totalCreated,
+            int rootCount) {
     }
 }

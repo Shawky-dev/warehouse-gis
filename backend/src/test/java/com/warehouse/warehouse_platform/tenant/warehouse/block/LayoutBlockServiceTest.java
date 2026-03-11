@@ -10,9 +10,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -186,6 +188,38 @@ class LayoutBlockServiceTest {
         assertEquals(1, existingChild.getPosition());
     }
 
+        @Test
+        void addBlocks_shouldCreateMultipleBlocksAndShiftFollowingSiblings() {
+                LayoutBlock existingRoot = block(UUID.fromString("1212eeee-0000-0000-0000-000000000000"), LAYOUT_ID, null, 1);
+                AtomicInteger sequence = new AtomicInteger();
+
+                when(layoutRepository.existsById(LAYOUT_ID)).thenReturn(true);
+                when(blockTemplateRepository.findById(TEMPLATE_ID)).thenReturn(Optional.of(template(
+                                TEMPLATE_ID, BlockTemplate.IdentifierFormat.NUMERIC, BlockTemplate.SideConfig.NONE, null)));
+                when(layoutBlockRepository.findByLayoutIdAndParentIdIsNullOrderByPositionAsc(LAYOUT_ID))
+                                .thenReturn(List.of(existingRoot));
+                when(layoutBlockRepository.save(any())).thenAnswer(invocation -> {
+                        LayoutBlock saved = invocation.getArgument(0);
+                        saved.setId(UUID.fromString("90000000-0000-0000-0000-00000000000" + sequence.incrementAndGet()));
+                        saved.setCreatedAt(Instant.now());
+                        saved.setUpdatedAt(Instant.now());
+                        return saved;
+                });
+
+                LayoutBlockService.BatchBlockResult result = service.addBlocks(LAYOUT_ID, TEMPLATE_ID, null, 1, 2, null);
+
+                assertEquals(2, result.createdBlocks().size());
+                assertEquals(2, result.totalCreated());
+                assertEquals(2, result.rootCount());
+                assertEquals(1, result.createdBlocks().get(0).position());
+                assertEquals("2", result.createdBlocks().get(0).identifier());
+                assertEquals(2, result.createdBlocks().get(1).position());
+                assertEquals("3", result.createdBlocks().get(1).identifier());
+                assertEquals(3, existingRoot.getPosition());
+                verify(tenantAuditService).record(eq("LAYOUT_BLOCK_BATCH_ADD"), eq("LAYOUT_BLOCK"),
+                                eq(LAYOUT_ID.toString()), eq(null), any());
+        }
+
     // -------------------------------------------------------------------------
     // moveBlock — cycle prevention
     // -------------------------------------------------------------------------
@@ -238,6 +272,57 @@ class LayoutBlockServiceTest {
         assertEquals(1, sibling2.getPosition());
         verify(tenantAuditService).record(eq("LAYOUT_BLOCK_REMOVE"), eq("LAYOUT_BLOCK"),
                 eq(blockId.toString()), any(), eq(null));
+    }
+
+    @Test
+    void copySubtree_shouldCloneStructureAndRepeatRequestedCopies() {
+        UUID sourceRootId = UUID.fromString("55550000-0000-0000-0000-000000000000");
+        UUID sourceChildId = UUID.fromString("55550000-0000-0000-0000-000000000001");
+        UUID existingRootId = UUID.fromString("55550000-0000-0000-0000-000000000002");
+        LayoutBlock sourceRoot = block(sourceRootId, LAYOUT_ID, null, 0);
+        LayoutBlock sourceChild = block(sourceChildId, LAYOUT_ID, sourceRootId, 0);
+        sourceChild.setBlockTemplateId(TEMPLATE_LR_ID);
+        sourceChild.setSide("L");
+        LayoutBlock existingRoot = block(existingRootId, LAYOUT_ID, null, 1);
+
+        List<LayoutBlock> savedBlocks = new ArrayList<>();
+        AtomicInteger sequence = new AtomicInteger();
+
+        when(layoutRepository.existsById(LAYOUT_ID)).thenReturn(true);
+        when(layoutBlockRepository.findById(sourceRootId)).thenReturn(Optional.of(sourceRoot));
+        when(layoutBlockRepository.findById(sourceChildId)).thenReturn(Optional.of(sourceChild));
+        when(layoutBlockRepository.findByLayoutIdOrderByParentIdAscPositionAsc(LAYOUT_ID))
+                .thenReturn(List.of(sourceRoot, sourceChild, existingRoot));
+        when(layoutBlockRepository.findByLayoutIdAndParentIdIsNullOrderByPositionAsc(LAYOUT_ID))
+                .thenReturn(List.of(sourceRoot, existingRoot));
+        when(blockTemplateRepository.findAllById(any())).thenReturn(List.of(
+                template(TEMPLATE_ID, BlockTemplate.IdentifierFormat.NUMERIC, BlockTemplate.SideConfig.NONE, null),
+                template(TEMPLATE_LR_ID, BlockTemplate.IdentifierFormat.ALPHA, BlockTemplate.SideConfig.LR, null)));
+        when(layoutBlockRepository.save(any())).thenAnswer(invocation -> {
+            LayoutBlock saved = invocation.getArgument(0);
+            saved.setId(UUID.fromString("70000000-0000-0000-0000-00000000000" + sequence.incrementAndGet()));
+            saved.setCreatedAt(Instant.now());
+            saved.setUpdatedAt(Instant.now());
+            savedBlocks.add(saved);
+            return saved;
+        });
+
+        LayoutBlockService.BatchBlockResult result = service.copySubtree(LAYOUT_ID, sourceRootId, null, 1, 2);
+
+        assertEquals(2, result.createdBlocks().size());
+        assertEquals(4, result.totalCreated());
+        assertEquals(2, result.rootCount());
+        assertEquals(1, result.createdBlocks().get(0).position());
+        assertEquals(2, result.createdBlocks().get(1).position());
+        assertEquals(3, existingRoot.getPosition());
+        assertEquals(4, savedBlocks.size());
+        assertNull(savedBlocks.get(0).getParentId());
+        assertEquals(savedBlocks.get(0).getId(), savedBlocks.get(1).getParentId());
+        assertEquals("L", savedBlocks.get(1).getSide());
+        assertNull(savedBlocks.get(2).getParentId());
+        assertEquals(savedBlocks.get(2).getId(), savedBlocks.get(3).getParentId());
+        verify(tenantAuditService).record(eq("LAYOUT_BLOCK_SUBTREE_COPY"), eq("LAYOUT_BLOCK"),
+                eq(sourceRootId.toString()), eq(null), any());
     }
 
     // -------------------------------------------------------------------------

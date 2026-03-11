@@ -70,6 +70,39 @@ public class LayoutBlockController {
                                 request.side()));
         }
 
+        @PostMapping("/batch")
+        @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_EDIT)")
+        public ResponseEntity<LayoutBlockService.BatchBlockResult> addBlocks(
+                        @PathVariable String tenantSlug,
+                        @PathVariable UUID layoutId,
+                        @Valid @RequestBody AddBlocksRequest request,
+                        Authentication authentication) {
+                tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
+                return ResponseEntity.ok(layoutBlockService.addBlocks(
+                                layoutId,
+                                request.blockTemplateId(),
+                                request.parentId(),
+                                request.position(),
+                                request.count(),
+                                request.side()));
+        }
+
+        @PostMapping("/copy-subtree")
+        @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_EDIT)")
+        public ResponseEntity<LayoutBlockService.BatchBlockResult> copySubtree(
+                        @PathVariable String tenantSlug,
+                        @PathVariable UUID layoutId,
+                        @Valid @RequestBody CopySubtreeRequest request,
+                        Authentication authentication) {
+                tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
+                return ResponseEntity.ok(layoutBlockService.copySubtree(
+                                layoutId,
+                                request.sourceBlockId(),
+                                request.targetParentId(),
+                                request.position(),
+                                request.copies()));
+        }
+
         @PutMapping("/{blockId}/move")
         @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_EDIT)")
         public ResponseEntity<LayoutBlockService.BlockResult> moveBlock(
@@ -125,6 +158,21 @@ public class LayoutBlockController {
                         UUID parentId,
                         @Min(0) Integer position,
                         @Size(max = 50) String side) {
+        }
+
+        public record AddBlocksRequest(
+                        @NotNull UUID blockTemplateId,
+                        UUID parentId,
+                        @Min(0) Integer position,
+                        @Min(1) int count,
+                        @Size(max = 50) String side) {
+        }
+
+        public record CopySubtreeRequest(
+                        @NotNull UUID sourceBlockId,
+                        UUID targetParentId,
+                        @Min(0) Integer position,
+                        @Min(1) int copies) {
         }
 
         public record MoveBlockRequest(

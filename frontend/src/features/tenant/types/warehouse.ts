@@ -97,6 +97,23 @@ export interface AddWarehouseBlockRequest {
     side?: string | null;
 }
 
+export interface AddWarehouseBlocksRequest extends AddWarehouseBlockRequest {
+    count: number;
+}
+
+export interface CopyWarehouseBlockSubtreeRequest {
+    sourceBlockId: string;
+    targetParentId?: string | null;
+    position?: number | null;
+    copies: number;
+}
+
+export interface WarehouseBlockOperationResult {
+    createdBlocks: WarehouseBlockResult[];
+    totalCreated: number;
+    rootCount: number;
+}
+
 export interface MoveWarehouseBlockRequest {
     parentId?: string | null;
     position: number;

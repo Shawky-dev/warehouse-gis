@@ -3,6 +3,8 @@ import { normalizeTenantSlug } from "@/features/auth/shared/scope";
 import { api } from "@/lib/api";
 import type {
     AddWarehouseBlockRequest,
+    AddWarehouseBlocksRequest,
+    CopyWarehouseBlockSubtreeRequest,
     CreateClassicPresetRequest,
     ListWarehouseLayoutsParams,
     ListWarehouseTemplatesParams,
@@ -13,6 +15,7 @@ import type {
     UpsertWarehouseTemplateRequest,
     WarehouseApiErrorResponse,
     WarehouseBlockNode,
+    WarehouseBlockOperationResult,
     WarehouseBlockResult,
     WarehouseLayoutPageResult,
     WarehouseLayoutResult,
@@ -165,6 +168,32 @@ export async function addWarehouseLayoutBlock(
 ): Promise<WarehouseBlockResult> {
     const response = await api.post<WarehouseBlockResult>(
         `${tenantBasePath(tenantSlug)}/warehouse-layouts/${layoutId}/blocks`,
+        payload,
+        { headers: tenantHeaders(tenantSlug) }
+    );
+    return response.data;
+}
+
+export async function addWarehouseLayoutBlocks(
+    tenantSlug: string,
+    layoutId: string,
+    payload: AddWarehouseBlocksRequest
+): Promise<WarehouseBlockOperationResult> {
+    const response = await api.post<WarehouseBlockOperationResult>(
+        `${tenantBasePath(tenantSlug)}/warehouse-layouts/${layoutId}/blocks/batch`,
+        payload,
+        { headers: tenantHeaders(tenantSlug) }
+    );
+    return response.data;
+}
+
+export async function copyWarehouseLayoutBlockSubtree(
+    tenantSlug: string,
+    layoutId: string,
+    payload: CopyWarehouseBlockSubtreeRequest
+): Promise<WarehouseBlockOperationResult> {
+    const response = await api.post<WarehouseBlockOperationResult>(
+        `${tenantBasePath(tenantSlug)}/warehouse-layouts/${layoutId}/blocks/copy-subtree`,
         payload,
         { headers: tenantHeaders(tenantSlug) }
     );

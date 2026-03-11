@@ -10,6 +10,8 @@ import {
     ArrowDown,
     ArrowUp,
     Check,
+    ClipboardPaste,
+    Copy,
     FolderTree,
     Pencil,
     Plus,
@@ -22,6 +24,8 @@ import { TENANT_PERMISSIONS } from "@/features/auth/shared/permissions";
 import {
     activateWarehouseLayout,
     addWarehouseLayoutBlock,
+    addWarehouseLayoutBlocks,
+    copyWarehouseLayoutBlockSubtree,
     createClassicWarehousePreset,
     createWarehouseLayout,
     createWarehouseTemplate,
@@ -123,7 +127,21 @@ interface TemplateFormState {
 interface BlockFormState {
     blockTemplateId: string;
     parentId: string;
+    position: string;
+    quantity: string;
     side: string;
+}
+
+interface PasteBlockFormState {
+    parentId: string;
+    position: string;
+    copies: string;
+}
+
+interface BlockClipboardState {
+    sourceBlockId: string;
+    label: string;
+    totalNodes: number;
 }
 
 type DeleteTarget =
@@ -150,7 +168,15 @@ const DEFAULT_TEMPLATE_FORM: TemplateFormState = {
 const DEFAULT_BLOCK_FORM: BlockFormState = {
     blockTemplateId: "",
     parentId: "__root__",
+    position: "",
+    quantity: "1",
     side: "__none__",
+};
+
+const DEFAULT_PASTE_FORM: PasteBlockFormState = {
+    parentId: "__root__",
+    position: "",
+    copies: "1",
 };
 
 function parsePath(value: string | null): string[] {
@@ -192,12 +218,36 @@ function buildDescendantSet(node: WarehouseBlockNode): Set<string> {
     return ids;
 }
 
+function countSubtreeNodes(node: WarehouseBlockNode): number {
+    return 1 + node.children.reduce((total, child) => total + countSubtreeNodes(child), 0);
+}
+
 function splitSideOptions(value: string): string[] | null {
     const options = value
         .split(",")
         .map((item) => item.trim())
         .filter(Boolean);
     return options.length > 0 ? options : null;
+}
+
+function parseOptionalPosition(value: string): number | null {
+    const normalized = value.trim();
+    if (!normalized) {
+        return null;
+    }
+    const parsed = Number.parseInt(normalized, 10);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+        throw new Error("invalid-position");
+    }
+    return parsed;
+}
+
+function parseRequiredPositiveInteger(value: string): number {
+    const parsed = Number.parseInt(value.trim(), 10);
+    if (!Number.isFinite(parsed) || parsed < 1) {
+        throw new Error("invalid-positive-integer");
+    }
+    return parsed;
 }
 
 function getTemplateSideOptions(template: WarehouseTemplateResult | null): string[] {
@@ -279,6 +329,9 @@ export default function WarehouseLayoutsPage() {
     const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
     const [isAddBlockOpen, setIsAddBlockOpen] = useState(false);
     const [blockForm, setBlockForm] = useState<BlockFormState>(DEFAULT_BLOCK_FORM);
+    const [isPasteBlockOpen, setIsPasteBlockOpen] = useState(false);
+    const [pasteForm, setPasteForm] = useState<PasteBlockFormState>(DEFAULT_PASTE_FORM);
+    const [blockClipboard, setBlockClipboard] = useState<BlockClipboardState | null>(null);
     const [selectedBlockTemplateId, setSelectedBlockTemplateId] = useState("");
     const [selectedBlockParentId, setSelectedBlockParentId] = useState("__root__");
     const [selectedBlockSide, setSelectedBlockSide] = useState("__none__");
@@ -343,6 +396,20 @@ export default function WarehouseLayoutsPage() {
         const invalidIds = buildDescendantSet(selectedFlattenedNode.node);
         return flattenedNodes.filter((item) => !invalidIds.has(item.node.block.id));
     }, [flattenedNodes, selectedFlattenedNode]);
+    const clipboardSourceNode = useMemo(
+        () => blockClipboard
+            ? flattenedNodes.find((item) => item.node.block.id === blockClipboard.sourceBlockId) ?? null
+            : null,
+        [blockClipboard, flattenedNodes]
+    );
+    const pasteSelectableParents = useMemo(() => {
+        if (!clipboardSourceNode) {
+            return flattenedNodes;
+        }
+
+        const invalidIds = buildDescendantSet(clipboardSourceNode.node);
+        return flattenedNodes.filter((item) => !invalidIds.has(item.node.block.id));
+    }, [clipboardSourceNode, flattenedNodes]);
 
     const blockBreadcrumbs = useMemo(() => {
         return selectedPath
@@ -590,22 +657,123 @@ export default function WarehouseLayoutsPage() {
         }
 
         setActionError(null);
+        let quantity: number;
+        let position: number | null;
+        try {
+            quantity = parseRequiredPositiveInteger(blockForm.quantity);
+        } catch {
+            setActionError(t("warehouse.builder.quantityInvalid"));
+            return;
+        }
+
+        try {
+            position = parseOptionalPosition(blockForm.position);
+        } catch {
+            setActionError(t("warehouse.builder.positionInvalid"));
+            return;
+        }
+
         setIsSubmitting(true);
         try {
             const payload: AddWarehouseBlockRequest = {
                 blockTemplateId: blockForm.blockTemplateId,
                 parentId: blockForm.parentId === "__root__" ? null : blockForm.parentId,
-                position: null,
+                position,
                 side: normalizeSideSelection(blockForm.side, addBlockTemplate),
             };
-            const created = await addWarehouseLayoutBlock(slug, selectedLayout.id, payload);
+            const createdBlocks = quantity === 1
+                ? [await addWarehouseLayoutBlock(slug, selectedLayout.id, payload)]
+                : (await addWarehouseLayoutBlocks(slug, selectedLayout.id, {
+                    ...payload,
+                    count: quantity,
+                })).createdBlocks;
             await loadTree(selectedLayout.id);
             const parentPath = payload.parentId
                 ? flattenedNodes.find((item) => item.node.block.id === payload.parentId)?.path ?? []
                 : [];
-            updateQuery({ path: joinPath([...parentPath, created.id]) });
+            const firstCreatedBlock = createdBlocks[0];
+            updateQuery({ path: firstCreatedBlock ? joinPath([...parentPath, firstCreatedBlock.id]) : joinPath(parentPath) });
             setIsAddBlockOpen(false);
             setBlockForm(DEFAULT_BLOCK_FORM);
+        } catch (error) {
+            setActionError(extractWarehouseErrorMessage(error) ?? t("warehouse.common.actionFailed"));
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleCopySelectedBlock = () => {
+        if (!selectedFlattenedNode) {
+            return;
+        }
+        const template = templates.find((entry) => entry.id === selectedFlattenedNode.node.block.blockTemplateId) ?? null;
+        setBlockClipboard({
+            sourceBlockId: selectedFlattenedNode.node.block.id,
+            label: getBlockDisplayLabel(selectedFlattenedNode.node.block, template, t("warehouse.builder.unknownBlock")),
+            totalNodes: countSubtreeNodes(selectedFlattenedNode.node),
+        });
+        setActionError(null);
+    };
+
+    const handleOpenPasteDialog = () => {
+        if (!blockClipboard) {
+            return;
+        }
+
+        const invalidTargetIds = clipboardSourceNode ? buildDescendantSet(clipboardSourceNode.node) : new Set<string>();
+        const suggestedParentId = selectedFlattenedNode && !invalidTargetIds.has(selectedFlattenedNode.node.block.id)
+            ? selectedFlattenedNode.node.block.id
+            : clipboardSourceNode?.node.block.parentId ?? "__root__";
+
+        setPasteForm({
+            parentId: suggestedParentId,
+            position: "",
+            copies: "1",
+        });
+        setIsPasteBlockOpen(true);
+    };
+
+    const handlePasteBlock = async (event: FormEvent) => {
+        event.preventDefault();
+        if (!selectedLayout || !blockClipboard) {
+            return;
+        }
+
+        setActionError(null);
+
+        let copies: number;
+        let position: number | null;
+        try {
+            copies = parseRequiredPositiveInteger(pasteForm.copies);
+        } catch {
+            setActionError(t("warehouse.builder.copiesInvalid"));
+            return;
+        }
+
+        try {
+            position = parseOptionalPosition(pasteForm.position);
+        } catch {
+            setActionError(t("warehouse.builder.positionInvalid"));
+            return;
+        }
+
+        const targetParentId = pasteForm.parentId === "__root__" ? null : pasteForm.parentId;
+        setIsSubmitting(true);
+        try {
+            const result = await copyWarehouseLayoutBlockSubtree(slug, selectedLayout.id, {
+                sourceBlockId: blockClipboard.sourceBlockId,
+                targetParentId,
+                position,
+                copies,
+            });
+            await loadTree(selectedLayout.id);
+            const parentPath = targetParentId
+                ? flattenedNodes.find((item) => item.node.block.id === targetParentId)?.path ?? []
+                : [];
+            const firstCreatedBlock = result.createdBlocks[0];
+            updateQuery({ path: firstCreatedBlock ? joinPath([...parentPath, firstCreatedBlock.id]) : joinPath(parentPath) });
+            setIsPasteBlockOpen(false);
+            setPasteForm(DEFAULT_PASTE_FORM);
         } catch (error) {
             setActionError(extractWarehouseErrorMessage(error) ?? t("warehouse.common.actionFailed"));
         } finally {
@@ -1010,24 +1178,50 @@ export default function WarehouseLayoutsPage() {
                                                     <CardDescription>{t("warehouse.builder.treeDescription")}</CardDescription>
                                                 </div>
                                                 {canEdit ? (
-                                                    <Button
-                                                        variant="outline"
-                                                        onClick={() => {
-                                                            setBlockForm({
-                                                                blockTemplateId: templates[0]?.id ?? "",
-                                                                parentId: selectedFlattenedNode?.node.block.id ?? "__root__",
-                                                                side: "__none__",
-                                                            });
-                                                            setIsAddBlockOpen(true);
-                                                        }}
-                                                    >
-                                                        <Plus className="h-4 w-4" />
-                                                        {t("warehouse.builder.addBlockAction")}
-                                                    </Button>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {blockClipboard ? (
+                                                            <Button variant="outline" onClick={handleOpenPasteDialog}>
+                                                                <ClipboardPaste className="h-4 w-4" />
+                                                                {t("warehouse.builder.pasteSubtreeAction")}
+                                                            </Button>
+                                                        ) : null}
+                                                        <Button
+                                                            variant="outline"
+                                                            onClick={() => {
+                                                                setBlockForm({
+                                                                    blockTemplateId: templates[0]?.id ?? "",
+                                                                    parentId: selectedFlattenedNode?.node.block.id ?? "__root__",
+                                                                    position: "",
+                                                                    quantity: "1",
+                                                                    side: "__none__",
+                                                                });
+                                                                setIsAddBlockOpen(true);
+                                                            }}
+                                                        >
+                                                            <Plus className="h-4 w-4" />
+                                                            {t("warehouse.builder.addBlockAction")}
+                                                        </Button>
+                                                    </div>
                                                 ) : null}
                                             </div>
                                         </CardHeader>
                                         <CardContent>
+                                            {blockClipboard ? (
+                                                <div className="mb-4 flex items-center justify-between gap-3 border bg-muted/20 px-3 py-2 text-sm">
+                                                    <div>
+                                                        <p className="font-medium">{t("warehouse.builder.clipboardReady")}</p>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            {t("warehouse.builder.clipboardSummary", {
+                                                                label: blockClipboard.label,
+                                                                count: String(blockClipboard.totalNodes),
+                                                            })}
+                                                        </p>
+                                                    </div>
+                                                    <Button variant="ghost" size="sm" onClick={() => setBlockClipboard(null)}>
+                                                        {t("warehouse.builder.clearClipboardAction")}
+                                                    </Button>
+                                                </div>
+                                            ) : null}
                                             {isLoadingTree ? (
                                                 <p className="text-sm text-muted-foreground">{t("warehouse.common.loading")}</p>
                                             ) : layoutTree.length === 0 ? (
@@ -1163,6 +1357,16 @@ export default function WarehouseLayoutsPage() {
                                                                     <ArrowDown className="h-4 w-4" />
                                                                     {t("warehouse.builder.moveDownAction")}
                                                                 </Button>
+                                                                <Button variant="outline" onClick={handleCopySelectedBlock} disabled={isSubmitting}>
+                                                                    <Copy className="h-4 w-4" />
+                                                                    {t("warehouse.builder.copySubtreeAction")}
+                                                                </Button>
+                                                                {blockClipboard ? (
+                                                                    <Button variant="outline" onClick={handleOpenPasteDialog} disabled={isSubmitting}>
+                                                                        <ClipboardPaste className="h-4 w-4" />
+                                                                        {t("warehouse.builder.pasteSubtreeAction")}
+                                                                    </Button>
+                                                                ) : null}
                                                             </>
                                                         ) : null}
                                                         {canHardDelete ? (
@@ -1405,6 +1609,30 @@ export default function WarehouseLayoutsPage() {
                                 </SelectContent>
                             </Select>
                         </div>
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                                <Label htmlFor="block-position">{t("warehouse.builder.positionLabel")}</Label>
+                                <Input
+                                    id="block-position"
+                                    min={0}
+                                    type="number"
+                                    value={blockForm.position}
+                                    onChange={(event) => setBlockForm((current) => ({ ...current, position: event.target.value }))}
+                                    placeholder={t("warehouse.builder.positionPlaceholder")}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="block-quantity">{t("warehouse.builder.quantityLabel")}</Label>
+                                <Input
+                                    id="block-quantity"
+                                    min={1}
+                                    type="number"
+                                    value={blockForm.quantity}
+                                    onChange={(event) => setBlockForm((current) => ({ ...current, quantity: event.target.value }))}
+                                    placeholder={t("warehouse.builder.quantityPlaceholder")}
+                                />
+                            </div>
+                        </div>
                         {addBlockSideOptions.length > 0 ? (
                             <div className="space-y-2">
                                 <Label htmlFor="block-side">{t("warehouse.builder.sideLabel")}</Label>
@@ -1429,7 +1657,83 @@ export default function WarehouseLayoutsPage() {
                                 {t("warehouse.common.cancel")}
                             </Button>
                             <Button type="submit" disabled={isSubmitting || !blockForm.blockTemplateId}>
-                                {t("warehouse.builder.addBlockAction")}
+                                {t("warehouse.builder.addBlockSubmitAction")}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={isPasteBlockOpen} onOpenChange={setIsPasteBlockOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{t("warehouse.builder.pasteSubtreeDialogTitle")}</DialogTitle>
+                        <DialogDescription>{t("warehouse.builder.pasteSubtreeDialogDescription")}</DialogDescription>
+                    </DialogHeader>
+                    <form className="space-y-4" onSubmit={handlePasteBlock}>
+                        {blockClipboard ? (
+                            <div className="border bg-muted/20 px-3 py-2 text-sm">
+                                <p className="font-medium">{blockClipboard.label}</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {t("warehouse.builder.clipboardSummary", {
+                                        label: blockClipboard.label,
+                                        count: String(blockClipboard.totalNodes),
+                                    })}
+                                </p>
+                            </div>
+                        ) : null}
+                        <div className="space-y-2">
+                            <Label htmlFor="paste-parent">{t("warehouse.builder.pasteTargetLabel")}</Label>
+                            <Select
+                                value={pasteForm.parentId}
+                                onValueChange={(value) => setPasteForm((current) => ({ ...current, parentId: value }))}
+                            >
+                                <SelectTrigger id="paste-parent" className="w-full">
+                                    <SelectValue placeholder={t("warehouse.builder.parentPlaceholder")} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="__root__">{t("warehouse.builder.rootParent")}</SelectItem>
+                                    {pasteSelectableParents.map((item) => {
+                                        const template = templates.find((entry) => entry.id === item.node.block.blockTemplateId);
+                                        return (
+                                            <SelectItem key={item.node.block.id} value={item.node.block.id}>
+                                                {`${"- ".repeat(item.depth)}${getBlockDisplayLabel(item.node.block, template ?? null, t("warehouse.builder.unknownBlock"))}`}
+                                            </SelectItem>
+                                        );
+                                    })}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                                <Label htmlFor="paste-position">{t("warehouse.builder.positionLabel")}</Label>
+                                <Input
+                                    id="paste-position"
+                                    min={0}
+                                    type="number"
+                                    value={pasteForm.position}
+                                    onChange={(event) => setPasteForm((current) => ({ ...current, position: event.target.value }))}
+                                    placeholder={t("warehouse.builder.positionPlaceholder")}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="paste-copies">{t("warehouse.builder.copiesLabel")}</Label>
+                                <Input
+                                    id="paste-copies"
+                                    min={1}
+                                    type="number"
+                                    value={pasteForm.copies}
+                                    onChange={(event) => setPasteForm((current) => ({ ...current, copies: event.target.value }))}
+                                    placeholder={t("warehouse.builder.copiesPlaceholder")}
+                                />
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button type="button" variant="outline" onClick={() => setIsPasteBlockOpen(false)}>
+                                {t("warehouse.common.cancel")}
+                            </Button>
+                            <Button type="submit" disabled={isSubmitting || !blockClipboard}>
+                                {t("warehouse.builder.pasteSubtreeSubmitAction")}
                             </Button>
                         </DialogFooter>
                     </form>
