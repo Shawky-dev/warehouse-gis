@@ -26,8 +26,13 @@ import java.util.UUID;
 @Builder
 public class BlockTemplate {
 
-    public enum IdentifierFormat { NUMERIC, ALPHA, CUSTOM, FREE_TEXT }
-    public enum SideConfig { NONE, LR, AB, CUSTOM }
+    public enum IdentifierFormat {
+        NUMERIC, ALPHA, CUSTOM, FREE_TEXT
+    }
+
+    public enum SideConfig {
+        NONE, LR, AB, CUSTOM
+    }
 
     @Id
     private UUID id;
@@ -58,6 +63,9 @@ public class BlockTemplate {
     @Column(length = 500)
     private String description;
 
+    @Column(name = "icon_name", length = 100)
+    private String iconName;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -66,12 +74,15 @@ public class BlockTemplate {
 
     @PrePersist
     public void prePersist() {
-        if (id == null) id = UUID.randomUUID();
+        if (id == null)
+            id = UUID.randomUUID();
         Instant now = Instant.now();
         createdAt = now;
         updatedAt = now;
-        if (sideConfig == null) sideConfig = SideConfig.NONE;
-        if (required == null) required = true;
+        if (sideConfig == null)
+            sideConfig = SideConfig.NONE;
+        if (required == null)
+            required = true;
     }
 
     @PreUpdate

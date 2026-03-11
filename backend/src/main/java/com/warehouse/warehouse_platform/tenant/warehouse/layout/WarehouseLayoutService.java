@@ -1,6 +1,9 @@
 package com.warehouse.warehouse_platform.tenant.warehouse.layout;
 
 import com.warehouse.warehouse_platform.tenant.audit.TenantAuditService;
+import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplate;
+import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplateRepository;
+import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlock;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlockRepository;
 import com.warehouse.warehouse_platform.tenant.warehouse.common.WarehouseManagementException;
 import org.springframework.data.domain.Page;
@@ -15,6 +18,8 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -22,14 +27,17 @@ public class WarehouseLayoutService {
 
     private final WarehouseLayoutRepository layoutRepository;
     private final LayoutBlockRepository layoutBlockRepository;
+    private final BlockTemplateRepository blockTemplateRepository;
     private final TenantAuditService tenantAuditService;
 
     public WarehouseLayoutService(
             WarehouseLayoutRepository layoutRepository,
             LayoutBlockRepository layoutBlockRepository,
+            BlockTemplateRepository blockTemplateRepository,
             TenantAuditService tenantAuditService) {
         this.layoutRepository = layoutRepository;
         this.layoutBlockRepository = layoutBlockRepository;
+        this.blockTemplateRepository = blockTemplateRepository;
         this.tenantAuditService = tenantAuditService;
     }
 
@@ -66,9 +74,48 @@ public class WarehouseLayoutService {
                 .isActive(false)
                 .build();
 
-        WarehouseLayout saved = layoutRepository.save(layout);
+        WarehouseLayout saved = saveLayout(layout);
         LayoutResult result = toResult(saved);
         tenantAuditService.record("WAREHOUSE_LAYOUT_CREATE", "WAREHOUSE_LAYOUT", result.id().toString(), null, result);
+        return result;
+    }
+
+    @Transactional
+    public LayoutResult createClassicPreset(String name, String description, boolean activate) {
+        WarehouseLayout layout = createLayoutEntity(name, description);
+        WarehouseLayout savedLayout = saveLayout(layout);
+        UUID savedLayoutId = savedLayout.getId();
+
+        LayoutBlock aisleBlock = createPresetBlock(savedLayoutId, null, 0,
+                resolveClassicTemplate("Aisle", BlockTemplate.IdentifierFormat.ALPHA,
+                        BlockTemplate.SideConfig.LR, true, "Primary warehouse aisle segment", "AlignJustify").getId());
+        LayoutBlock sideBlock = createPresetBlock(savedLayoutId, aisleBlock.getId(), 0,
+                resolveClassicTemplate("Side", BlockTemplate.IdentifierFormat.ALPHA,
+                        BlockTemplate.SideConfig.AB, true, "Split aisle side", "GitBranch").getId());
+        LayoutBlock bayBlock = createPresetBlock(savedLayoutId, sideBlock.getId(), 0,
+                resolveClassicTemplate("Bay", BlockTemplate.IdentifierFormat.NUMERIC,
+                        BlockTemplate.SideConfig.NONE, true, "Numbered bay segment", "Layers").getId());
+        LayoutBlock levelBlock = createPresetBlock(savedLayoutId, bayBlock.getId(), 0,
+                resolveClassicTemplate("Level", BlockTemplate.IdentifierFormat.NUMERIC,
+                        BlockTemplate.SideConfig.NONE, true, "Vertical bay level", "List").getId());
+        createPresetBlock(savedLayoutId, levelBlock.getId(), 0,
+                resolveClassicTemplate("Shelf", BlockTemplate.IdentifierFormat.NUMERIC,
+                        BlockTemplate.SideConfig.NONE, true, "Shelf within a level", "MapPin").getId());
+
+        if (activate) {
+            layoutRepository.findByIsActiveTrue()
+                    .filter(current -> !current.getId().equals(savedLayoutId))
+                    .ifPresent(current -> {
+                        current.setIsActive(false);
+                        saveLayout(current);
+                    });
+            savedLayout.setIsActive(true);
+            savedLayout = saveLayout(savedLayout);
+        }
+
+        LayoutResult result = toResult(savedLayout);
+        tenantAuditService.record("WAREHOUSE_LAYOUT_CREATE_CLASSIC_PRESET", "WAREHOUSE_LAYOUT",
+                result.id().toString(), null, result);
         return result;
     }
 
@@ -89,7 +136,7 @@ public class WarehouseLayoutService {
         existing.setName(normalizedName);
         existing.setDescription(normalizedDesc);
 
-        WarehouseLayout saved = layoutRepository.save(existing);
+        WarehouseLayout saved = saveLayout(existing);
         LayoutResult after = toResult(saved);
         tenantAuditService.record("WAREHOUSE_LAYOUT_UPDATE", "WAREHOUSE_LAYOUT", after.id().toString(), before, after);
         return after;
@@ -107,13 +154,14 @@ public class WarehouseLayoutService {
         // Deactivate the currently active layout, if any
         layoutRepository.findByIsActiveTrue().ifPresent(current -> {
             current.setIsActive(false);
-            layoutRepository.save(current);
+            saveLayout(current);
         });
 
         layout.setIsActive(true);
-        layoutRepository.save(layout);
+        saveLayout(layout);
 
-        tenantAuditService.record("WAREHOUSE_LAYOUT_ACTIVATE", "WAREHOUSE_LAYOUT", id.toString(), before, toResult(layout));
+        tenantAuditService.record("WAREHOUSE_LAYOUT_ACTIVATE", "WAREHOUSE_LAYOUT", id.toString(), before,
+                toResult(layout));
     }
 
     @Transactional
@@ -126,9 +174,10 @@ public class WarehouseLayoutService {
         }
 
         layout.setIsActive(false);
-        layoutRepository.save(layout);
+        saveLayout(layout);
 
-        tenantAuditService.record("WAREHOUSE_LAYOUT_DEACTIVATE", "WAREHOUSE_LAYOUT", id.toString(), before, toResult(layout));
+        tenantAuditService.record("WAREHOUSE_LAYOUT_DEACTIVATE", "WAREHOUSE_LAYOUT", id.toString(), before,
+                toResult(layout));
     }
 
     @Transactional
@@ -151,8 +200,78 @@ public class WarehouseLayoutService {
     }
 
     private WarehouseLayout loadLayout(UUID id) {
-        return layoutRepository.findById(id)
+        return layoutRepository.findById(Objects.requireNonNull(id, "id must not be null"))
                 .orElseThrow(() -> WarehouseManagementException.notFound("Layout not found: " + id));
+    }
+
+    @SuppressWarnings("null")
+    private WarehouseLayout saveLayout(WarehouseLayout layout) {
+        return Objects.requireNonNull(layoutRepository.save(layout), "layoutRepository.save returned null");
+    }
+
+    private WarehouseLayout createLayoutEntity(String name, String description) {
+        String normalizedName = normalizeName(name);
+        String normalizedDesc = normalizeOptional(description, 500, "description");
+
+        layoutRepository.findByNameIgnoreCase(normalizedName)
+                .ifPresent(existing -> {
+                    throw WarehouseManagementException.conflict("Layout name already exists: " + normalizedName);
+                });
+
+        return WarehouseLayout.builder()
+                .name(normalizedName)
+                .description(normalizedDesc)
+                .isActive(false)
+                .build();
+    }
+
+    private BlockTemplate resolveClassicTemplate(
+            String name,
+            BlockTemplate.IdentifierFormat identifierFormat,
+            BlockTemplate.SideConfig sideConfig,
+            boolean required,
+            String description,
+            String iconName) {
+        Optional<BlockTemplate> existing = blockTemplateRepository.findByNameIgnoreCase(name);
+        if (existing.isPresent()) {
+            BlockTemplate template = existing.get();
+            if (template.getIconName() == null || template.getIconName().isBlank()) {
+                template.setIconName(iconName);
+                return saveTemplate(template);
+            }
+            return template;
+        }
+
+        BlockTemplate template = BlockTemplate.builder()
+                .name(name)
+                .identifierFormat(identifierFormat)
+                .sideConfig(sideConfig)
+                .required(required)
+                .description(description)
+                .iconName(iconName)
+                .build();
+        return saveTemplate(template);
+    }
+
+    private LayoutBlock createPresetBlock(UUID layoutId, UUID parentId, int position, UUID templateId) {
+        return saveLayoutBlock(LayoutBlock.builder()
+                .layoutId(layoutId)
+                .parentId(parentId)
+                .position(position)
+                .blockTemplateId(templateId)
+                .build());
+    }
+
+    @SuppressWarnings("null")
+    private BlockTemplate saveTemplate(BlockTemplate template) {
+        return Objects.requireNonNull(blockTemplateRepository.save(template),
+                "blockTemplateRepository.save returned null");
+    }
+
+    @SuppressWarnings("null")
+    private LayoutBlock saveLayoutBlock(LayoutBlock layoutBlock) {
+        return Objects.requireNonNull(layoutBlockRepository.save(layoutBlock),
+                "layoutBlockRepository.save returned null");
     }
 
     private Specification<WarehouseLayout> buildSpecification(String search, Boolean active) {
@@ -185,9 +304,11 @@ public class WarehouseLayoutService {
     }
 
     private String normalizeOptional(String value, int maxLength, String field) {
-        if (value == null) return null;
+        if (value == null)
+            return null;
         String normalized = value.trim();
-        if (normalized.isEmpty()) return null;
+        if (normalized.isEmpty())
+            return null;
         if (normalized.length() > maxLength) {
             throw WarehouseManagementException.badRequest(field + " must be at most " + maxLength + " characters");
         }

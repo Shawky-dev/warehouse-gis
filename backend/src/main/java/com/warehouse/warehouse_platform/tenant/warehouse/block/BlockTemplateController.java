@@ -70,7 +70,7 @@ public class BlockTemplateController {
         tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
         return ResponseEntity.ok(blockTemplateService.createTemplate(
                 request.name(), request.identifierFormat(), request.sideConfig(),
-                request.sideOptions(), request.required(), request.description()));
+                request.sideOptions(), request.required(), request.description(), request.iconName()));
     }
 
     @PutMapping("/{id}")
@@ -83,7 +83,7 @@ public class BlockTemplateController {
         tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
         return ResponseEntity.ok(blockTemplateService.updateTemplate(
                 id, request.name(), request.identifierFormat(), request.sideConfig(),
-                request.sideOptions(), request.required(), request.description()));
+                request.sideOptions(), request.required(), request.description(), request.iconName()));
     }
 
     @DeleteMapping("/{id}")
@@ -103,6 +103,7 @@ public class BlockTemplateController {
             BlockTemplate.SideConfig sideConfig,
             List<String> sideOptions,
             boolean required,
-            @Size(max = 500) String description) {
+            @Size(max = 500) String description,
+            @Size(max = 100) String iconName) {
     }
 }

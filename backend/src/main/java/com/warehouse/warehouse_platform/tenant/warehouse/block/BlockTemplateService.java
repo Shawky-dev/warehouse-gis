@@ -57,12 +57,14 @@ public class BlockTemplateService {
             BlockTemplate.SideConfig sideConfig,
             List<String> sideOptions,
             boolean required,
-            String description) {
+            String description,
+            String iconName) {
         String normalizedName = normalizeName(name);
 
         templateRepository.findByNameIgnoreCase(normalizedName)
                 .ifPresent(existing -> {
-                    throw WarehouseManagementException.conflict("Block template name already exists: " + normalizedName);
+                    throw WarehouseManagementException
+                            .conflict("Block template name already exists: " + normalizedName);
                 });
 
         String sideOptionsStr = normalizeSideOptions(sideConfig, sideOptions);
@@ -74,6 +76,7 @@ public class BlockTemplateService {
                 .sideOptions(sideOptionsStr)
                 .required(required)
                 .description(normalizeOptional(description, 500, "description"))
+                .iconName(normalizeOptional(iconName, 100, "iconName"))
                 .build();
 
         BlockTemplate saved = templateRepository.save(template);
@@ -90,7 +93,8 @@ public class BlockTemplateService {
             BlockTemplate.SideConfig sideConfig,
             List<String> sideOptions,
             boolean required,
-            String description) {
+            String description,
+            String iconName) {
         BlockTemplate existing = loadTemplate(id);
         TemplateResult before = toResult(existing);
 
@@ -99,7 +103,8 @@ public class BlockTemplateService {
         templateRepository.findByNameIgnoreCase(normalizedName)
                 .filter(found -> !found.getId().equals(id))
                 .ifPresent(found -> {
-                    throw WarehouseManagementException.conflict("Block template name already exists: " + normalizedName);
+                    throw WarehouseManagementException
+                            .conflict("Block template name already exists: " + normalizedName);
                 });
 
         String sideOptionsStr = normalizeSideOptions(sideConfig, sideOptions);
@@ -110,6 +115,7 @@ public class BlockTemplateService {
         existing.setSideOptions(sideOptionsStr);
         existing.setRequired(required);
         existing.setDescription(normalizeOptional(description, 500, "description"));
+        existing.setIconName(normalizeOptional(iconName, 100, "iconName"));
 
         BlockTemplate saved = templateRepository.save(existing);
         TemplateResult after = toResult(saved);
@@ -185,9 +191,11 @@ public class BlockTemplateService {
     }
 
     private String normalizeOptional(String value, int maxLength, String field) {
-        if (value == null) return null;
+        if (value == null)
+            return null;
         String normalized = value.trim();
-        if (normalized.isEmpty()) return null;
+        if (normalized.isEmpty())
+            return null;
         if (normalized.length() > maxLength) {
             throw WarehouseManagementException.badRequest(field + " must be at most " + maxLength + " characters");
         }
@@ -207,6 +215,7 @@ public class BlockTemplateService {
                 parsedOptions,
                 Boolean.TRUE.equals(t.getRequired()),
                 t.getDescription(),
+                t.getIconName(),
                 t.getCreatedAt(),
                 t.getUpdatedAt());
     }
@@ -219,6 +228,7 @@ public class BlockTemplateService {
             List<String> sideOptions,
             boolean required,
             String description,
+            String iconName,
             Instant createdAt,
             Instant updatedAt) {
     }

@@ -39,26 +39,6 @@ vi.mock("@/features/tenant/warehouse/WarehouseLayoutsPage", () => ({
   default: () => <p>tenant-warehouse-layouts-page</p>,
 }));
 
-vi.mock("@/features/tenant/warehouse/WarehouseAislesPage", () => ({
-  default: () => <p>tenant-warehouse-aisles-page</p>,
-}));
-
-vi.mock("@/features/tenant/warehouse/WarehouseSidesPage", () => ({
-  default: () => <p>tenant-warehouse-sides-page</p>,
-}));
-
-vi.mock("@/features/tenant/warehouse/WarehouseBaysPage", () => ({
-  default: () => <p>tenant-warehouse-bays-page</p>,
-}));
-
-vi.mock("@/features/tenant/warehouse/WarehouseLevelsPage", () => ({
-  default: () => <p>tenant-warehouse-levels-page</p>,
-}));
-
-vi.mock("@/features/tenant/warehouse/WarehouseShelvesPage", () => ({
-  default: () => <p>tenant-warehouse-shelves-page</p>,
-}));
-
 function renderTenantRoute(path: string) {
   return render(
     <I18nProvider initialLocale="en" storageKey="test-locale-tenant-routes">

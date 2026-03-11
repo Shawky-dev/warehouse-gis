@@ -83,3 +83,17 @@ databaseChangeLog:
         - sqlFile:
             path: db/migration/tenant/V12__seed_f1_warehouse_permissions.sql
             relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-block-warehouse-13
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V13__replace_f1_with_block_system.sql
+            relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-block-template-icons-14
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V14__add_block_template_icons.sql
+            relativeToChangelogFile: false

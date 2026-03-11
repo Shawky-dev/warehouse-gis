@@ -29,19 +29,15 @@ import com.warehouse.warehouse_platform.tenant.product.ProductRepository;
 import com.warehouse.warehouse_platform.tenant.product.ProductSupplierRepository;
 import com.warehouse.warehouse_platform.tenant.supplier.SupplierRepository;
 import com.warehouse.warehouse_platform.tenant.uom.UnitOfMeasureRepository;
-import com.warehouse.warehouse_platform.tenant.warehouse.aisle.WarehouseAisleRepository;
-import com.warehouse.warehouse_platform.tenant.warehouse.bay.WarehouseBayRepository;
+import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplateRepository;
+import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlockRepository;
 import com.warehouse.warehouse_platform.tenant.warehouse.layout.WarehouseLayoutRepository;
-import com.warehouse.warehouse_platform.tenant.warehouse.level.WarehouseBayLevelRepository;
-import com.warehouse.warehouse_platform.tenant.warehouse.shelf.WarehouseShelfRepository;
-import com.warehouse.warehouse_platform.tenant.warehouse.side.WarehouseAisleSideRepository;
 import com.warehouse.warehouse_platform.user.UserRepository;
 
 import jakarta.persistence.EntityManagerFactory;
 
 @Configuration
-@EnableJpaRepositories(
-        basePackageClasses = {
+@EnableJpaRepositories(basePackageClasses = {
                 UserRepository.class,
                 RefreshTokenSessionRepository.class,
                 UnitOfMeasureRepository.class,
@@ -51,62 +47,57 @@ import jakarta.persistence.EntityManagerFactory;
                 ProductCategoryRepository.class,
                 AuditLogRepository.class,
                 WarehouseLayoutRepository.class,
-                WarehouseAisleRepository.class,
-                WarehouseAisleSideRepository.class,
-                WarehouseBayRepository.class,
-                WarehouseBayLevelRepository.class,
-                WarehouseShelfRepository.class
-        },
-        entityManagerFactoryRef = "tenantEntityManagerFactory",
-        transactionManagerRef = "tenantTransactionManager")
+                LayoutBlockRepository.class,
+                BlockTemplateRepository.class
+}, entityManagerFactoryRef = "tenantEntityManagerFactory", transactionManagerRef = "tenantTransactionManager")
 @EnableConfigurationProperties(JpaProperties.class)
 public class TenantPersistenceConfig {
 
-    private final ConfigurableListableBeanFactory beanFactory;
-    private final JpaProperties jpaProperties;
-    private final String[] entityPackages;
+        private final ConfigurableListableBeanFactory beanFactory;
+        private final JpaProperties jpaProperties;
+        private final String[] entityPackages;
 
-    public TenantPersistenceConfig(
-            ConfigurableListableBeanFactory beanFactory,
-            JpaProperties jpaProperties,
-            @Value("${multitenancy.tenant.entityManager.packages}") String[] entityPackages) {
-        this.beanFactory = beanFactory;
-        this.jpaProperties = jpaProperties;
-        this.entityPackages = entityPackages;
-    }
+        public TenantPersistenceConfig(
+                        ConfigurableListableBeanFactory beanFactory,
+                        JpaProperties jpaProperties,
+                        @Value("${multitenancy.tenant.entityManager.packages}") String[] entityPackages) {
+                this.beanFactory = beanFactory;
+                this.jpaProperties = jpaProperties;
+                this.entityPackages = entityPackages;
+        }
 
-    @Primary
-    @Bean
-    public LocalContainerEntityManagerFactoryBean tenantEntityManagerFactory(
-            @Qualifier("schemaBasedMultiTenantConnectionProvider") MultiTenantConnectionProvider<?> connectionProvider,
-            @Qualifier("currentTenantIdentifierResolver") CurrentTenantIdentifierResolver<?> tenantResolver) {
-        LocalContainerEntityManagerFactoryBean emfBean = new LocalContainerEntityManagerFactoryBean();
-        emfBean.setPersistenceUnitName("tenant-persistence-unit");
-        emfBean.setPackagesToScan(entityPackages);
+        @Primary
+        @Bean
+        public LocalContainerEntityManagerFactoryBean tenantEntityManagerFactory(
+                        @Qualifier("schemaBasedMultiTenantConnectionProvider") MultiTenantConnectionProvider<?> connectionProvider,
+                        @Qualifier("currentTenantIdentifierResolver") CurrentTenantIdentifierResolver<?> tenantResolver) {
+                LocalContainerEntityManagerFactoryBean emfBean = new LocalContainerEntityManagerFactoryBean();
+                emfBean.setPersistenceUnitName("tenant-persistence-unit");
+                emfBean.setPackagesToScan(entityPackages);
 
-        JpaVendorAdapter vendorAdapter = new HibernateJpaVendorAdapter();
-        emfBean.setJpaVendorAdapter(vendorAdapter);
+                JpaVendorAdapter vendorAdapter = new HibernateJpaVendorAdapter();
+                emfBean.setJpaVendorAdapter(vendorAdapter);
 
-        Map<String, Object> properties = new HashMap<>(this.jpaProperties.getProperties());
-        properties.put(AvailableSettings.PHYSICAL_NAMING_STRATEGY,
-                "org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy");
-        properties.put(AvailableSettings.IMPLICIT_NAMING_STRATEGY,
-                "org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy");
-        properties.put(AvailableSettings.BEAN_CONTAINER, new SpringBeanContainer(this.beanFactory));
-        properties.remove(AvailableSettings.DEFAULT_SCHEMA);
-        properties.put(MultiTenancySettings.MULTI_TENANT_CONNECTION_PROVIDER, connectionProvider);
-        properties.put(MultiTenancySettings.MULTI_TENANT_IDENTIFIER_RESOLVER, tenantResolver);
-        emfBean.setJpaPropertyMap(properties);
+                Map<String, Object> properties = new HashMap<>(this.jpaProperties.getProperties());
+                properties.put(AvailableSettings.PHYSICAL_NAMING_STRATEGY,
+                                "org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy");
+                properties.put(AvailableSettings.IMPLICIT_NAMING_STRATEGY,
+                                "org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy");
+                properties.put(AvailableSettings.BEAN_CONTAINER, new SpringBeanContainer(this.beanFactory));
+                properties.remove(AvailableSettings.DEFAULT_SCHEMA);
+                properties.put(MultiTenancySettings.MULTI_TENANT_CONNECTION_PROVIDER, connectionProvider);
+                properties.put(MultiTenancySettings.MULTI_TENANT_IDENTIFIER_RESOLVER, tenantResolver);
+                emfBean.setJpaPropertyMap(properties);
 
-        return emfBean;
-    }
+                return emfBean;
+        }
 
-    @Primary
-    @Bean
-    public JpaTransactionManager tenantTransactionManager(
-            @Qualifier("tenantEntityManagerFactory") EntityManagerFactory emf) {
-        JpaTransactionManager tenantTransactionManager = new JpaTransactionManager();
-        tenantTransactionManager.setEntityManagerFactory(emf);
-        return tenantTransactionManager;
-    }
+        @Primary
+        @Bean
+        public JpaTransactionManager tenantTransactionManager(
+                        @Qualifier("tenantEntityManagerFactory") EntityManagerFactory emf) {
+                JpaTransactionManager tenantTransactionManager = new JpaTransactionManager();
+                tenantTransactionManager.setEntityManagerFactory(emf);
+                return tenantTransactionManager;
+        }
 }

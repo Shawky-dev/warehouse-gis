@@ -1,6 +1,9 @@
 package com.warehouse.warehouse_platform.tenant.warehouse.layout;
 
 import com.warehouse.warehouse_platform.tenant.audit.TenantAuditService;
+import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplate;
+import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplateRepository;
+import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlock;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlockRepository;
 import com.warehouse.warehouse_platform.tenant.warehouse.common.WarehouseManagementException;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -27,15 +31,21 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class WarehouseLayoutServiceTest {
 
-    @Mock private WarehouseLayoutRepository layoutRepository;
-    @Mock private LayoutBlockRepository layoutBlockRepository;
-    @Mock private TenantAuditService tenantAuditService;
+    @Mock
+    private WarehouseLayoutRepository layoutRepository;
+    @Mock
+    private LayoutBlockRepository layoutBlockRepository;
+    @Mock
+    private BlockTemplateRepository blockTemplateRepository;
+    @Mock
+    private TenantAuditService tenantAuditService;
 
     private WarehouseLayoutService service;
 
     @BeforeEach
     void setUp() {
-        service = new WarehouseLayoutService(layoutRepository, layoutBlockRepository, tenantAuditService);
+        service = new WarehouseLayoutService(layoutRepository, layoutBlockRepository, blockTemplateRepository,
+                tenantAuditService);
     }
 
     // -------------------------------------------------------------------------
@@ -77,6 +87,51 @@ class WarehouseLayoutServiceTest {
         WarehouseManagementException ex = assertThrows(WarehouseManagementException.class,
                 () -> service.createLayout("   ", null));
         assertEquals("BAD_REQUEST", ex.getCode());
+    }
+
+    @Test
+    void createClassicPreset_shouldCreateNestedDefaultBlocks() {
+        when(layoutRepository.findByNameIgnoreCase("Classic Layout")).thenReturn(Optional.empty());
+        when(blockTemplateRepository.findByNameIgnoreCase(any())).thenReturn(Optional.empty());
+        when(layoutRepository.save(any(WarehouseLayout.class))).thenAnswer(inv -> {
+            WarehouseLayout l = inv.getArgument(0);
+            if (l.getId() == null) {
+                l.setId(UUID.fromString("11111111-1111-1111-1111-111111111111"));
+            }
+            l.setCreatedAt(Instant.parse("2026-03-01T00:00:00Z"));
+            l.setUpdatedAt(Instant.parse("2026-03-01T00:00:00Z"));
+            return l;
+        });
+        when(blockTemplateRepository.save(any(BlockTemplate.class))).thenAnswer(inv -> {
+            BlockTemplate t = inv.getArgument(0);
+            if (t.getId() == null) {
+                t.setId(UUID.randomUUID());
+            }
+            t.setCreatedAt(Instant.parse("2026-03-01T00:00:00Z"));
+            t.setUpdatedAt(Instant.parse("2026-03-01T00:00:00Z"));
+            return t;
+        });
+        when(layoutBlockRepository.save(any(LayoutBlock.class))).thenAnswer(inv -> {
+            LayoutBlock block = inv.getArgument(0);
+            if (block.getId() == null) {
+                block.setId(UUID.randomUUID());
+            }
+            block.setCreatedAt(Instant.parse("2026-03-01T00:00:00Z"));
+            block.setUpdatedAt(Instant.parse("2026-03-01T00:00:00Z"));
+            return block;
+        });
+
+        WarehouseLayoutService.LayoutResult result = service.createClassicPreset("Classic Layout", "Default tree",
+                true);
+
+        assertTrue(result.isActive());
+        verify(blockTemplateRepository).save(argThat(
+                template -> "Aisle".equals(template.getName()) && "AlignJustify".equals(template.getIconName())));
+        verify(blockTemplateRepository).save(
+                argThat(template -> "Shelf".equals(template.getName()) && "MapPin".equals(template.getIconName())));
+        verify(layoutBlockRepository, org.mockito.Mockito.times(5)).save(any(LayoutBlock.class));
+        verify(tenantAuditService).record(eq("WAREHOUSE_LAYOUT_CREATE_CLASSIC_PRESET"), eq("WAREHOUSE_LAYOUT"),
+                eq(result.id().toString()), eq(null), any());
     }
 
     // -------------------------------------------------------------------------

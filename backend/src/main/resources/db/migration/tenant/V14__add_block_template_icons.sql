@@ -1,0 +1,2 @@
+ALTER TABLE IF EXISTS block_templates
+    ADD COLUMN IF NOT EXISTS icon_name VARCHAR(100);

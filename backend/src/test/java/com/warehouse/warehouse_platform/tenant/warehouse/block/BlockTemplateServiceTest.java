@@ -24,9 +24,12 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class BlockTemplateServiceTest {
 
-    @Mock private BlockTemplateRepository templateRepository;
-    @Mock private LayoutBlockRepository layoutBlockRepository;
-    @Mock private TenantAuditService tenantAuditService;
+    @Mock
+    private BlockTemplateRepository templateRepository;
+    @Mock
+    private LayoutBlockRepository layoutBlockRepository;
+    @Mock
+    private TenantAuditService tenantAuditService;
 
     private BlockTemplateService service;
 
@@ -52,11 +55,12 @@ class BlockTemplateServiceTest {
 
         BlockTemplateService.TemplateResult result = service.createTemplate(
                 "Aisle", BlockTemplate.IdentifierFormat.ALPHA, BlockTemplate.SideConfig.LR,
-                null, true, "Aisle template");
+                null, true, "Aisle template", "AlignJustify");
 
         assertEquals("Aisle", result.name());
         assertEquals(BlockTemplate.IdentifierFormat.ALPHA, result.identifierFormat());
         assertEquals(BlockTemplate.SideConfig.LR, result.sideConfig());
+        assertEquals("AlignJustify", result.iconName());
         assertNull(result.sideOptions());
         verify(tenantAuditService).record(eq("BLOCK_TEMPLATE_CREATE"), eq("BLOCK_TEMPLATE"),
                 eq(result.id().toString()), eq(null), any());
@@ -69,7 +73,7 @@ class BlockTemplateServiceTest {
 
         WarehouseManagementException ex = assertThrows(WarehouseManagementException.class,
                 () -> service.createTemplate("Bay", BlockTemplate.IdentifierFormat.NUMERIC,
-                        BlockTemplate.SideConfig.NONE, null, true, null));
+                        BlockTemplate.SideConfig.NONE, null, true, null, null));
         assertEquals("CONFLICT", ex.getCode());
     }
 
@@ -77,7 +81,7 @@ class BlockTemplateServiceTest {
     void createTemplate_shouldRejectBlankName() {
         WarehouseManagementException ex = assertThrows(WarehouseManagementException.class,
                 () -> service.createTemplate("  ", BlockTemplate.IdentifierFormat.NUMERIC,
-                        BlockTemplate.SideConfig.NONE, null, true, null));
+                        BlockTemplate.SideConfig.NONE, null, true, null, null));
         assertEquals("BAD_REQUEST", ex.getCode());
     }
 
@@ -87,7 +91,7 @@ class BlockTemplateServiceTest {
 
         WarehouseManagementException ex = assertThrows(WarehouseManagementException.class,
                 () -> service.createTemplate("Zone", BlockTemplate.IdentifierFormat.ALPHA,
-                        BlockTemplate.SideConfig.CUSTOM, null, true, null));
+                        BlockTemplate.SideConfig.CUSTOM, null, true, null, null));
         assertEquals("BAD_REQUEST", ex.getCode());
     }
 
@@ -97,7 +101,7 @@ class BlockTemplateServiceTest {
 
         WarehouseManagementException ex = assertThrows(WarehouseManagementException.class,
                 () -> service.createTemplate("Zone", BlockTemplate.IdentifierFormat.ALPHA,
-                        BlockTemplate.SideConfig.CUSTOM, List.of("OnlyOne"), true, null));
+                        BlockTemplate.SideConfig.CUSTOM, List.of("OnlyOne"), true, null, null));
         assertEquals("BAD_REQUEST", ex.getCode());
     }
 
@@ -115,9 +119,10 @@ class BlockTemplateServiceTest {
         BlockTemplateService.TemplateResult result = service.createTemplate(
                 "Room", BlockTemplate.IdentifierFormat.FREE_TEXT,
                 BlockTemplate.SideConfig.CUSTOM, List.of("North", "South", "East", "West"),
-                false, null);
+                false, null, "MapPin");
 
         assertEquals(List.of("North", "South", "East", "West"), result.sideOptions());
+        assertEquals("MapPin", result.iconName());
     }
 
     // -------------------------------------------------------------------------

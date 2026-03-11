@@ -70,6 +70,17 @@ public class WarehouseLayoutController {
         return ResponseEntity.ok(warehouseLayoutService.createLayout(request.name(), request.description()));
     }
 
+    @PostMapping("/presets/classic")
+    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_EDIT)")
+    public ResponseEntity<WarehouseLayoutService.LayoutResult> createClassicPreset(
+            @PathVariable String tenantSlug,
+            @Valid @RequestBody CreateClassicPresetRequest request,
+            Authentication authentication) {
+        tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
+        return ResponseEntity.ok(warehouseLayoutService.createClassicPreset(
+                request.name(), request.description(), request.activate()));
+    }
+
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_EDIT)")
     public ResponseEntity<WarehouseLayoutService.LayoutResult> updateLayout(
@@ -122,5 +133,11 @@ public class WarehouseLayoutController {
     public record UpdateLayoutRequest(
             @NotBlank @Size(max = 120) String name,
             @Size(max = 500) String description) {
+    }
+
+    public record CreateClassicPresetRequest(
+            @NotBlank @Size(max = 120) String name,
+            @Size(max = 500) String description,
+            boolean activate) {
     }
 }

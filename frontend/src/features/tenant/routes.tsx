@@ -8,16 +8,6 @@ import TenantSuppliersPage from "@/features/tenant/supplier/TenantSuppliersPage"
 import TenantAuditLogsPage from "@/features/tenant/audit/TenantAuditLogsPage";
 import TenantCategoriesPage from "@/features/tenant/category/TenantCategoriesPage";
 import WarehouseLayoutsPage from "@/features/tenant/warehouse/WarehouseLayoutsPage";
-import WarehouseAislesPage from "@/features/tenant/warehouse/WarehouseAislesPage";
-import WarehouseSidesPage from "@/features/tenant/warehouse/WarehouseSidesPage";
-import WarehouseBaysPage from "@/features/tenant/warehouse/WarehouseBaysPage";
-import WarehouseLevelsPage from "@/features/tenant/warehouse/WarehouseLevelsPage";
-import WarehouseShelvesPage from "@/features/tenant/warehouse/WarehouseShelvesPage";
-import WarehouseAislesGlobalPage from "@/features/tenant/warehouse/WarehouseAislesGlobalPage";
-import WarehouseSidesGlobalPage from "@/features/tenant/warehouse/WarehouseSidesGlobalPage";
-import WarehouseBaysGlobalPage from "@/features/tenant/warehouse/WarehouseBaysGlobalPage";
-import WarehouseLevelsGlobalPage from "@/features/tenant/warehouse/WarehouseLevelsGlobalPage";
-import WarehouseShelvesGlobalPage from "@/features/tenant/warehouse/WarehouseShelvesGlobalPage";
 import { RequirePermission } from "@/features/auth/guards/RequirePermission";
 import { TENANT_PERMISSIONS } from "@/features/auth/shared/permissions";
 
@@ -83,90 +73,10 @@ export const tenantRoutes = [
     ),
   },
   {
-    path: PATHS.TENANT.WAREHOUSE_AISLES_PATTERN,
-    element: (
-      <RequirePermission permission={TENANT_PERMISSIONS.WAREHOUSE_VIEW}>
-        <WarehouseAislesPage />
-      </RequirePermission>
-    ),
-  },
-  {
-    path: PATHS.TENANT.WAREHOUSE_SIDES_PATTERN,
-    element: (
-      <RequirePermission permission={TENANT_PERMISSIONS.WAREHOUSE_VIEW}>
-        <WarehouseSidesPage />
-      </RequirePermission>
-    ),
-  },
-  {
-    path: PATHS.TENANT.WAREHOUSE_BAYS_PATTERN,
-    element: (
-      <RequirePermission permission={TENANT_PERMISSIONS.WAREHOUSE_VIEW}>
-        <WarehouseBaysPage />
-      </RequirePermission>
-    ),
-  },
-  {
-    path: PATHS.TENANT.WAREHOUSE_LEVELS_PATTERN,
-    element: (
-      <RequirePermission permission={TENANT_PERMISSIONS.WAREHOUSE_VIEW}>
-        <WarehouseLevelsPage />
-      </RequirePermission>
-    ),
-  },
-  {
-    path: PATHS.TENANT.WAREHOUSE_SHELVES_PATTERN,
-    element: (
-      <RequirePermission permission={TENANT_PERMISSIONS.WAREHOUSE_VIEW}>
-        <WarehouseShelvesPage />
-      </RequirePermission>
-    ),
-  },
-  {
     path: PATHS.TENANT.AUDIT_LOGS_PATTERN,
     element: (
       <RequirePermission permission={TENANT_PERMISSIONS.AUDIT_VIEW}>
         <TenantAuditLogsPage />
-      </RequirePermission>
-    ),
-  },
-  {
-    path: PATHS.TENANT.WAREHOUSE_AISLES_GLOBAL_PATTERN,
-    element: (
-      <RequirePermission permission={TENANT_PERMISSIONS.WAREHOUSE_VIEW}>
-        <WarehouseAislesGlobalPage />
-      </RequirePermission>
-    ),
-  },
-  {
-    path: PATHS.TENANT.WAREHOUSE_SIDES_GLOBAL_PATTERN,
-    element: (
-      <RequirePermission permission={TENANT_PERMISSIONS.WAREHOUSE_VIEW}>
-        <WarehouseSidesGlobalPage />
-      </RequirePermission>
-    ),
-  },
-  {
-    path: PATHS.TENANT.WAREHOUSE_BAYS_GLOBAL_PATTERN,
-    element: (
-      <RequirePermission permission={TENANT_PERMISSIONS.WAREHOUSE_VIEW}>
-        <WarehouseBaysGlobalPage />
-      </RequirePermission>
-    ),
-  },
-  {
-    path: PATHS.TENANT.WAREHOUSE_LEVELS_GLOBAL_PATTERN,
-    element: (
-      <RequirePermission permission={TENANT_PERMISSIONS.WAREHOUSE_VIEW}>
-        <WarehouseLevelsGlobalPage />
-      </RequirePermission>
-    ),
-  },
-  {
-    path: PATHS.TENANT.WAREHOUSE_SHELVES_GLOBAL_PATTERN,
-    element: (
-      <RequirePermission permission={TENANT_PERMISSIONS.WAREHOUSE_VIEW}>
-        <WarehouseShelvesGlobalPage />
       </RequirePermission>
     ),
   },
