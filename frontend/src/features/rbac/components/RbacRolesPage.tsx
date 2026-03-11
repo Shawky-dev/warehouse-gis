@@ -378,9 +378,8 @@ export default function RbacRolesPage({ adapter }: RbacRolesPageProps) {
                   <button
                     key={role.code}
                     type="button"
-                    className={`w-full border px-3 py-2 text-start text-sm ${
-                      selectedRoleCode === role.code ? "border-primary bg-primary/10" : "border-border"
-                    }`}
+                    className={`w-full border px-3 py-2 text-start text-sm ${selectedRoleCode === role.code ? "border-primary bg-primary/10" : "border-border"
+                      }`}
                     onClick={() => setSelectedRoleCode(role.code)}
                   >
                     <p className="font-medium">{role.code}</p>
