@@ -315,6 +315,8 @@ export const enMessages = {
   "warehouse.builder.rootParent": "Root level",
   "warehouse.builder.moveUpAction": "Move up",
   "warehouse.builder.moveDownAction": "Move down",
+  "warehouse.builder.collapseBlockAction": "Collapse block",
+  "warehouse.builder.expandBlockAction": "Expand block",
   "warehouse.builder.copySubtreeAction": "Copy subtree",
   "warehouse.builder.pasteSubtreeAction": "Paste subtree",
   "warehouse.builder.pasteSubtreeSubmitAction": "Paste copy",

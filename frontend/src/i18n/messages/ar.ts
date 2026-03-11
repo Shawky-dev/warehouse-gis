@@ -317,6 +317,8 @@ export const arMessages: Record<keyof typeof enMessages, string> = {
   "warehouse.builder.rootParent": "المستوى الجذري",
   "warehouse.builder.moveUpAction": "تحريك للأعلى",
   "warehouse.builder.moveDownAction": "تحريك للأسفل",
+  "warehouse.builder.collapseBlockAction": "طي الكتلة",
+  "warehouse.builder.expandBlockAction": "توسيع الكتلة",
   "warehouse.builder.copySubtreeAction": "نسخ الشجرة الفرعية",
   "warehouse.builder.pasteSubtreeAction": "لصق الشجرة الفرعية",
   "warehouse.builder.pasteSubtreeSubmitAction": "لصق النسخة",

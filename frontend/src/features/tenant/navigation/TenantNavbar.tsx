@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ComponentType } from "react";
+import { useMemo, useState, type ComponentType } from "react";
 import { Link, NavLink, useLocation, useParams } from "react-router-dom";
 import {
   Home,
@@ -13,17 +13,6 @@ import {
   LayoutGrid,
   BookOpen,
 } from "lucide-react";
-import {
-  listWarehouseLayoutBlocks,
-  listWarehouseLayouts,
-  listWarehouseTemplates,
-} from "@/features/tenant/api/warehouseApi";
-import type {
-  WarehouseBlockNode,
-  WarehouseFlattenedNode,
-  WarehouseLayoutResult,
-  WarehouseTemplateResult,
-} from "@/features/tenant/types/warehouse";
 import { Separator } from "@/components/ui/separator";
 import {
   Accordion,
@@ -37,7 +26,6 @@ import { useI18n } from "@/i18n";
 import { normalizeTenantSlug } from "@/features/auth/shared/scope";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { TENANT_PERMISSIONS } from "@/features/auth/shared/permissions";
-import { getLucideIcon } from "@/shared/lib/lucide-icons";
 
 type LeafNavItem = {
   to: string;
@@ -46,7 +34,6 @@ type LeafNavItem = {
   end?: boolean;
   depth?: number;
   exactMatch?: boolean;
-  iconName?: string;
 };
 
 type GroupNavItem = {
@@ -92,76 +79,12 @@ export function TenantNavbar() {
   const canViewCategories = hasPermission(TENANT_PERMISSIONS.CATEGORIES_VIEW);
   const canViewWarehouse = hasPermission(TENANT_PERMISSIONS.WAREHOUSE_VIEW);
   const canViewAudit = hasPermission(TENANT_PERMISSIONS.AUDIT_VIEW);
-  const [activeLayout, setActiveLayout] = useState<WarehouseLayoutResult | null>(null);
-  const [activeTree, setActiveTree] = useState<WarehouseBlockNode[]>([]);
-  const [templates, setTemplates] = useState<WarehouseTemplateResult[]>([]);
-
-  const flattenedActiveTree = useMemo<WarehouseFlattenedNode[]>(() => {
-    function flatten(nodes: WarehouseBlockNode[], depth = 0, parentPath: string[] = []): WarehouseFlattenedNode[] {
-      return nodes.flatMap((node) => {
-        const path = [...parentPath, node.block.id];
-        return [{ node, depth, path }, ...flatten(node.children, depth + 1, path)];
-      });
-    }
-
-    return flatten(activeTree);
-  }, [activeTree]);
-
-  useEffect(() => {
-    if (!canViewWarehouse || !normalizedSlug) {
-      setActiveLayout(null);
-      setActiveTree([]);
-      setTemplates([]);
-      return;
-    }
-
-    let cancelled = false;
-
-    async function loadWarehouseNav() {
-      try {
-        const [layoutResponse, templateResponse] = await Promise.all([
-          listWarehouseLayouts(normalizedSlug, { active: true, page: 0, size: 1 }),
-          listWarehouseTemplates(normalizedSlug, { page: 0, size: 100 }),
-        ]);
-
-        if (cancelled) {
-          return;
-        }
-
-        const currentActiveLayout = layoutResponse.content[0] ?? null;
-        setActiveLayout(currentActiveLayout);
-        setTemplates(templateResponse.content);
-
-        if (!currentActiveLayout) {
-          setActiveTree([]);
-          return;
-        }
-
-        const tree = await listWarehouseLayoutBlocks(normalizedSlug, currentActiveLayout.id);
-        if (!cancelled) {
-          setActiveTree(tree);
-        }
-      } catch {
-        if (!cancelled) {
-          setActiveLayout(null);
-          setActiveTree([]);
-        }
-      }
-    }
-
-    void loadWarehouseNav();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [canViewWarehouse, normalizedSlug]);
-
   const warehouseChildren = useMemo<LeafNavItem[]>(() => {
     if (!canViewWarehouse) {
       return [];
     }
 
-    const baseItems: LeafNavItem[] = [
+    return [
       {
         to: PATHS.TENANT.warehouseLayouts(normalizedSlug),
         label: t("tenant.nav.layouts"),
@@ -170,30 +93,7 @@ export function TenantNavbar() {
         exactMatch: true,
       },
     ];
-
-    if (!activeLayout) {
-      return baseItems;
-    }
-
-    const treeItems = flattenedActiveTree.map((entry) => {
-      const template = templates.find((item) => item.id === entry.node.block.blockTemplateId);
-      return {
-        to: PATHS.TENANT.warehouseLayouts(normalizedSlug, {
-          layoutId: activeLayout.id,
-          mode: "active",
-          path: entry.path.join(","),
-          tab: "builder",
-        }),
-        label: template?.name ?? t("tenant.nav.layoutBlock"),
-        icon: getLucideIcon(template?.iconName),
-        depth: entry.depth,
-        exactMatch: true,
-        iconName: template?.iconName ?? "LayoutGrid",
-      } satisfies LeafNavItem;
-    });
-
-    return [...baseItems, ...treeItems];
-  }, [activeLayout, canViewWarehouse, flattenedActiveTree, normalizedSlug, t, templates]);
+  }, [canViewWarehouse, normalizedSlug, t]);
 
   const navItems = useMemo<NavItem[]>(
     () =>
@@ -369,7 +269,6 @@ export function TenantNavbar() {
                         <Link
                           key={child.to}
                           to={child.to}
-                          data-warehouse-icon={child.iconName}
                           className={
                             cn(
                               "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",

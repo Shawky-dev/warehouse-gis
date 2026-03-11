@@ -280,4 +280,22 @@ describe("WarehouseLayoutsPage", () => {
             });
         });
     });
+
+    it("collapses and expands nested blocks in the builder tree", async () => {
+        const user = userEvent.setup();
+
+        renderPage(
+            "/acme/warehouse-layouts?layoutId=layout-fork&mode=fork&path=block-aisle&tab=builder",
+            [TENANT_PERMISSIONS.WAREHOUSE_VIEW, TENANT_PERMISSIONS.WAREHOUSE_EDIT]
+        );
+
+        await screen.findByText("Aisle · A");
+        expect(screen.getByText("Side · A · A")).toBeInTheDocument();
+
+        await user.click(screen.getByRole("button", { name: "Collapse block" }));
+        expect(screen.queryByText("Side · A · A")).not.toBeInTheDocument();
+
+        await user.click(screen.getByRole("button", { name: "Expand block" }));
+        expect(screen.getByText("Side · A · A")).toBeInTheDocument();
+    });
 });

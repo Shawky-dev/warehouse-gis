@@ -10,6 +10,8 @@ import {
     ArrowDown,
     ArrowUp,
     Check,
+    ChevronDown,
+    ChevronRight,
     ClipboardPaste,
     Copy,
     FolderTree,
@@ -197,6 +199,21 @@ function flattenTree(nodes: WarehouseBlockNode[], depth = 0, parentPath: string[
     });
 }
 
+function flattenVisibleTree(
+    nodes: WarehouseBlockNode[],
+    collapsedIds: Set<string>,
+    depth = 0,
+    parentPath: string[] = []
+): WarehouseFlattenedNode[] {
+    return nodes.flatMap((node) => {
+        const path = [...parentPath, node.block.id];
+        if (collapsedIds.has(node.block.id)) {
+            return [{ node, depth, path }];
+        }
+        return [{ node, depth, path }, ...flattenVisibleTree(node.children, collapsedIds, depth + 1, path)];
+    });
+}
+
 function findFlattenedNodeByPath(flattenedNodes: WarehouseFlattenedNode[], path: string[]) {
     if (path.length === 0) {
         return null;
@@ -332,6 +349,7 @@ export default function WarehouseLayoutsPage() {
     const [isPasteBlockOpen, setIsPasteBlockOpen] = useState(false);
     const [pasteForm, setPasteForm] = useState<PasteBlockFormState>(DEFAULT_PASTE_FORM);
     const [blockClipboard, setBlockClipboard] = useState<BlockClipboardState | null>(null);
+    const [collapsedBlockIds, setCollapsedBlockIds] = useState<string[]>([]);
     const [selectedBlockTemplateId, setSelectedBlockTemplateId] = useState("");
     const [selectedBlockParentId, setSelectedBlockParentId] = useState("__root__");
     const [selectedBlockSide, setSelectedBlockSide] = useState("__none__");
@@ -359,6 +377,10 @@ export default function WarehouseLayoutsPage() {
     }, [templateSearch, templates]);
 
     const flattenedNodes = useMemo(() => flattenTree(layoutTree), [layoutTree]);
+    const visibleFlattenedNodes = useMemo(
+        () => flattenVisibleTree(layoutTree, new Set(collapsedBlockIds)),
+        [collapsedBlockIds, layoutTree]
+    );
     const selectedFlattenedNode = useMemo(
         () => findFlattenedNodeByPath(flattenedNodes, selectedPath),
         [flattenedNodes, selectedPath]
@@ -488,6 +510,32 @@ export default function WarehouseLayoutsPage() {
         }
         void loadTree(selectedLayoutId);
     }, [loadTree, selectedLayoutId]);
+
+    useEffect(() => {
+        const validIds = new Set(flattenedNodes.map((item) => item.node.block.id));
+        setCollapsedBlockIds((current) => {
+            const next = current.filter((id) => validIds.has(id));
+            if (next.length === current.length && next.every((id, index) => id === current[index])) {
+                return current;
+            }
+            return next;
+        });
+    }, [flattenedNodes]);
+
+    useEffect(() => {
+        if (selectedPath.length <= 1) {
+            return;
+        }
+
+        const ancestorIds = new Set(selectedPath.slice(0, -1));
+        setCollapsedBlockIds((current) => {
+            const next = current.filter((id) => !ancestorIds.has(id));
+            if (next.length === current.length && next.every((id, index) => id === current[index])) {
+                return current;
+            }
+            return next;
+        });
+    }, [selectedPath]);
 
     useEffect(() => {
         if (!selectedFlattenedNode) {
@@ -863,6 +911,15 @@ export default function WarehouseLayoutsPage() {
         }
     };
 
+    const toggleBlockCollapsed = (blockId: string) => {
+        setCollapsedBlockIds((current) => {
+            if (current.includes(blockId)) {
+                return current.filter((id) => id !== blockId);
+            }
+            return [...current, blockId];
+        });
+    };
+
     const confirmDelete = async () => {
         if (!deleteTarget) {
             return;
@@ -1228,29 +1285,52 @@ export default function WarehouseLayoutsPage() {
                                                 <p className="text-sm text-muted-foreground">{t("warehouse.builder.emptyTree")}</p>
                                             ) : (
                                                 <div className="space-y-1">
-                                                    {flattenedNodes.map((item) => {
+                                                    {visibleFlattenedNodes.map((item) => {
                                                         const template = templates.find((entry) => entry.id === item.node.block.blockTemplateId);
                                                         const Icon = getLucideIcon(template?.iconName);
                                                         const isSelected = selectedFlattenedNode?.node.block.id === item.node.block.id;
+                                                        const hasChildren = item.node.children.length > 0;
+                                                        const isCollapsed = collapsedBlockIds.includes(item.node.block.id);
                                                         return (
-                                                            <button
+                                                            <div
                                                                 key={item.node.block.id}
-                                                                type="button"
                                                                 className={[
                                                                     "flex w-full items-center gap-2 rounded-none border px-3 py-2 text-start text-sm transition-colors",
                                                                     isSelected ? "border-primary bg-primary/5 text-foreground" : "border-border hover:bg-accent",
                                                                 ].join(" ")}
                                                                 style={{ paddingInlineStart: `${0.75 + item.depth * 1}rem` }}
-                                                                onClick={() => updateQuery({
-                                                                    path: joinPath(item.path),
-                                                                    layoutId: selectedLayout.id,
-                                                                    mode: selectedLayout.isActive ? "active" : "fork",
-                                                                    tab: "builder",
-                                                                })}
                                                             >
-                                                                <Icon className="h-4 w-4 shrink-0 text-primary" />
-                                                                <span className="flex-1">{getBlockDisplayLabel(item.node.block, template ?? null, t("warehouse.builder.unknownBlock"))}</span>
-                                                            </button>
+                                                                {hasChildren ? (
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        className="h-7 w-7 shrink-0 px-0"
+                                                                        aria-label={isCollapsed ? t("warehouse.builder.expandBlockAction") : t("warehouse.builder.collapseBlockAction")}
+                                                                        onClick={(event) => {
+                                                                            event.stopPropagation();
+                                                                            toggleBlockCollapsed(item.node.block.id);
+                                                                        }}
+                                                                    >
+                                                                        {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                                                    </Button>
+                                                                ) : (
+                                                                    <span className="w-7 shrink-0" />
+                                                                )}
+                                                                <button
+                                                                    type="button"
+                                                                    className="flex min-w-0 flex-1 items-center gap-2 text-start"
+                                                                    onClick={() => updateQuery({
+                                                                        path: joinPath(item.path),
+                                                                        layoutId: selectedLayout.id,
+                                                                        mode: selectedLayout.isActive ? "active" : "fork",
+                                                                        tab: "builder",
+                                                                    })}
+                                                                >
+                                                                    <Icon className="h-4 w-4 shrink-0 text-primary" />
+                                                                    <span className="flex-1 truncate">{getBlockDisplayLabel(item.node.block, template ?? null, t("warehouse.builder.unknownBlock"))}</span>
+                                                                </button>
+                                                            </div>
                                                         );
                                                     })}
                                                 </div>
