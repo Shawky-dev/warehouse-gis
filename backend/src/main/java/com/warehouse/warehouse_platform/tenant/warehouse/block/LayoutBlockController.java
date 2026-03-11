@@ -58,7 +58,7 @@ public class LayoutBlockController {
         }
 
         @PostMapping
-        @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_EDIT)")
+        @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_BLOCK_EDIT)")
         public ResponseEntity<LayoutBlockService.BlockResult> addBlock(
                         @PathVariable String tenantSlug,
                         @PathVariable UUID layoutId,
@@ -71,7 +71,7 @@ public class LayoutBlockController {
         }
 
         @PostMapping("/batch")
-        @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_EDIT)")
+        @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_BLOCK_EDIT)")
         public ResponseEntity<LayoutBlockService.BatchBlockResult> addBlocks(
                         @PathVariable String tenantSlug,
                         @PathVariable UUID layoutId,
@@ -88,7 +88,7 @@ public class LayoutBlockController {
         }
 
         @PostMapping("/copy-subtree")
-        @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_EDIT)")
+        @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_BLOCK_EDIT)")
         public ResponseEntity<LayoutBlockService.BatchBlockResult> copySubtree(
                         @PathVariable String tenantSlug,
                         @PathVariable UUID layoutId,
@@ -104,7 +104,7 @@ public class LayoutBlockController {
         }
 
         @PutMapping("/{blockId}/move")
-        @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_EDIT)")
+        @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_BLOCK_EDIT)")
         public ResponseEntity<LayoutBlockService.BlockResult> moveBlock(
                         @PathVariable String tenantSlug,
                         @PathVariable UUID layoutId,
@@ -117,7 +117,7 @@ public class LayoutBlockController {
         }
 
         @PutMapping("/{blockId}/template")
-        @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_EDIT)")
+        @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_BLOCK_EDIT)")
         public ResponseEntity<LayoutBlockService.BlockResult> reassignTemplate(
                         @PathVariable String tenantSlug,
                         @PathVariable UUID layoutId,
@@ -130,7 +130,7 @@ public class LayoutBlockController {
         }
 
         @PutMapping("/{blockId}/metadata")
-        @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_EDIT)")
+        @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_BLOCK_EDIT)")
         public ResponseEntity<LayoutBlockService.BlockResult> updateMetadata(
                         @PathVariable String tenantSlug,
                         @PathVariable UUID layoutId,

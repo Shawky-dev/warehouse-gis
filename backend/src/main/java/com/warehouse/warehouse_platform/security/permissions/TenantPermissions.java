@@ -34,9 +34,10 @@ public final class TenantPermissions {
     public static final String CATEGORIES_RESTORE = "tenant.categories.restore";
     public static final String CATEGORIES_HARD_DELETE = "tenant.categories.hard_delete";
     public static final String WAREHOUSE_VIEW = "tenant.warehouse.view";
-    public static final String WAREHOUSE_EDIT = "tenant.warehouse.edit";
-    public static final String WAREHOUSE_SOFT_DELETE = "tenant.warehouse.soft_delete";
-    public static final String WAREHOUSE_RESTORE = "tenant.warehouse.restore";
+    public static final String WAREHOUSE_LAYOUT_MANAGE = "tenant.warehouse.layout.manage";
+    public static final String WAREHOUSE_LAYOUT_ACTIVATE = "tenant.warehouse.layout.activate";
+    public static final String WAREHOUSE_TEMPLATE_MANAGE = "tenant.warehouse.template.manage";
+    public static final String WAREHOUSE_BLOCK_EDIT = "tenant.warehouse.block.edit";
     public static final String WAREHOUSE_HARD_DELETE = "tenant.warehouse.hard_delete";
     public static final String AUDIT_VIEW = "tenant.audit.view";
 

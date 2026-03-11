@@ -61,7 +61,7 @@ public class WarehouseLayoutController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_EDIT)")
+    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_LAYOUT_MANAGE)")
     public ResponseEntity<WarehouseLayoutService.LayoutResult> createLayout(
             @PathVariable String tenantSlug,
             @Valid @RequestBody CreateLayoutRequest request,
@@ -71,7 +71,7 @@ public class WarehouseLayoutController {
     }
 
     @PostMapping("/presets/classic")
-    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_EDIT)")
+    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_LAYOUT_MANAGE) and (!#request.activate() or hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_LAYOUT_ACTIVATE))")
     public ResponseEntity<WarehouseLayoutService.LayoutResult> createClassicPreset(
             @PathVariable String tenantSlug,
             @Valid @RequestBody CreateClassicPresetRequest request,
@@ -82,7 +82,7 @@ public class WarehouseLayoutController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_EDIT)")
+    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_LAYOUT_MANAGE)")
     public ResponseEntity<WarehouseLayoutService.LayoutResult> updateLayout(
             @PathVariable String tenantSlug,
             @PathVariable UUID id,
@@ -93,7 +93,7 @@ public class WarehouseLayoutController {
     }
 
     @PostMapping("/{id}/activate")
-    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_EDIT)")
+    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_LAYOUT_ACTIVATE)")
     public ResponseEntity<Void> activateLayout(
             @PathVariable String tenantSlug,
             @PathVariable UUID id,
@@ -104,7 +104,7 @@ public class WarehouseLayoutController {
     }
 
     @PostMapping("/{id}/deactivate")
-    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_EDIT)")
+    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_LAYOUT_ACTIVATE)")
     public ResponseEntity<Void> deactivateLayout(
             @PathVariable String tenantSlug,
             @PathVariable UUID id,

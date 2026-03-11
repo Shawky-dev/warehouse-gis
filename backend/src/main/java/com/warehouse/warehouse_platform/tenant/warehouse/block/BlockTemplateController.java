@@ -62,7 +62,7 @@ public class BlockTemplateController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_EDIT)")
+    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_TEMPLATE_MANAGE)")
     public ResponseEntity<BlockTemplateService.TemplateResult> createTemplate(
             @PathVariable String tenantSlug,
             @Valid @RequestBody TemplateRequest request,
@@ -74,7 +74,7 @@ public class BlockTemplateController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_EDIT)")
+    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_TEMPLATE_MANAGE)")
     public ResponseEntity<BlockTemplateService.TemplateResult> updateTemplate(
             @PathVariable String tenantSlug,
             @PathVariable UUID id,

@@ -43,9 +43,10 @@ export const TENANT_PERMISSIONS = {
   CATEGORIES_RESTORE: "tenant.categories.restore",
   CATEGORIES_HARD_DELETE: "tenant.categories.hard_delete",
   WAREHOUSE_VIEW: "tenant.warehouse.view",
-  WAREHOUSE_EDIT: "tenant.warehouse.edit",
-  WAREHOUSE_SOFT_DELETE: "tenant.warehouse.soft_delete",
-  WAREHOUSE_RESTORE: "tenant.warehouse.restore",
+  WAREHOUSE_LAYOUT_MANAGE: "tenant.warehouse.layout.manage",
+  WAREHOUSE_LAYOUT_ACTIVATE: "tenant.warehouse.layout.activate",
+  WAREHOUSE_TEMPLATE_MANAGE: "tenant.warehouse.template.manage",
+  WAREHOUSE_BLOCK_EDIT: "tenant.warehouse.block.edit",
   WAREHOUSE_HARD_DELETE: "tenant.warehouse.hard_delete",
   AUDIT_VIEW: "tenant.audit.view",
 } as const;

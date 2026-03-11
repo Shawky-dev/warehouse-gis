@@ -104,3 +104,10 @@ databaseChangeLog:
         - sqlFile:
             path: db/migration/tenant/V15__add_layout_block_side.sql
             relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-warehouse-permission-split-16
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V16__split_warehouse_permissions.sql
+            relativeToChangelogFile: false

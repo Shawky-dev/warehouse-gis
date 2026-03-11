@@ -205,7 +205,7 @@ describe("WarehouseLayoutsPage", () => {
     it("renders layouts list and classic preset action", async () => {
         renderPage("/acme/warehouse-layouts", [
             TENANT_PERMISSIONS.WAREHOUSE_VIEW,
-            TENANT_PERMISSIONS.WAREHOUSE_EDIT,
+            TENANT_PERMISSIONS.WAREHOUSE_LAYOUT_MANAGE,
         ]);
 
         await waitFor(() => {
@@ -217,7 +217,7 @@ describe("WarehouseLayoutsPage", () => {
     it("shows fork editing state and selected block inspector from query params", async () => {
         renderPage(
             "/acme/warehouse-layouts?layoutId=layout-fork&mode=fork&path=block-aisle,block-side&tab=builder",
-            [TENANT_PERMISSIONS.WAREHOUSE_VIEW, TENANT_PERMISSIONS.WAREHOUSE_EDIT]
+            [TENANT_PERMISSIONS.WAREHOUSE_VIEW, TENANT_PERMISSIONS.WAREHOUSE_BLOCK_EDIT]
         );
 
         await waitFor(() => {
@@ -233,7 +233,7 @@ describe("WarehouseLayoutsPage", () => {
 
         renderPage(
             "/acme/warehouse-layouts?layoutId=layout-fork&mode=fork&path=block-aisle&tab=builder",
-            [TENANT_PERMISSIONS.WAREHOUSE_VIEW, TENANT_PERMISSIONS.WAREHOUSE_EDIT]
+            [TENANT_PERMISSIONS.WAREHOUSE_VIEW, TENANT_PERMISSIONS.WAREHOUSE_BLOCK_EDIT]
         );
 
         await screen.findByRole("button", { name: "Add block" });
@@ -259,7 +259,7 @@ describe("WarehouseLayoutsPage", () => {
 
         renderPage(
             "/acme/warehouse-layouts?layoutId=layout-fork&mode=fork&path=block-aisle,block-side&tab=builder",
-            [TENANT_PERMISSIONS.WAREHOUSE_VIEW, TENANT_PERMISSIONS.WAREHOUSE_EDIT]
+            [TENANT_PERMISSIONS.WAREHOUSE_VIEW, TENANT_PERMISSIONS.WAREHOUSE_BLOCK_EDIT]
         );
 
         await screen.findByRole("button", { name: "Copy subtree" });
@@ -286,7 +286,7 @@ describe("WarehouseLayoutsPage", () => {
 
         renderPage(
             "/acme/warehouse-layouts?layoutId=layout-fork&mode=fork&path=block-aisle&tab=builder",
-            [TENANT_PERMISSIONS.WAREHOUSE_VIEW, TENANT_PERMISSIONS.WAREHOUSE_EDIT]
+            [TENANT_PERMISSIONS.WAREHOUSE_VIEW, TENANT_PERMISSIONS.WAREHOUSE_BLOCK_EDIT]
         );
 
         await screen.findByText("Aisle · A");
@@ -297,5 +297,30 @@ describe("WarehouseLayoutsPage", () => {
 
         await user.click(screen.getByRole("button", { name: "Expand block" }));
         expect(screen.getByText("Side · A · A")).toBeInTheDocument();
+    });
+
+    it("shows layout edit without activation when only layout manage permission is present", async () => {
+        renderPage("/acme/warehouse-layouts", [
+            TENANT_PERMISSIONS.WAREHOUSE_VIEW,
+            TENANT_PERMISSIONS.WAREHOUSE_LAYOUT_MANAGE,
+        ]);
+
+        await waitFor(() => {
+            expect(screen.getAllByRole("button", { name: "Edit" }).length).toBeGreaterThan(0);
+            expect(screen.queryByRole("button", { name: "Activate" })).not.toBeInTheDocument();
+            expect(screen.queryByRole("button", { name: "Deactivate" })).not.toBeInTheDocument();
+        });
+    });
+
+    it("shows template create only with template manage permission", async () => {
+        renderPage(
+            "/acme/warehouse-layouts?layoutId=layout-fork&mode=fork&tab=templates",
+            [TENANT_PERMISSIONS.WAREHOUSE_VIEW, TENANT_PERMISSIONS.WAREHOUSE_TEMPLATE_MANAGE]
+        );
+
+        await waitFor(() => {
+            expect(screen.getByRole("button", { name: "Create template" })).toBeInTheDocument();
+            expect(screen.queryByRole("button", { name: "Add block" })).not.toBeInTheDocument();
+        });
     });
 });

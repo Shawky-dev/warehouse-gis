@@ -326,7 +326,10 @@ export default function WarehouseLayoutsPage() {
     const { hasPermission } = useAuth();
     const [searchParams, setSearchParams] = useSearchParams();
 
-    const canEdit = hasPermission(TENANT_PERMISSIONS.WAREHOUSE_EDIT);
+    const canManageLayouts = hasPermission(TENANT_PERMISSIONS.WAREHOUSE_LAYOUT_MANAGE);
+    const canActivateLayouts = hasPermission(TENANT_PERMISSIONS.WAREHOUSE_LAYOUT_ACTIVATE);
+    const canManageTemplates = hasPermission(TENANT_PERMISSIONS.WAREHOUSE_TEMPLATE_MANAGE);
+    const canEditBlocks = hasPermission(TENANT_PERMISSIONS.WAREHOUSE_BLOCK_EDIT);
     const canHardDelete = hasPermission(TENANT_PERMISSIONS.WAREHOUSE_HARD_DELETE);
 
     const [layouts, setLayouts] = useState<WarehouseLayoutResult[]>([]);
@@ -623,7 +626,7 @@ export default function WarehouseLayoutsPage() {
                 const created = await createClassicWarehousePreset(slug, {
                     name: layoutForm.name.trim(),
                     description: layoutForm.description.trim() || null,
-                    activate: layoutForm.activate,
+                    activate: canActivateLayouts ? layoutForm.activate : false,
                 });
                 await loadLayouts();
                 handleOpenLayout(created);
@@ -966,7 +969,7 @@ export default function WarehouseLayoutsPage() {
                     <h1 className="text-xl font-semibold">{t("warehouse.layouts.pageTitle")}</h1>
                     <p className="text-sm text-muted-foreground">{t("warehouse.layouts.pageDescription")}</p>
                 </div>
-                {canEdit ? (
+                {canManageLayouts ? (
                     <div className="flex flex-wrap gap-2">
                         <Button variant="outline" onClick={() => handleLayoutDialogOpen("classic")}>
                             <Sparkles className="h-4 w-4" />
@@ -1037,19 +1040,19 @@ export default function WarehouseLayoutsPage() {
                                                     <Button size="sm" variant="outline" onClick={() => handleOpenLayout(layout)}>
                                                         {layout.isActive ? t("warehouse.layouts.openActiveAction") : t("warehouse.layouts.openForkAction")}
                                                     </Button>
-                                                    {canEdit ? (
+                                                    {canManageLayouts ? (
                                                         <Button size="sm" variant="outline" onClick={() => handleLayoutDialogOpen("edit", layout)}>
                                                             <Pencil className="h-4 w-4" />
                                                             {t("warehouse.common.edit")}
                                                         </Button>
                                                     ) : null}
-                                                    {canEdit && !layout.isActive ? (
+                                                    {canActivateLayouts && !layout.isActive ? (
                                                         <Button size="sm" variant="outline" onClick={() => handleActivateLayout(layout.id)}>
                                                             <Check className="h-4 w-4" />
                                                             {t("warehouse.layouts.activateAction")}
                                                         </Button>
                                                     ) : null}
-                                                    {canEdit && layout.isActive ? (
+                                                    {canActivateLayouts && layout.isActive ? (
                                                         <Button size="sm" variant="outline" onClick={() => handleDeactivateLayout(layout.id)}>
                                                             {t("warehouse.layouts.deactivateAction")}
                                                         </Button>
@@ -1113,7 +1116,7 @@ export default function WarehouseLayoutsPage() {
                                         onChange={(event) => setTemplateSearch(event.target.value)}
                                         placeholder={t("warehouse.templates.searchPlaceholder")}
                                     />
-                                    {canEdit ? (
+                                    {canManageTemplates ? (
                                         <Button onClick={() => handleTemplateDialogOpen("create")}>
                                             <Plus className="h-4 w-4" />
                                             {t("warehouse.templates.createAction")}
@@ -1162,7 +1165,7 @@ export default function WarehouseLayoutsPage() {
                                                         </TableCell>
                                                         <TableCell>
                                                             <div className="flex flex-wrap gap-2">
-                                                                {canEdit ? (
+                                                                {canManageTemplates ? (
                                                                     <Button size="sm" variant="outline" onClick={() => handleTemplateDialogOpen("edit", template)}>
                                                                         <Pencil className="h-4 w-4" />
                                                                         {t("warehouse.common.edit")}
@@ -1234,7 +1237,7 @@ export default function WarehouseLayoutsPage() {
                                                     <CardTitle>{t("warehouse.builder.treeTitle")}</CardTitle>
                                                     <CardDescription>{t("warehouse.builder.treeDescription")}</CardDescription>
                                                 </div>
-                                                {canEdit ? (
+                                                {canEditBlocks ? (
                                                     <div className="flex flex-wrap gap-2">
                                                         {blockClipboard ? (
                                                             <Button variant="outline" onClick={handleOpenPasteDialog}>
@@ -1424,7 +1427,7 @@ export default function WarehouseLayoutsPage() {
                                                     ) : null}
 
                                                     <div className="flex flex-wrap gap-2">
-                                                        {canEdit ? (
+                                                        {canEditBlocks ? (
                                                             <>
                                                                 <Button onClick={() => void handleSaveSelectedBlock()} disabled={isSubmitting}>
                                                                     {t("warehouse.common.save")}
@@ -1505,7 +1508,7 @@ export default function WarehouseLayoutsPage() {
                                 onChange={(event) => setLayoutForm((current) => ({ ...current, description: event.target.value }))}
                             />
                         </div>
-                        {layoutDialogMode === "classic" ? (
+                        {layoutDialogMode === "classic" && canActivateLayouts ? (
                             <label className="flex items-center gap-2 text-sm">
                                 <input
                                     checked={layoutForm.activate}
