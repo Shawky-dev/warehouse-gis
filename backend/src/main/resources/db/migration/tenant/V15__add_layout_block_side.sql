@@ -1,0 +1,2 @@
+ALTER TABLE layout_blocks
+    ADD COLUMN IF NOT EXISTS side VARCHAR(50) NULL;

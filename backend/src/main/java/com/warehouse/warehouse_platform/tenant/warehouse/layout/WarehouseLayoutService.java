@@ -88,13 +88,12 @@ public class WarehouseLayoutService {
 
         LayoutBlock aisleBlock = createPresetBlock(savedLayoutId, null, 0,
                 resolveClassicTemplate("Aisle", BlockTemplate.IdentifierFormat.ALPHA,
-                        BlockTemplate.SideConfig.LR, true, "Primary warehouse aisle segment", "AlignJustify").getId());
-        LayoutBlock sideBlock = createPresetBlock(savedLayoutId, aisleBlock.getId(), 0,
-                resolveClassicTemplate("Side", BlockTemplate.IdentifierFormat.ALPHA,
-                        BlockTemplate.SideConfig.AB, true, "Split aisle side", "GitBranch").getId());
-        LayoutBlock bayBlock = createPresetBlock(savedLayoutId, sideBlock.getId(), 0,
+                        BlockTemplate.SideConfig.NONE, true, "Primary warehouse aisle segment", "AlignJustify")
+                        .getId());
+        LayoutBlock bayBlock = createPresetBlock(savedLayoutId, aisleBlock.getId(), 0,
                 resolveClassicTemplate("Bay", BlockTemplate.IdentifierFormat.NUMERIC,
-                        BlockTemplate.SideConfig.NONE, true, "Numbered bay segment", "Layers").getId());
+                        BlockTemplate.SideConfig.LR, true, "Numbered bay segment on a left or right aisle side",
+                        "Layers").getId());
         LayoutBlock levelBlock = createPresetBlock(savedLayoutId, bayBlock.getId(), 0,
                 resolveClassicTemplate("Level", BlockTemplate.IdentifierFormat.NUMERIC,
                         BlockTemplate.SideConfig.NONE, true, "Vertical bay level", "List").getId());

@@ -29,6 +29,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("null")
 class WarehouseLayoutServiceTest {
 
     @Mock
@@ -127,9 +128,12 @@ class WarehouseLayoutServiceTest {
         assertTrue(result.isActive());
         verify(blockTemplateRepository).save(argThat(
                 template -> "Aisle".equals(template.getName()) && "AlignJustify".equals(template.getIconName())));
+        verify(blockTemplateRepository).save(argThat(
+                template -> "Bay".equals(template.getName())
+                        && template.getSideConfig() == BlockTemplate.SideConfig.LR));
         verify(blockTemplateRepository).save(
                 argThat(template -> "Shelf".equals(template.getName()) && "MapPin".equals(template.getIconName())));
-        verify(layoutBlockRepository, org.mockito.Mockito.times(5)).save(any(LayoutBlock.class));
+        verify(layoutBlockRepository, org.mockito.Mockito.times(4)).save(any(LayoutBlock.class));
         verify(tenantAuditService).record(eq("WAREHOUSE_LAYOUT_CREATE_CLASSIC_PRESET"), eq("WAREHOUSE_LAYOUT"),
                 eq(result.id().toString()), eq(null), any());
     }

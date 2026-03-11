@@ -85,6 +85,8 @@ function installWarehouseHandlers() {
                         blockTemplateId: "template-aisle",
                         parentId: null,
                         position: 0,
+                        identifier: "A",
+                        side: null,
                         createdAt: "2026-03-02T00:00:00Z",
                         updatedAt: "2026-03-02T00:00:00Z",
                     },
@@ -96,6 +98,8 @@ function installWarehouseHandlers() {
                                 blockTemplateId: "template-side",
                                 parentId: "block-aisle",
                                 position: 0,
+                                identifier: "A",
+                                side: "A",
                                 createdAt: "2026-03-02T00:00:00Z",
                                 updatedAt: "2026-03-02T00:00:00Z",
                             },
@@ -149,6 +153,7 @@ describe("WarehouseLayoutsPage", () => {
             expect(screen.getByText(/You are editing a non-active layout/i)).toBeInTheDocument();
             expect(screen.getByText("Block inspector")).toBeInTheDocument();
             expect(screen.getAllByText("Side").length).toBeGreaterThan(0);
+            expect(screen.getByText(/Identifier: A/i)).toBeInTheDocument();
         });
     });
 });

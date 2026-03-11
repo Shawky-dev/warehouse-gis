@@ -4,6 +4,7 @@ import com.warehouse.warehouse_platform.tenant.access.TenantAccessPolicy;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -25,98 +26,117 @@ import java.util.UUID;
 @Validated
 public class LayoutBlockController {
 
-    private final TenantAccessPolicy tenantAccessPolicy;
-    private final LayoutBlockService layoutBlockService;
+        private final TenantAccessPolicy tenantAccessPolicy;
+        private final LayoutBlockService layoutBlockService;
 
-    public LayoutBlockController(
-            TenantAccessPolicy tenantAccessPolicy,
-            LayoutBlockService layoutBlockService) {
-        this.tenantAccessPolicy = tenantAccessPolicy;
-        this.layoutBlockService = layoutBlockService;
-    }
+        public LayoutBlockController(
+                        TenantAccessPolicy tenantAccessPolicy,
+                        LayoutBlockService layoutBlockService) {
+                this.tenantAccessPolicy = tenantAccessPolicy;
+                this.layoutBlockService = layoutBlockService;
+        }
 
-    @GetMapping
-    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_VIEW)")
-    public ResponseEntity<List<LayoutBlockService.BlockNode>> getTree(
-            @PathVariable String tenantSlug,
-            @PathVariable UUID layoutId,
-            Authentication authentication) {
-        tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
-        return ResponseEntity.ok(layoutBlockService.getTree(layoutId));
-    }
+        @GetMapping
+        @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_VIEW)")
+        public ResponseEntity<List<LayoutBlockService.BlockNode>> getTree(
+                        @PathVariable String tenantSlug,
+                        @PathVariable UUID layoutId,
+                        Authentication authentication) {
+                tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
+                return ResponseEntity.ok(layoutBlockService.getTree(layoutId));
+        }
 
-    @GetMapping("/{blockId}")
-    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_VIEW)")
-    public ResponseEntity<LayoutBlockService.BlockResult> getBlock(
-            @PathVariable String tenantSlug,
-            @PathVariable UUID layoutId,
-            @PathVariable UUID blockId,
-            Authentication authentication) {
-        tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
-        return ResponseEntity.ok(layoutBlockService.getBlock(layoutId, blockId));
-    }
+        @GetMapping("/{blockId}")
+        @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_VIEW)")
+        public ResponseEntity<LayoutBlockService.BlockResult> getBlock(
+                        @PathVariable String tenantSlug,
+                        @PathVariable UUID layoutId,
+                        @PathVariable UUID blockId,
+                        Authentication authentication) {
+                tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
+                return ResponseEntity.ok(layoutBlockService.getBlock(layoutId, blockId));
+        }
 
-    @PostMapping
-    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_EDIT)")
-    public ResponseEntity<LayoutBlockService.BlockResult> addBlock(
-            @PathVariable String tenantSlug,
-            @PathVariable UUID layoutId,
-            @Valid @RequestBody AddBlockRequest request,
-            Authentication authentication) {
-        tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
-        return ResponseEntity.ok(layoutBlockService.addBlock(
-                layoutId, request.blockTemplateId(), request.parentId(), request.position()));
-    }
+        @PostMapping
+        @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_EDIT)")
+        public ResponseEntity<LayoutBlockService.BlockResult> addBlock(
+                        @PathVariable String tenantSlug,
+                        @PathVariable UUID layoutId,
+                        @Valid @RequestBody AddBlockRequest request,
+                        Authentication authentication) {
+                tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
+                return ResponseEntity.ok(layoutBlockService.addBlock(
+                                layoutId, request.blockTemplateId(), request.parentId(), request.position(),
+                                request.side()));
+        }
 
-    @PutMapping("/{blockId}/move")
-    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_EDIT)")
-    public ResponseEntity<LayoutBlockService.BlockResult> moveBlock(
-            @PathVariable String tenantSlug,
-            @PathVariable UUID layoutId,
-            @PathVariable UUID blockId,
-            @Valid @RequestBody MoveBlockRequest request,
-            Authentication authentication) {
-        tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
-        return ResponseEntity.ok(layoutBlockService.moveBlock(
-                layoutId, blockId, request.parentId(), request.position()));
-    }
+        @PutMapping("/{blockId}/move")
+        @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_EDIT)")
+        public ResponseEntity<LayoutBlockService.BlockResult> moveBlock(
+                        @PathVariable String tenantSlug,
+                        @PathVariable UUID layoutId,
+                        @PathVariable UUID blockId,
+                        @Valid @RequestBody MoveBlockRequest request,
+                        Authentication authentication) {
+                tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
+                return ResponseEntity.ok(layoutBlockService.moveBlock(
+                                layoutId, blockId, request.parentId(), request.position()));
+        }
 
-    @PutMapping("/{blockId}/template")
-    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_EDIT)")
-    public ResponseEntity<LayoutBlockService.BlockResult> reassignTemplate(
-            @PathVariable String tenantSlug,
-            @PathVariable UUID layoutId,
-            @PathVariable UUID blockId,
-            @Valid @RequestBody ReassignTemplateRequest request,
-            Authentication authentication) {
-        tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
-        return ResponseEntity.ok(layoutBlockService.reassignTemplate(layoutId, blockId, request.blockTemplateId()));
-    }
+        @PutMapping("/{blockId}/template")
+        @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_EDIT)")
+        public ResponseEntity<LayoutBlockService.BlockResult> reassignTemplate(
+                        @PathVariable String tenantSlug,
+                        @PathVariable UUID layoutId,
+                        @PathVariable UUID blockId,
+                        @Valid @RequestBody ReassignTemplateRequest request,
+                        Authentication authentication) {
+                tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
+                return ResponseEntity
+                                .ok(layoutBlockService.reassignTemplate(layoutId, blockId, request.blockTemplateId()));
+        }
 
-    @DeleteMapping("/{blockId}")
-    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_HARD_DELETE)")
-    public ResponseEntity<Void> removeBlock(
-            @PathVariable String tenantSlug,
-            @PathVariable UUID layoutId,
-            @PathVariable UUID blockId,
-            Authentication authentication) {
-        tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
-        layoutBlockService.removeBlock(layoutId, blockId);
-        return ResponseEntity.noContent().build();
-    }
+        @PutMapping("/{blockId}/metadata")
+        @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_EDIT)")
+        public ResponseEntity<LayoutBlockService.BlockResult> updateMetadata(
+                        @PathVariable String tenantSlug,
+                        @PathVariable UUID layoutId,
+                        @PathVariable UUID blockId,
+                        @Valid @RequestBody UpdateBlockMetadataRequest request,
+                        Authentication authentication) {
+                tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
+                return ResponseEntity.ok(layoutBlockService.updateMetadata(layoutId, blockId, request.side()));
+        }
 
-    public record AddBlockRequest(
-            @NotNull UUID blockTemplateId,
-            UUID parentId,
-            @Min(0) Integer position) {
-    }
+        @DeleteMapping("/{blockId}")
+        @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).WAREHOUSE_HARD_DELETE)")
+        public ResponseEntity<Void> removeBlock(
+                        @PathVariable String tenantSlug,
+                        @PathVariable UUID layoutId,
+                        @PathVariable UUID blockId,
+                        Authentication authentication) {
+                tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
+                layoutBlockService.removeBlock(layoutId, blockId);
+                return ResponseEntity.noContent().build();
+        }
 
-    public record MoveBlockRequest(
-            UUID parentId,
-            @Min(0) int position) {
-    }
+        public record AddBlockRequest(
+                        @NotNull UUID blockTemplateId,
+                        UUID parentId,
+                        @Min(0) Integer position,
+                        @Size(max = 50) String side) {
+        }
 
-    public record ReassignTemplateRequest(
-            @NotNull UUID blockTemplateId) {
-    }
+        public record MoveBlockRequest(
+                        UUID parentId,
+                        @Min(0) int position) {
+        }
+
+        public record ReassignTemplateRequest(
+                        @NotNull UUID blockTemplateId) {
+        }
+
+        public record UpdateBlockMetadataRequest(
+                        @Size(max = 50) String side) {
+        }
 }

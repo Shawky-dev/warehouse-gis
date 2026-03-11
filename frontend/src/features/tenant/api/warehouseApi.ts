@@ -8,6 +8,7 @@ import type {
     ListWarehouseTemplatesParams,
     MoveWarehouseBlockRequest,
     ReassignWarehouseBlockTemplateRequest,
+    UpdateWarehouseBlockMetadataRequest,
     UpsertWarehouseLayoutRequest,
     UpsertWarehouseTemplateRequest,
     WarehouseApiErrorResponse,
@@ -192,6 +193,20 @@ export async function reassignWarehouseLayoutBlockTemplate(
 ): Promise<WarehouseBlockResult> {
     const response = await api.put<WarehouseBlockResult>(
         `${tenantBasePath(tenantSlug)}/warehouse-layouts/${layoutId}/blocks/${blockId}/template`,
+        payload,
+        { headers: tenantHeaders(tenantSlug) }
+    );
+    return response.data;
+}
+
+export async function updateWarehouseLayoutBlockMetadata(
+    tenantSlug: string,
+    layoutId: string,
+    blockId: string,
+    payload: UpdateWarehouseBlockMetadataRequest
+): Promise<WarehouseBlockResult> {
+    const response = await api.put<WarehouseBlockResult>(
+        `${tenantBasePath(tenantSlug)}/warehouse-layouts/${layoutId}/blocks/${blockId}/metadata`,
         payload,
         { headers: tenantHeaders(tenantSlug) }
     );

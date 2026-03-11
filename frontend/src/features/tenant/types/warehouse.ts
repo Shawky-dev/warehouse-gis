@@ -79,6 +79,8 @@ export interface WarehouseBlockResult {
     blockTemplateId: string;
     parentId: string | null;
     position: number;
+    identifier: string | null;
+    side: string | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -92,6 +94,7 @@ export interface AddWarehouseBlockRequest {
     blockTemplateId: string;
     parentId?: string | null;
     position?: number | null;
+    side?: string | null;
 }
 
 export interface MoveWarehouseBlockRequest {
@@ -101,6 +104,10 @@ export interface MoveWarehouseBlockRequest {
 
 export interface ReassignWarehouseBlockTemplateRequest {
     blockTemplateId: string;
+}
+
+export interface UpdateWarehouseBlockMetadataRequest {
+    side?: string | null;
 }
 
 export interface WarehouseApiErrorResponse {

@@ -48,6 +48,9 @@ public class LayoutBlock {
     @Column(nullable = false)
     private Integer position;
 
+    @Column(length = 50)
+    private String side;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -56,7 +59,8 @@ public class LayoutBlock {
 
     @PrePersist
     public void prePersist() {
-        if (id == null) id = UUID.randomUUID();
+        if (id == null)
+            id = UUID.randomUUID();
         Instant now = Instant.now();
         createdAt = now;
         updatedAt = now;

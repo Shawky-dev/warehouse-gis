@@ -97,3 +97,10 @@ databaseChangeLog:
         - sqlFile:
             path: db/migration/tenant/V14__add_block_template_icons.sql
             relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-layout-block-side-15
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V15__add_layout_block_side.sql
+            relativeToChangelogFile: false

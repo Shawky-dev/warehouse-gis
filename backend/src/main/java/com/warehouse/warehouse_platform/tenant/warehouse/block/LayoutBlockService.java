@@ -8,9 +8,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -33,13 +35,14 @@ public class LayoutBlockService {
     }
 
     /**
-     * Returns the full block tree for a layout, with children nested under their parent.
+     * Returns the full block tree for a layout, with children nested under their
+     * parent.
      */
     @Transactional(readOnly = true)
     public List<BlockNode> getTree(UUID layoutId) {
         assertLayoutExists(layoutId);
         List<LayoutBlock> all = layoutBlockRepository.findByLayoutIdOrderByParentIdAscPositionAsc(layoutId);
-        return buildTree(all, null);
+        return buildTree(all, null, loadTemplateMap(all));
     }
 
     @Transactional(readOnly = true)
@@ -47,7 +50,7 @@ public class LayoutBlockService {
         assertLayoutExists(layoutId);
         LayoutBlock block = loadBlock(blockId);
         assertBelongsToLayout(block, layoutId);
-        return toResult(block);
+        return toResult(block, loadTemplate(block.getBlockTemplateId()));
     }
 
     /**
@@ -56,9 +59,9 @@ public class LayoutBlockService {
      * If position is null, it is appended after the last sibling.
      */
     @Transactional
-    public BlockResult addBlock(UUID layoutId, UUID blockTemplateId, UUID parentId, Integer position) {
+    public BlockResult addBlock(UUID layoutId, UUID blockTemplateId, UUID parentId, Integer position, String side) {
         assertLayoutExists(layoutId);
-        assertTemplateExists(blockTemplateId);
+        BlockTemplate template = loadTemplate(blockTemplateId);
 
         if (parentId != null) {
             LayoutBlock parent = loadBlock(parentId);
@@ -75,10 +78,11 @@ public class LayoutBlockService {
                 .blockTemplateId(blockTemplateId)
                 .parentId(parentId)
                 .position(resolvedPosition)
+                .side(normalizeSide(side, template))
                 .build();
 
-        LayoutBlock saved = layoutBlockRepository.save(block);
-        BlockResult result = toResult(saved);
+        LayoutBlock saved = saveBlock(block);
+        BlockResult result = toResult(saved, template);
         tenantAuditService.record("LAYOUT_BLOCK_ADD", "LAYOUT_BLOCK", result.id().toString(), null, result);
         return result;
     }
@@ -102,7 +106,7 @@ public class LayoutBlockService {
 
         UUID oldParentId = block.getParentId();
         int oldPosition = block.getPosition();
-        BlockResult before = toResult(block);
+        BlockResult before = toResult(block, loadTemplate(block.getBlockTemplateId()));
 
         // Temporarily remove from old position (shift siblings down)
         shiftPositions(layoutId, oldParentId, oldPosition + 1, -1, blockId);
@@ -118,9 +122,9 @@ public class LayoutBlockService {
 
         block.setParentId(newParentId);
         block.setPosition(resolvedNew);
-        LayoutBlock saved = layoutBlockRepository.save(block);
+        LayoutBlock saved = saveBlock(block);
 
-        BlockResult after = toResult(saved);
+        BlockResult after = toResult(saved, loadTemplate(saved.getBlockTemplateId()));
         tenantAuditService.record("LAYOUT_BLOCK_MOVE", "LAYOUT_BLOCK", blockId.toString(), before, after);
         return after;
     }
@@ -131,20 +135,37 @@ public class LayoutBlockService {
     @Transactional
     public BlockResult reassignTemplate(UUID layoutId, UUID blockId, UUID newTemplateId) {
         assertLayoutExists(layoutId);
-        assertTemplateExists(newTemplateId);
+        BlockTemplate template = loadTemplate(newTemplateId);
         LayoutBlock block = loadBlock(blockId);
         assertBelongsToLayout(block, layoutId);
 
-        BlockResult before = toResult(block);
+        BlockResult before = toResult(block, loadTemplate(block.getBlockTemplateId()));
+        block.setSide(retainCompatibleSide(block.getSide(), template));
         block.setBlockTemplateId(newTemplateId);
-        LayoutBlock saved = layoutBlockRepository.save(block);
-        BlockResult after = toResult(saved);
+        LayoutBlock saved = saveBlock(block);
+        BlockResult after = toResult(saved, template);
         tenantAuditService.record("LAYOUT_BLOCK_REASSIGN", "LAYOUT_BLOCK", blockId.toString(), before, after);
         return after;
     }
 
+    @Transactional
+    public BlockResult updateMetadata(UUID layoutId, UUID blockId, String side) {
+        assertLayoutExists(layoutId);
+        LayoutBlock block = loadBlock(blockId);
+        assertBelongsToLayout(block, layoutId);
+
+        BlockTemplate template = loadTemplate(block.getBlockTemplateId());
+        BlockResult before = toResult(block, template);
+        block.setSide(normalizeSide(side, template));
+        LayoutBlock saved = saveBlock(block);
+        BlockResult after = toResult(saved, template);
+        tenantAuditService.record("LAYOUT_BLOCK_UPDATE_METADATA", "LAYOUT_BLOCK", blockId.toString(), before, after);
+        return after;
+    }
+
     /**
-     * Removes a block (and cascades deletion to all its descendants via DB ON DELETE CASCADE).
+     * Removes a block (and cascades deletion to all its descendants via DB ON
+     * DELETE CASCADE).
      * Shifts remaining siblings to fill the gap.
      */
     @Transactional
@@ -153,7 +174,7 @@ public class LayoutBlockService {
         LayoutBlock block = loadBlock(blockId);
         assertBelongsToLayout(block, layoutId);
 
-        BlockResult before = toResult(block);
+        BlockResult before = toResult(block, loadTemplate(block.getBlockTemplateId()));
         UUID parentId = block.getParentId();
         int position = block.getPosition();
 
@@ -184,8 +205,10 @@ public class LayoutBlockService {
     }
 
     /**
-     * Shifts the position of all siblings at or after {@code fromPosition} by {@code delta}.
-     * Optionally excludes a specific block (useful when the block being moved is still in the list).
+     * Shifts the position of all siblings at or after {@code fromPosition} by
+     * {@code delta}.
+     * Optionally excludes a specific block (useful when the block being moved is
+     * still in the list).
      */
     private void shiftPositions(UUID layoutId, UUID parentId, int fromPosition, int delta, UUID excludeBlockId) {
         List<LayoutBlock> siblings = (parentId == null)
@@ -194,7 +217,8 @@ public class LayoutBlockService {
 
         List<LayoutBlock> toUpdate = new ArrayList<>();
         for (LayoutBlock sibling : siblings) {
-            if (excludeBlockId != null && sibling.getId().equals(excludeBlockId)) continue;
+            if (excludeBlockId != null && sibling.getId().equals(excludeBlockId))
+                continue;
             if (sibling.getPosition() >= fromPosition) {
                 sibling.setPosition(sibling.getPosition() + delta);
                 toUpdate.add(sibling);
@@ -205,7 +229,10 @@ public class LayoutBlockService {
         }
     }
 
-    /** Recursively checks that {@code candidateAncestorId} is not a descendant of {@code blockId}. */
+    /**
+     * Recursively checks that {@code candidateAncestorId} is not a descendant of
+     * {@code blockId}.
+     */
     private void assertNotDescendant(UUID layoutId, UUID blockId, UUID candidateAncestorId) {
         List<LayoutBlock> all = layoutBlockRepository.findByLayoutIdOrderByParentIdAscPositionAsc(layoutId);
         // Build a child map
@@ -224,33 +251,30 @@ public class LayoutBlockService {
     private boolean isDescendant(Map<UUID, List<UUID>> childMap, UUID rootId, UUID targetId) {
         List<UUID> children = childMap.getOrDefault(rootId, List.of());
         for (UUID child : children) {
-            if (child.equals(targetId)) return true;
-            if (isDescendant(childMap, child, targetId)) return true;
+            if (child.equals(targetId))
+                return true;
+            if (isDescendant(childMap, child, targetId))
+                return true;
         }
         return false;
     }
 
-    private List<BlockNode> buildTree(List<LayoutBlock> all, UUID parentId) {
+    private List<BlockNode> buildTree(List<LayoutBlock> all, UUID parentId, Map<UUID, BlockTemplate> templatesById) {
         List<BlockNode> nodes = new ArrayList<>();
         for (LayoutBlock b : all) {
-            if (java.util.Objects.equals(b.getParentId(), parentId)) {
-                List<BlockNode> children = buildTree(all, b.getId());
-                nodes.add(new BlockNode(toResult(b), children));
+            if (Objects.equals(b.getParentId(), parentId)) {
+                List<BlockNode> children = buildTree(all, b.getId(), templatesById);
+                nodes.add(new BlockNode(toResult(b, requireTemplate(templatesById, b.getBlockTemplateId())), children));
             }
         }
-        nodes.sort(java.util.Comparator.comparingInt(n -> n.block().position()));
+        nodes.sort(Comparator.comparingInt(n -> n.block().position()));
         return nodes;
     }
 
     private void assertLayoutExists(UUID layoutId) {
-        if (!layoutRepository.existsById(layoutId)) {
+        UUID checkedLayoutId = Objects.requireNonNull(layoutId, "layoutId must not be null");
+        if (!layoutRepository.existsById(checkedLayoutId)) {
             throw WarehouseManagementException.notFound("Layout not found: " + layoutId);
-        }
-    }
-
-    private void assertTemplateExists(UUID templateId) {
-        if (!blockTemplateRepository.existsById(templateId)) {
-            throw WarehouseManagementException.notFound("Block template not found: " + templateId);
         }
     }
 
@@ -260,18 +284,140 @@ public class LayoutBlockService {
         }
     }
 
+    private BlockTemplate loadTemplate(UUID templateId) {
+        UUID checkedTemplateId = Objects.requireNonNull(templateId, "templateId must not be null");
+        return blockTemplateRepository.findById(checkedTemplateId)
+                .orElseThrow(() -> WarehouseManagementException.notFound("Block template not found: " + templateId));
+    }
+
+    private Map<UUID, BlockTemplate> loadTemplateMap(List<LayoutBlock> blocks) {
+        List<UUID> templateIds = blocks.stream()
+                .map(LayoutBlock::getBlockTemplateId)
+                .distinct()
+                .toList();
+        Map<UUID, BlockTemplate> templatesById = new HashMap<>();
+        blockTemplateRepository.findAllById(Objects.requireNonNull(templateIds, "templateIds must not be null"))
+                .forEach(template -> templatesById.put(template.getId(), template));
+        return templatesById;
+    }
+
+    private BlockTemplate requireTemplate(Map<UUID, BlockTemplate> templatesById, UUID templateId) {
+        BlockTemplate template = templatesById.get(templateId);
+        if (template == null) {
+            throw WarehouseManagementException.notFound("Block template not found: " + templateId);
+        }
+        return template;
+    }
+
     private LayoutBlock loadBlock(UUID blockId) {
-        return layoutBlockRepository.findById(blockId)
+        UUID checkedBlockId = Objects.requireNonNull(blockId, "blockId must not be null");
+        return layoutBlockRepository.findById(checkedBlockId)
                 .orElseThrow(() -> WarehouseManagementException.notFound("Layout block not found: " + blockId));
     }
 
-    private BlockResult toResult(LayoutBlock b) {
+    @SuppressWarnings({ "null", "ConstantConditions" })
+    private LayoutBlock saveBlock(LayoutBlock block) {
+        return layoutBlockRepository.save(block);
+    }
+
+    private String normalizeSide(String side, BlockTemplate template) {
+        String normalized = normalizeOptional(side, 50, "side");
+        BlockTemplate.SideConfig sideConfig = template.getSideConfig() != null
+                ? template.getSideConfig()
+                : BlockTemplate.SideConfig.NONE;
+        if (normalized == null) {
+            return null;
+        }
+
+        return switch (sideConfig) {
+            case NONE -> throw WarehouseManagementException.badRequest(
+                    "side is not allowed when the template side configuration is NONE");
+            case LR -> normalizeAgainstAllowed(normalized, List.of("L", "R"), "side must be one of: L, R");
+            case AB -> normalizeAgainstAllowed(normalized, List.of("A", "B"), "side must be one of: A, B");
+            case CUSTOM -> normalizeAgainstAllowed(normalized, parseSideOptions(template),
+                    "side must match one of the template's custom side options");
+        };
+    }
+
+    private String normalizeAgainstAllowed(String value, List<String> allowed, String errorMessage) {
+        for (String candidate : allowed) {
+            if (candidate.equalsIgnoreCase(value)) {
+                return candidate;
+            }
+        }
+        throw WarehouseManagementException.badRequest(errorMessage);
+    }
+
+    private List<String> parseSideOptions(BlockTemplate template) {
+        String raw = template.getSideOptions();
+        if (raw == null || raw.isBlank()) {
+            throw WarehouseManagementException.badRequest("side options are not configured for this template");
+        }
+        return java.util.Arrays.stream(raw.split(","))
+                .map(String::trim)
+                .filter(option -> !option.isEmpty())
+                .toList();
+    }
+
+    private String retainCompatibleSide(String side, BlockTemplate template) {
+        if (side == null || side.isBlank()) {
+            return null;
+        }
+        try {
+            return normalizeSide(side, template);
+        } catch (WarehouseManagementException exception) {
+            if ("BAD_REQUEST".equals(exception.getCode())) {
+                return null;
+            }
+            throw exception;
+        }
+    }
+
+    private String normalizeOptional(String value, int maxLength, String field) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = value.trim();
+        if (normalized.isEmpty()) {
+            return null;
+        }
+        if (normalized.length() > maxLength) {
+            throw WarehouseManagementException.badRequest(field + " must be at most " + maxLength + " characters");
+        }
+        return normalized;
+    }
+
+    private String resolveIdentifier(LayoutBlock block, BlockTemplate template) {
+        BlockTemplate.IdentifierFormat format = template.getIdentifierFormat();
+        if (format == null) {
+            return null;
+        }
+        return switch (format) {
+            case NUMERIC -> String.valueOf(block.getPosition() + 1);
+            case ALPHA -> toAlphabeticIdentifier(block.getPosition());
+            case CUSTOM, FREE_TEXT -> null;
+        };
+    }
+
+    private String toAlphabeticIdentifier(int position) {
+        int value = position;
+        StringBuilder builder = new StringBuilder();
+        do {
+            builder.append((char) ('A' + (value % 26)));
+            value = (value / 26) - 1;
+        } while (value >= 0);
+        return builder.reverse().toString();
+    }
+
+    private BlockResult toResult(LayoutBlock b, BlockTemplate template) {
         return new BlockResult(
                 b.getId(),
                 b.getLayoutId(),
                 b.getBlockTemplateId(),
                 b.getParentId(),
                 b.getPosition(),
+                resolveIdentifier(b, template),
+                b.getSide(),
                 b.getCreatedAt(),
                 b.getUpdatedAt());
     }
@@ -282,6 +428,8 @@ public class LayoutBlockService {
             UUID blockTemplateId,
             UUID parentId,
             int position,
+            String identifier,
+            String side,
             Instant createdAt,
             Instant updatedAt) {
     }

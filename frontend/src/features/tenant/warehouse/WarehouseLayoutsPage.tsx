@@ -35,6 +35,7 @@ import {
     listWarehouseTemplates,
     moveWarehouseLayoutBlock,
     reassignWarehouseLayoutBlockTemplate,
+    updateWarehouseLayoutBlockMetadata,
     updateWarehouseLayout,
     updateWarehouseTemplate,
 } from "@/features/tenant/api/warehouseApi";
@@ -42,6 +43,7 @@ import type {
     AddWarehouseBlockRequest,
     UpsertWarehouseLayoutRequest,
     UpsertWarehouseTemplateRequest,
+    WarehouseBlockResult,
     WarehouseBlockNode,
     WarehouseFlattenedNode,
     WarehouseIdentifierFormat,
@@ -116,7 +118,7 @@ interface TemplateFormState {
 interface BlockFormState {
     blockTemplateId: string;
     parentId: string;
-    position: string;
+    side: string;
 }
 
 type DeleteTarget =
@@ -143,7 +145,7 @@ const DEFAULT_TEMPLATE_FORM: TemplateFormState = {
 const DEFAULT_BLOCK_FORM: BlockFormState = {
     blockTemplateId: "",
     parentId: "__root__",
-    position: "",
+    side: "__none__",
 };
 
 function parsePath(value: string | null): string[] {
@@ -185,25 +187,49 @@ function buildDescendantSet(node: WarehouseBlockNode): Set<string> {
     return ids;
 }
 
-function normalizePosition(value: string): number | null {
-    if (!value.trim()) {
-        return null;
-    }
-
-    const parsed = Number(value);
-    if (!Number.isInteger(parsed) || parsed < 0) {
-        return null;
-    }
-
-    return parsed;
-}
-
 function splitSideOptions(value: string): string[] | null {
     const options = value
         .split(",")
         .map((item) => item.trim())
         .filter(Boolean);
     return options.length > 0 ? options : null;
+}
+
+function getTemplateSideOptions(template: WarehouseTemplateResult | null): string[] {
+    if (!template) {
+        return [];
+    }
+    switch (template.sideConfig) {
+        case "LR":
+            return ["L", "R"];
+        case "AB":
+            return ["A", "B"];
+        case "CUSTOM":
+            return template.sideOptions ?? [];
+        default:
+            return [];
+    }
+}
+
+function normalizeSideSelection(value: string, template: WarehouseTemplateResult | null): string | null {
+    if (getTemplateSideOptions(template).length === 0) {
+        return null;
+    }
+    if (!value || value === "__none__") {
+        return null;
+    }
+    return value;
+}
+
+function getBlockDisplayLabel(block: WarehouseBlockResult, template: WarehouseTemplateResult | null, unknownLabel: string) {
+    const parts = [template?.name ?? unknownLabel];
+    if (block.identifier) {
+        parts.push(block.identifier);
+    }
+    if (block.side) {
+        parts.push(block.side);
+    }
+    return parts.join(" · ");
 }
 
 function useWarehouseFilters(layouts: WarehouseLayoutResult[], search: string, filter: LayoutFilter) {
@@ -250,7 +276,7 @@ export default function WarehouseLayoutsPage() {
     const [blockForm, setBlockForm] = useState<BlockFormState>(DEFAULT_BLOCK_FORM);
     const [selectedBlockTemplateId, setSelectedBlockTemplateId] = useState("");
     const [selectedBlockParentId, setSelectedBlockParentId] = useState("__root__");
-    const [selectedBlockPosition, setSelectedBlockPosition] = useState("0");
+    const [selectedBlockSide, setSelectedBlockSide] = useState("__none__");
     const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
     const [layoutSearch, setLayoutSearch] = useState("");
     const [layoutFilter, setLayoutFilter] = useState<LayoutFilter>("all");
@@ -286,6 +312,24 @@ export default function WarehouseLayoutsPage() {
         }
         return templates.find((template) => template.id === selectedFlattenedNode.node.block.blockTemplateId) ?? null;
     }, [selectedFlattenedNode, templates]);
+    const selectedEditorTemplate = useMemo(() => {
+        if (!selectedBlockTemplateId) {
+            return selectedTemplate;
+        }
+        return templates.find((template) => template.id === selectedBlockTemplateId) ?? selectedTemplate;
+    }, [selectedBlockTemplateId, selectedTemplate, templates]);
+    const selectedEditorSideOptions = useMemo(
+        () => getTemplateSideOptions(selectedEditorTemplate),
+        [selectedEditorTemplate]
+    );
+    const addBlockTemplate = useMemo(
+        () => templates.find((template) => template.id === blockForm.blockTemplateId) ?? null,
+        [blockForm.blockTemplateId, templates]
+    );
+    const addBlockSideOptions = useMemo(
+        () => getTemplateSideOptions(addBlockTemplate),
+        [addBlockTemplate]
+    );
 
     const selectableParents = useMemo(() => {
         if (!selectedFlattenedNode) {
@@ -378,14 +422,34 @@ export default function WarehouseLayoutsPage() {
         if (!selectedFlattenedNode) {
             setSelectedBlockTemplateId("");
             setSelectedBlockParentId("__root__");
-            setSelectedBlockPosition("0");
+            setSelectedBlockSide("__none__");
             return;
         }
 
         setSelectedBlockTemplateId(selectedFlattenedNode.node.block.blockTemplateId);
         setSelectedBlockParentId(selectedFlattenedNode.node.block.parentId ?? "__root__");
-        setSelectedBlockPosition(String(selectedFlattenedNode.node.block.position));
+        setSelectedBlockSide(selectedFlattenedNode.node.block.side ?? "__none__");
     }, [selectedFlattenedNode]);
+
+    useEffect(() => {
+        if (selectedEditorSideOptions.length === 0) {
+            setSelectedBlockSide("__none__");
+            return;
+        }
+        if (selectedBlockSide !== "__none__" && !selectedEditorSideOptions.includes(selectedBlockSide)) {
+            setSelectedBlockSide("__none__");
+        }
+    }, [selectedBlockSide, selectedEditorSideOptions]);
+
+    useEffect(() => {
+        if (addBlockSideOptions.length === 0) {
+            setBlockForm((current) => current.side === "__none__" ? current : { ...current, side: "__none__" });
+            return;
+        }
+        if (blockForm.side !== "__none__" && !addBlockSideOptions.includes(blockForm.side)) {
+            setBlockForm((current) => ({ ...current, side: "__none__" }));
+        }
+    }, [addBlockSideOptions, blockForm.side]);
 
     const handleOpenLayout = (layout: WarehouseLayoutResult) => {
         updateQuery({
@@ -527,7 +591,8 @@ export default function WarehouseLayoutsPage() {
             const payload: AddWarehouseBlockRequest = {
                 blockTemplateId: blockForm.blockTemplateId,
                 parentId: blockForm.parentId === "__root__" ? null : blockForm.parentId,
-                position: normalizePosition(blockForm.position),
+                position: null,
+                side: normalizeSideSelection(blockForm.side, addBlockTemplate),
             };
             const created = await addWarehouseLayoutBlock(slug, selectedLayout.id, payload);
             await loadTree(selectedLayout.id);
@@ -551,11 +616,7 @@ export default function WarehouseLayoutsPage() {
 
         const blockId = selectedFlattenedNode.node.block.id;
         const nextParentId = selectedBlockParentId === "__root__" ? null : selectedBlockParentId;
-        const nextPosition = normalizePosition(selectedBlockPosition);
-        if (nextPosition === null) {
-            setActionError(t("warehouse.builder.positionRequired"));
-            return;
-        }
+        const nextSide = normalizeSideSelection(selectedBlockSide, selectedEditorTemplate);
 
         setActionError(null);
         setIsSubmitting(true);
@@ -567,12 +628,26 @@ export default function WarehouseLayoutsPage() {
             }
 
             if (
-                nextParentId !== selectedFlattenedNode.node.block.parentId
-                || nextPosition !== selectedFlattenedNode.node.block.position
+                selectedBlockTemplateId !== selectedFlattenedNode.node.block.blockTemplateId
+                || nextSide !== (selectedFlattenedNode.node.block.side ?? null)
             ) {
+                await updateWarehouseLayoutBlockMetadata(slug, selectedLayout.id, blockId, {
+                    side: nextSide,
+                });
+            }
+
+            if (
+                nextParentId !== selectedFlattenedNode.node.block.parentId
+            ) {
+                const siblingCount = flattenedNodes.filter((item) => {
+                    if (item.node.block.id === blockId) {
+                        return false;
+                    }
+                    return item.node.block.parentId === nextParentId;
+                }).length;
                 await moveWarehouseLayoutBlock(slug, selectedLayout.id, blockId, {
                     parentId: nextParentId,
-                    position: nextPosition,
+                    position: siblingCount,
                 });
                 const parentPath = nextParentId
                     ? flattenedNodes.find((item) => item.node.block.id === nextParentId)?.path ?? []
@@ -601,9 +676,19 @@ export default function WarehouseLayoutsPage() {
         }
 
         const targetPosition = siblingNodes[targetIndex].node.block.position;
-        setSelectedBlockPosition(String(targetPosition));
-        setSelectedBlockParentId(selectedFlattenedNode.node.block.parentId ?? "__root__");
-        await handleSaveSelectedBlock();
+        setActionError(null);
+        setIsSubmitting(true);
+        try {
+            await moveWarehouseLayoutBlock(slug, selectedLayout.id, selectedFlattenedNode.node.block.id, {
+                parentId: selectedFlattenedNode.node.block.parentId,
+                position: targetPosition,
+            });
+            await loadTree(selectedLayout.id);
+        } catch (error) {
+            setActionError(extractWarehouseErrorMessage(error) ?? t("warehouse.common.actionFailed"));
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     const confirmDelete = async () => {
@@ -917,7 +1002,7 @@ export default function WarehouseLayoutsPage() {
                                                             setBlockForm({
                                                                 blockTemplateId: templates[0]?.id ?? "",
                                                                 parentId: selectedFlattenedNode?.node.block.id ?? "__root__",
-                                                                position: "",
+                                                                side: "__none__",
                                                             });
                                                             setIsAddBlockOpen(true);
                                                         }}
@@ -956,8 +1041,7 @@ export default function WarehouseLayoutsPage() {
                                                                 })}
                                                             >
                                                                 <Icon className="h-4 w-4 shrink-0 text-primary" />
-                                                                <span className="flex-1">{template?.name ?? t("warehouse.builder.unknownBlock")}</span>
-                                                                <span className="text-xs text-muted-foreground">#{item.node.block.position}</span>
+                                                                <span className="flex-1">{getBlockDisplayLabel(item.node.block, template ?? null, t("warehouse.builder.unknownBlock"))}</span>
                                                             </button>
                                                         );
                                                     })}
@@ -986,10 +1070,14 @@ export default function WarehouseLayoutsPage() {
                                                         <div>
                                                             <p className="font-medium">{selectedTemplate.name}</p>
                                                             <p className="text-xs text-muted-foreground">
-                                                                {t("warehouse.builder.blockMeta", {
-                                                                    identifier: selectedTemplate.identifierFormat,
-                                                                    position: String(selectedFlattenedNode.node.block.position),
-                                                                })}
+                                                                {selectedFlattenedNode.node.block.side
+                                                                    ? t("warehouse.builder.blockMetaWithSide", {
+                                                                        identifier: selectedFlattenedNode.node.block.identifier ?? t("warehouse.builder.identifierUnavailable"),
+                                                                        side: selectedFlattenedNode.node.block.side,
+                                                                    })
+                                                                    : t("warehouse.builder.blockMeta", {
+                                                                        identifier: selectedFlattenedNode.node.block.identifier ?? t("warehouse.builder.identifierUnavailable"),
+                                                                    })}
                                                             </p>
                                                         </div>
                                                     </div>
@@ -1008,16 +1096,6 @@ export default function WarehouseLayoutsPage() {
                                                                 </SelectContent>
                                                             </Select>
                                                         </div>
-                                                        <div className="space-y-2">
-                                                            <Label htmlFor="selected-position">{t("warehouse.builder.positionLabel")}</Label>
-                                                            <Input
-                                                                id="selected-position"
-                                                                type="number"
-                                                                min={0}
-                                                                value={selectedBlockPosition}
-                                                                onChange={(event) => setSelectedBlockPosition(event.target.value)}
-                                                            />
-                                                        </div>
                                                     </div>
 
                                                     <div className="space-y-2">
@@ -1032,13 +1110,30 @@ export default function WarehouseLayoutsPage() {
                                                                     const template = templates.find((entry) => entry.id === item.node.block.blockTemplateId);
                                                                     return (
                                                                         <SelectItem key={item.node.block.id} value={item.node.block.id}>
-                                                                            {`${"- ".repeat(item.depth)}${template?.name ?? t("warehouse.builder.unknownBlock")}`}
+                                                                            {`${"- ".repeat(item.depth)}${getBlockDisplayLabel(item.node.block, template ?? null, t("warehouse.builder.unknownBlock"))}`}
                                                                         </SelectItem>
                                                                     );
                                                                 })}
                                                             </SelectContent>
                                                         </Select>
                                                     </div>
+
+                                                    {selectedEditorSideOptions.length > 0 ? (
+                                                        <div className="space-y-2">
+                                                            <Label htmlFor="selected-side">{t("warehouse.builder.sideLabel")}</Label>
+                                                            <Select value={selectedBlockSide} onValueChange={setSelectedBlockSide}>
+                                                                <SelectTrigger id="selected-side" className="w-full">
+                                                                    <SelectValue placeholder={t("warehouse.builder.sidePlaceholder")} />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="__none__">{t("warehouse.builder.sideEmpty")}</SelectItem>
+                                                                    {selectedEditorSideOptions.map((sideOption) => (
+                                                                        <SelectItem key={sideOption} value={sideOption}>{sideOption}</SelectItem>
+                                                                    ))}
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </div>
+                                                    ) : null}
 
                                                     <div className="flex flex-wrap gap-2">
                                                         {canEdit ? (
@@ -1291,16 +1386,25 @@ export default function WarehouseLayoutsPage() {
                                 </SelectContent>
                             </Select>
                         </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="block-position">{t("warehouse.builder.positionLabelOptional")}</Label>
-                            <Input
-                                id="block-position"
-                                min={0}
-                                type="number"
-                                value={blockForm.position}
-                                onChange={(event) => setBlockForm((current) => ({ ...current, position: event.target.value }))}
-                            />
-                        </div>
+                        {addBlockSideOptions.length > 0 ? (
+                            <div className="space-y-2">
+                                <Label htmlFor="block-side">{t("warehouse.builder.sideLabel")}</Label>
+                                <Select
+                                    value={blockForm.side}
+                                    onValueChange={(value) => setBlockForm((current) => ({ ...current, side: value }))}
+                                >
+                                    <SelectTrigger id="block-side" className="w-full">
+                                        <SelectValue placeholder={t("warehouse.builder.sidePlaceholder")} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="__none__">{t("warehouse.builder.sideEmpty")}</SelectItem>
+                                        {addBlockSideOptions.map((sideOption) => (
+                                            <SelectItem key={sideOption} value={sideOption}>{sideOption}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        ) : null}
                         <DialogFooter>
                             <Button type="button" variant="outline" onClick={() => setIsAddBlockOpen(false)}>
                                 {t("warehouse.common.cancel")}
