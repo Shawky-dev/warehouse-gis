@@ -104,6 +104,34 @@ class AuthControllerTest {
     }
 
     @Test
+    void login_shouldUseContextPath_whenForwardedHeaderFilterHasAppliedPrefix() {
+        Instant accessExp = Instant.now().plusSeconds(600);
+        Instant refreshExp = Instant.now().plusSeconds(1200);
+
+        when(authService.login(eq(new LoginRequest("admin@system.local", "admin123")), eq("127.0.0.1"), eq("bruno")))
+                .thenReturn(new AuthService.AuthResult(
+                        "access-token",
+                        accessExp,
+                        "refresh-token",
+                        refreshExp,
+                        UUID.randomUUID(),
+                        "admin@system.local",
+                        java.util.List.of("ROLE_ADMIN"),
+                        java.util.List.of("landlord.users.view")));
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRemoteAddr("127.0.0.1");
+        request.addHeader(HttpHeaders.USER_AGENT, "bruno");
+        request.setContextPath("/api");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        controller.login(new LoginRequest("admin@system.local", "admin123"), request, response);
+
+        String setCookie = response.getHeader(HttpHeaders.SET_COOKIE);
+        assertTrue(setCookie.contains("Path=/api/landlord/auth"));
+    }
+
+    @Test
     void login_shouldForceBootstrapTenantContext_andRestorePreviousContext() {
         TenantContext.setTenantId("acme");
         Instant accessExp = Instant.now().plusSeconds(600);
@@ -178,6 +206,35 @@ class AuthControllerTest {
     }
 
     @Test
+    void refresh_shouldPrefixCookiePath_whenForwardedPrefixHeaderIsPresent() {
+        Instant accessExp = Instant.now().plusSeconds(600);
+        Instant refreshExp = Instant.now().plusSeconds(1200);
+
+        when(authService.refresh("old-refresh", "127.0.0.1", "bruno"))
+                .thenReturn(new AuthService.AuthResult(
+                        "new-access",
+                        accessExp,
+                        "new-refresh",
+                        refreshExp,
+                        UUID.randomUUID(),
+                        "admin@system.local",
+                        java.util.List.of("ROLE_ADMIN"),
+                        java.util.List.of("landlord.users.view")));
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRemoteAddr("127.0.0.1");
+        request.addHeader(HttpHeaders.USER_AGENT, "bruno");
+        request.addHeader("X-Forwarded-Prefix", "/api");
+        request.setCookies(new Cookie("refresh_token", "old-refresh"));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        controller.refresh(request, response);
+
+        String setCookie = response.getHeader(HttpHeaders.SET_COOKIE);
+        assertTrue(setCookie.contains("Path=/api/landlord/auth"));
+    }
+
+    @Test
     void logout_shouldClearCookie_andRevokeWhenCookieExists() {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setCookies(new Cookie("refresh_token", "to-revoke"));
@@ -191,5 +248,18 @@ class AuthControllerTest {
         String setCookie = response.getHeader(HttpHeaders.SET_COOKIE);
         assertTrue(setCookie.contains("refresh_token="));
         assertTrue(setCookie.contains("Max-Age=0"));
+    }
+
+    @Test
+    void logout_shouldPrefixClearedCookiePath_whenForwardedPrefixHeaderIsPresent() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("X-Forwarded-Prefix", "/api");
+        request.setCookies(new Cookie("refresh_token", "to-revoke"));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        controller.logout(request, response);
+
+        String setCookie = response.getHeader(HttpHeaders.SET_COOKIE);
+        assertTrue(setCookie.contains("Path=/api/landlord/auth"));
     }
 }

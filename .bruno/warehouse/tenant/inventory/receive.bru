@@ -1,0 +1,35 @@
+meta {
+  name: receive
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{URL}}/{{TENANT_SLUG}}/inventory/receive
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+body:json {
+  {
+    "locationId": "{{LOCATION_ID}}",
+    "productId": "{{PRODUCT_ID}}",
+    "qty": "10.00",
+    "lotNumber": "LOT-001",
+    "expiryDate": "2027-01-01",
+    "notes": "Inbound shipment"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

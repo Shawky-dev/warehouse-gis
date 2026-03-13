@@ -1,0 +1,21 @@
+session_name: warehouse-dev
+start_directory: .
+
+windows:
+  - window_name: infra
+    layout: even-vertical
+    panes:
+      - docker compose -f docker-compose.dev.yml --env-file .env.dev up -d db
+      - watch -n 3 docker compose -f docker-compose.dev.yml --env-file .env.dev ps db
+
+  - window_name: backend
+    panes:
+      - cd backend && sh ../scripts/backend-dev-watch.sh
+
+  - window_name: frontend
+    panes:
+      - cd frontend && npm run dev -- --host 0.0.0.0 --port 5173
+
+  - window_name: db-logs
+    panes:
+      - docker compose -f docker-compose.dev.yml --env-file .env.dev logs -f --tail=200 db

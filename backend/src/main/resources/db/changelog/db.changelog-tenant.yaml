@@ -111,3 +111,17 @@ databaseChangeLog:
         - sqlFile:
             path: db/migration/tenant/V16__split_warehouse_permissions.sql
             relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-f2-inventory-ledger-17
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V17__create_f2_inventory_ledger.sql
+            relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-f2-inventory-admin-grants-18
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V18__grant_inventory_permissions_to_admin.sql
+            relativeToChangelogFile: false

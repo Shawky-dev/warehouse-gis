@@ -94,6 +94,53 @@ describe("AuthContext", () => {
     });
   });
 
+  it("re-bootstrap landlord session after a full remount", async () => {
+    let refreshCalls = 0;
+    server.use(
+      http.post(`${API_URL}/landlord/auth/refresh`, () => {
+        refreshCalls += 1;
+        return HttpResponse.json({
+          accessToken: `landlord-access-token-${refreshCalls}`,
+          tokenType: "Bearer",
+          accessTokenExpiresAt: "2026-01-01T00:00:00Z",
+          user: {
+            id: "00000000-0000-0000-0000-000000000001",
+            email: "admin@system.local",
+            roles: ["ROLE_ADMIN"],
+            permissions: ["landlord.tenants.view"],
+          },
+        });
+      })
+    );
+
+    const firstRender = renderWithRouter(
+      <AuthProvider>
+        <AuthProbe />
+      </AuthProvider>,
+      ["/landlord"]
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("status")).toHaveTextContent("authenticated");
+      expect(screen.getByTestId("user-email")).toHaveTextContent("admin@system.local");
+    });
+
+    firstRender.unmount();
+
+    renderWithRouter(
+      <AuthProvider>
+        <AuthProbe />
+      </AuthProvider>,
+      ["/landlord"]
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("status")).toHaveTextContent("authenticated");
+      expect(screen.getByTestId("user-email")).toHaveTextContent("admin@system.local");
+      expect(refreshCalls).toBe(2);
+    });
+  });
+
   it("falls back to unauthenticated when refresh fails", async () => {
     server.use(
       http.post(`${API_URL}/landlord/auth/refresh`, () => {
@@ -163,6 +210,53 @@ describe("AuthContext", () => {
       expect(screen.getByTestId("status")).toHaveTextContent("authenticated");
       expect(screen.getByTestId("is-authenticated")).toHaveTextContent("true");
       expect(screen.getByTestId("user-email")).toHaveTextContent("admin@acme.local");
+    });
+  });
+
+  it("re-bootstrap tenant session after a full remount", async () => {
+    let refreshCalls = 0;
+    server.use(
+      http.post(`${API_URL}/acme/auth/refresh`, () => {
+        refreshCalls += 1;
+        return HttpResponse.json({
+          accessToken: `tenant-access-token-${refreshCalls}`,
+          tokenType: "Bearer",
+          accessTokenExpiresAt: "2026-01-01T00:00:00Z",
+          user: {
+            id: "00000000-0000-0000-0000-000000000002",
+            email: "admin@acme.local",
+            roles: ["ROLE_ADMIN"],
+            permissions: ["tenant.users.view"],
+          },
+        });
+      })
+    );
+
+    const firstRender = renderWithRouter(
+      <AuthProvider>
+        <AuthProbe />
+      </AuthProvider>,
+      ["/acme"]
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("status")).toHaveTextContent("authenticated");
+      expect(screen.getByTestId("user-email")).toHaveTextContent("admin@acme.local");
+    });
+
+    firstRender.unmount();
+
+    renderWithRouter(
+      <AuthProvider>
+        <AuthProbe />
+      </AuthProvider>,
+      ["/acme"]
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("status")).toHaveTextContent("authenticated");
+      expect(screen.getByTestId("user-email")).toHaveTextContent("admin@acme.local");
+      expect(refreshCalls).toBe(2);
     });
   });
 

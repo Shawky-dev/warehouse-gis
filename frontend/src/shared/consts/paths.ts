@@ -33,6 +33,7 @@ export const PATHS = {
     CATEGORIES_PATTERN: "/:tenantSlug/categories",
     WAREHOUSE_LAYOUTS_PATTERN: "/:tenantSlug/warehouse-layouts",
     AUDIT_LOGS_PATTERN: "/:tenantSlug/audit-logs",
+    INVENTORY_PATTERN: "/:tenantSlug/inventory",
     root: (tenantSlug: string) => `/${tenantSlug}`,
     authLogin: (tenantSlug: string) => `/${tenantSlug}/auth/login`,
     products: (tenantSlug: string) => `/${tenantSlug}/products`,
@@ -46,5 +47,6 @@ export const PATHS = {
       filters?: { layoutId?: string; mode?: string; path?: string; tab?: string }
     ) => buildUrl(`/${tenantSlug}/warehouse-layouts`, filters),
     auditLogs: (tenantSlug: string) => `/${tenantSlug}/audit-logs`,
+    inventory: (tenantSlug: string) => `/${tenantSlug}/inventory`,
   },
 };

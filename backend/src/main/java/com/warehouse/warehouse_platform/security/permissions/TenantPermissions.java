@@ -40,6 +40,10 @@ public final class TenantPermissions {
     public static final String WAREHOUSE_BLOCK_EDIT = "tenant.warehouse.block.edit";
     public static final String WAREHOUSE_HARD_DELETE = "tenant.warehouse.hard_delete";
     public static final String AUDIT_VIEW = "tenant.audit.view";
+    public static final String INVENTORY_VIEW = "tenant.inventory.view";
+    public static final String INVENTORY_RECEIVE = "tenant.inventory.receive";
+    public static final String INVENTORY_TRANSFER = "tenant.inventory.transfer";
+    public static final String INVENTORY_ADJUST = "tenant.inventory.adjust";
 
     private TenantPermissions() {
     }

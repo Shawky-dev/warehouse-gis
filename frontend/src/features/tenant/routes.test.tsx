@@ -39,6 +39,10 @@ vi.mock("@/features/tenant/warehouse/WarehouseLayoutsPage", () => ({
   default: () => <p>tenant-warehouse-layouts-page</p>,
 }));
 
+vi.mock("@/features/tenant/inventory/InventoryPage", () => ({
+  default: () => <p>tenant-inventory-page</p>,
+}));
+
 function renderTenantRoute(path: string) {
   return render(
     <I18nProvider initialLocale="en" storageKey="test-locale-tenant-routes">
@@ -217,5 +221,31 @@ describe("tenant routes RBAC", () => {
     renderTenantRoute("/acme/audit-logs");
 
     expect(screen.getByText("tenant-audit-page")).toBeInTheDocument();
+  });
+
+  it("blocks inventory route when all inventory permissions are missing", () => {
+    mockUseAuth.mockReturnValue({
+      status: "authenticated",
+      hasPermission: () => false,
+      hasAnyPermission: () => false,
+    });
+
+    renderTenantRoute("/acme/inventory");
+
+    expect(screen.queryByText("tenant-inventory-page")).not.toBeInTheDocument();
+    expect(screen.getByText("Access denied")).toBeInTheDocument();
+  });
+
+  it("renders inventory route when any inventory permission is present", () => {
+    mockUseAuth.mockReturnValue({
+      status: "authenticated",
+      hasPermission: () => false,
+      hasAnyPermission: (permissions: string[]) =>
+        permissions.includes(TENANT_PERMISSIONS.INVENTORY_TRANSFER),
+    });
+
+    renderTenantRoute("/acme/inventory");
+
+    expect(screen.getByText("tenant-inventory-page")).toBeInTheDocument();
   });
 });

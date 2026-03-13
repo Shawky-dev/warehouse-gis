@@ -2,6 +2,7 @@
 .env
 .env.local
 .env.production
+!frontend/.env.production
 secrets/*
 !secrets/README.md
 !secrets/.gitkeep

@@ -185,7 +185,7 @@ public class TenantAuthController {
     }
 
     private String resolveCookiePath(HttpServletRequest request, String cookiePath) {
-        String forwardedPrefix = request.getHeader("X-Forwarded-Prefix");
+        String forwardedPrefix = resolvePublicPathPrefix(request);
         if (forwardedPrefix == null || forwardedPrefix.isBlank() || "/".equals(forwardedPrefix)) {
             return cookiePath;
         }
@@ -196,6 +196,15 @@ public class TenantAuthController {
         }
 
         return normalizedPrefix + cookiePath;
+    }
+
+    private String resolvePublicPathPrefix(HttpServletRequest request) {
+        String contextPath = request.getContextPath();
+        if (contextPath != null && !contextPath.isBlank() && !"/".equals(contextPath)) {
+            return contextPath;
+        }
+
+        return request.getHeader("X-Forwarded-Prefix");
     }
 
     private static String resolveClientIp(HttpServletRequest request) {

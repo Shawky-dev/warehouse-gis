@@ -119,7 +119,7 @@ public class AuthController {
 
     private String resolveCookiePath(HttpServletRequest request, String configuredPath) {
         String normalizedPath = configuredPath.startsWith("/") ? configuredPath : "/" + configuredPath;
-        String forwardedPrefix = request.getHeader("X-Forwarded-Prefix");
+        String forwardedPrefix = resolvePublicPathPrefix(request);
 
         if (forwardedPrefix == null || forwardedPrefix.isBlank() || "/".equals(forwardedPrefix)) {
             return normalizedPath;
@@ -131,6 +131,15 @@ public class AuthController {
         }
 
         return normalizedPrefix + normalizedPath;
+    }
+
+    private String resolvePublicPathPrefix(HttpServletRequest request) {
+        String contextPath = request.getContextPath();
+        if (contextPath != null && !contextPath.isBlank() && !"/".equals(contextPath)) {
+            return contextPath;
+        }
+
+        return request.getHeader("X-Forwarded-Prefix");
     }
 
     private String extractRefreshCookie(HttpServletRequest request) {

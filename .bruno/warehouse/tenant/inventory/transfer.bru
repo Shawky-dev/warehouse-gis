@@ -1,0 +1,35 @@
+meta {
+  name: transfer
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{URL}}/{{TENANT_SLUG}}/inventory/transfer
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+body:json {
+  {
+    "fromLocationId": "{{LOCATION_ID}}",
+    "toLocationId": "{{LOCATION_B_ID}}",
+    "productId": "{{PRODUCT_ID}}",
+    "qty": "5.00",
+    "lotNumber": null,
+    "notes": "Relocation"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

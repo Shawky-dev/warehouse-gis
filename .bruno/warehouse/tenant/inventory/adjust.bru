@@ -1,0 +1,33 @@
+meta {
+  name: adjust
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{URL}}/{{TENANT_SLUG}}/inventory/adjust
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+body:json {
+  {
+    "locationId": "{{LOCATION_ID}}",
+    "productId": "{{PRODUCT_ID}}",
+    "qty": "-2.00",
+    "notes": "Damaged units removed"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

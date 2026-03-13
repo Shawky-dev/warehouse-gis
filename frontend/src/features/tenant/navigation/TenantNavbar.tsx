@@ -12,6 +12,7 @@ import {
   ClipboardList,
   LayoutGrid,
   BookOpen,
+  PackageOpen,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -66,7 +67,7 @@ function normalizeNavigationUrl(value: string) {
 export function TenantNavbar() {
   const { pathname, search } = useLocation();
   const { t } = useI18n();
-  const { hasPermission } = useAuth();
+  const { hasPermission, hasAnyPermission } = useAuth();
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
   const normalizedSlug = normalizeTenantSlug(tenantSlug ?? "");
   const currentUrl = `${pathname}${search}`;
@@ -79,6 +80,12 @@ export function TenantNavbar() {
   const canViewCategories = hasPermission(TENANT_PERMISSIONS.CATEGORIES_VIEW);
   const canViewWarehouse = hasPermission(TENANT_PERMISSIONS.WAREHOUSE_VIEW);
   const canViewAudit = hasPermission(TENANT_PERMISSIONS.AUDIT_VIEW);
+  const canAccessInventory = hasAnyPermission([
+    TENANT_PERMISSIONS.INVENTORY_VIEW,
+    TENANT_PERMISSIONS.INVENTORY_RECEIVE,
+    TENANT_PERMISSIONS.INVENTORY_TRANSFER,
+    TENANT_PERMISSIONS.INVENTORY_ADJUST,
+  ]);
   const warehouseChildren = useMemo<LeafNavItem[]>(() => {
     if (!canViewWarehouse) {
       return [];
@@ -142,6 +149,15 @@ export function TenantNavbar() {
               : []),
           ],
         },
+        ...(canAccessInventory
+          ? [
+            {
+              to: PATHS.TENANT.inventory(normalizedSlug),
+              label: t("tenant.nav.inventory"),
+              icon: PackageOpen,
+            },
+          ]
+          : []),
         ...(canViewAudit
           ? [
             {
@@ -160,6 +176,7 @@ export function TenantNavbar() {
       canViewSuppliers,
       canViewUoms,
       canViewUsers,
+      canAccessInventory,
       canViewWarehouse,
       normalizedSlug,
       t,

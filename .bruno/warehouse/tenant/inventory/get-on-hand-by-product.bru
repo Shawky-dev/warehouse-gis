@@ -1,0 +1,24 @@
+meta {
+  name: get-on-hand-by-product
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{URL}}/{{TENANT_SLUG}}/inventory/on-hand/by-product/{{PRODUCT_ID}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

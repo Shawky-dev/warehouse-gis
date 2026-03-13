@@ -49,6 +49,10 @@ export const TENANT_PERMISSIONS = {
   WAREHOUSE_BLOCK_EDIT: "tenant.warehouse.block.edit",
   WAREHOUSE_HARD_DELETE: "tenant.warehouse.hard_delete",
   AUDIT_VIEW: "tenant.audit.view",
+  INVENTORY_VIEW: "tenant.inventory.view",
+  INVENTORY_RECEIVE: "tenant.inventory.receive",
+  INVENTORY_TRANSFER: "tenant.inventory.transfer",
+  INVENTORY_ADJUST: "tenant.inventory.adjust",
 } as const;
 
 export type LandlordPermission = (typeof LANDLORD_PERMISSIONS)[keyof typeof LANDLORD_PERMISSIONS];

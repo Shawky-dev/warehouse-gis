@@ -50,7 +50,8 @@ function renderPage(permissions: string[] = []) {
   server.use(
     http.get(`${API_URL}/acme/products`, () => HttpResponse.json(productPage)),
     http.get(`${API_URL}/acme/uoms`, () => HttpResponse.json(emptyPage)),
-    http.get(`${API_URL}/acme/suppliers`, () => HttpResponse.json(emptyPage))
+    http.get(`${API_URL}/acme/suppliers`, () => HttpResponse.json(emptyPage)),
+    http.get(`${API_URL}/acme/categories`, () => HttpResponse.json(emptyPage))
   );
 
   return render(

@@ -11,9 +11,10 @@ vi.mock("@/features/auth/context/AuthContext", () => ({
   useAuth: () => mockUseAuth(),
 }));
 
-function renderNavbar() {
+function renderNavbar(permissions: string[] = [TENANT_PERMISSIONS.WAREHOUSE_VIEW]) {
   mockUseAuth.mockReturnValue({
-    hasPermission: (permission: string) => permission === TENANT_PERMISSIONS.WAREHOUSE_VIEW,
+    hasPermission: (permission: string) => permissions.includes(permission),
+    hasAnyPermission: (requested: string[]) => requested.some((permission) => permissions.includes(permission)),
   });
 
   return render(
@@ -39,5 +40,11 @@ describe("TenantNavbar", () => {
       expect(screen.queryByRole("link", { name: "Aisle" })).not.toBeInTheDocument();
       expect(screen.queryByRole("link", { name: "Side" })).not.toBeInTheDocument();
     });
+  });
+
+  it("shows the inventory entry when the user has any inventory permission", () => {
+    renderNavbar([TENANT_PERMISSIONS.INVENTORY_TRANSFER]);
+
+    expect(screen.getByRole("link", { name: "Inventory" })).toBeInTheDocument();
   });
 });

@@ -150,6 +150,14 @@ public class LayoutBlockService {
         int oldPosition = block.getPosition();
         BlockResult before = toResult(block, loadTemplate(block.getBlockTemplateId()));
 
+        // Park the block at a temporary position outside the sibling range so that
+        // the subsequent shifts do not collide with its current position in the DB.
+        Integer currentMax = (oldParentId == null)
+                ? layoutBlockRepository.findMaxRootPosition(layoutId)
+                : layoutBlockRepository.findMaxChildPosition(layoutId, oldParentId);
+        block.setPosition((currentMax == null ? 0 : currentMax) + 1);
+        layoutBlockRepository.saveAndFlush(block);
+
         // Temporarily remove from old position (shift siblings down)
         shiftPositions(layoutId, oldParentId, oldPosition + 1, -1, blockId);
 
@@ -304,23 +312,18 @@ public class LayoutBlockService {
      * {@code delta}.
      * Optionally excludes a specific block (useful when the block being moved is
      * still in the list).
+     * <p>
+     * Uses a single bulk UPDATE so the unique-position constraint is evaluated
+     * after all rows are updated, not row-by-row.
      */
     private void shiftPositions(UUID layoutId, UUID parentId, int fromPosition, int delta, UUID excludeBlockId) {
-        List<LayoutBlock> siblings = (parentId == null)
-                ? layoutBlockRepository.findByLayoutIdAndParentIdIsNullOrderByPositionAsc(layoutId)
-                : layoutBlockRepository.findByLayoutIdAndParentIdOrderByPositionAsc(layoutId, parentId);
-
-        List<LayoutBlock> toUpdate = new ArrayList<>();
-        for (LayoutBlock sibling : siblings) {
-            if (excludeBlockId != null && sibling.getId().equals(excludeBlockId))
-                continue;
-            if (sibling.getPosition() >= fromPosition) {
-                sibling.setPosition(sibling.getPosition() + delta);
-                toUpdate.add(sibling);
-            }
-        }
-        if (!toUpdate.isEmpty()) {
-            layoutBlockRepository.saveAll(toUpdate);
+        // Use a random UUID as sentinel when there is nothing to exclude, so the
+        // query parameter is never null.
+        UUID exclude = excludeBlockId != null ? excludeBlockId : UUID.randomUUID();
+        if (parentId == null) {
+            layoutBlockRepository.shiftRootPositions(layoutId, fromPosition, delta, exclude);
+        } else {
+            layoutBlockRepository.shiftChildPositions(layoutId, parentId, fromPosition, delta, exclude);
         }
     }
 

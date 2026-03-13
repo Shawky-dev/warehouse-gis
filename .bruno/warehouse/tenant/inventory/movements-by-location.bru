@@ -1,0 +1,24 @@
+meta {
+  name: movements-by-location
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{URL}}/{{TENANT_SLUG}}/inventory/movements/by-location/{{LOCATION_ID}}?page=0&size=20
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
