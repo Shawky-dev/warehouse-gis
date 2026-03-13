@@ -43,6 +43,18 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, UU
     List<OnHandEntry> findOnHandByProduct(@Param("productId") UUID productId);
 
     @Query(value = """
+            SELECT location_id   AS locationId,
+                   product_id    AS productId,
+                   qty_on_hand   AS qtyOnHand
+            FROM   v_on_hand
+            WHERE  location_id = :locationId
+              AND  product_id = :productId
+            """, nativeQuery = true)
+    List<OnHandEntry> findOnHandByLocationAndProduct(
+            @Param("locationId") UUID locationId,
+            @Param("productId") UUID productId);
+
+    @Query(value = """
             SELECT qty_on_hand
             FROM   v_on_hand
             WHERE  location_id = :locationId
@@ -58,6 +70,17 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, UU
     /** Movement history for a product across all locations, newest first. */
     Page<StockMovement> findByProductIdOrderByCreatedAtDesc(UUID productId, Pageable pageable);
 
+    /** Movement history for a location/product pair, newest first. */
+    Page<StockMovement> findByLocationIdAndProductIdOrderByCreatedAtDesc(
+            UUID locationId,
+            UUID productId,
+            Pageable pageable);
+
+    /** All movements, newest first. */
+    Page<StockMovement> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
     /** All rows sharing a transfer reference (the two legs of a transfer). */
     List<StockMovement> findByReferenceId(UUID referenceId);
+
+    List<StockMovement> findByReferenceIdIn(List<UUID> referenceIds);
 }

@@ -45,36 +45,85 @@ public class InventoryLedgerController {
 
     @GetMapping("/on-hand")
     @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_VIEW)")
-    public ResponseEntity<List<OnHandEntry>> getAllOnHand(
+    public ResponseEntity<List<InventoryLedgerService.OnHandResult>> getOnHand(
             @PathVariable String tenantSlug,
+            @RequestParam(required = false) UUID productId,
+            @RequestParam(required = false) UUID locationId,
             Authentication authentication) {
         tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
-        return ResponseEntity.ok(inventoryLedgerService.getAllOnHand());
+        return ResponseEntity.ok(inventoryLedgerService.getOnHand(productId, locationId));
     }
 
     @GetMapping("/on-hand/by-location/{locationId}")
     @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_VIEW)")
-    public ResponseEntity<List<OnHandEntry>> getOnHandByLocation(
+    public ResponseEntity<List<InventoryLedgerService.OnHandResult>> getOnHandByLocation(
             @PathVariable String tenantSlug,
             @PathVariable UUID locationId,
             Authentication authentication) {
         tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
-        return ResponseEntity.ok(inventoryLedgerService.getOnHandByLocation(locationId));
+        return ResponseEntity.ok(inventoryLedgerService.getOnHand(null, locationId));
     }
 
     @GetMapping("/on-hand/by-product/{productId}")
     @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_VIEW)")
-    public ResponseEntity<List<OnHandEntry>> getOnHandByProduct(
+    public ResponseEntity<List<InventoryLedgerService.OnHandResult>> getOnHandByProduct(
             @PathVariable String tenantSlug,
             @PathVariable UUID productId,
             Authentication authentication) {
         tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
-        return ResponseEntity.ok(inventoryLedgerService.getOnHandByProduct(productId));
+        return ResponseEntity.ok(inventoryLedgerService.getOnHand(productId, null));
+    }
+
+    @GetMapping("/lookups/products")
+    @PreAuthorize("hasAnyAuthority("
+            + "T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_VIEW,"
+            + "T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_RECEIVE,"
+            + "T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_TRANSFER,"
+            + "T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_ADJUST"
+            + ")")
+    public ResponseEntity<InventoryLedgerService.ProductLookupPageResult> getProductLookups(
+            @PathVariable String tenantSlug,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+            Authentication authentication) {
+        tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
+        return ResponseEntity.ok(inventoryLedgerService.listProductLookups(page, size, search));
+    }
+
+    @GetMapping("/lookups/locations")
+    @PreAuthorize("hasAnyAuthority("
+            + "T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_VIEW,"
+            + "T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_RECEIVE,"
+            + "T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_TRANSFER,"
+            + "T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_ADJUST"
+            + ")")
+    public ResponseEntity<InventoryLedgerService.LocationLookupPageResult> getLocationLookups(
+            @PathVariable String tenantSlug,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+            Authentication authentication) {
+        tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
+        return ResponseEntity.ok(inventoryLedgerService.listLocationLookups(page, size, search));
     }
 
     // -------------------------------------------------------------------------
     // Movement history
     // -------------------------------------------------------------------------
+
+    @GetMapping("/movements")
+    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_VIEW)")
+    public ResponseEntity<InventoryLedgerService.MovementPageResult> getMovements(
+            @PathVariable String tenantSlug,
+            @RequestParam(required = false) UUID productId,
+            @RequestParam(required = false) UUID locationId,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "50") @Min(1) @Max(200) int size,
+            Authentication authentication) {
+        tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
+        return ResponseEntity.ok(inventoryLedgerService.getMovements(productId, locationId, page, size));
+    }
 
     @GetMapping("/movements/by-location/{locationId}")
     @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_VIEW)")
@@ -85,7 +134,7 @@ public class InventoryLedgerController {
             @RequestParam(defaultValue = "50") @Min(1) @Max(200) int size,
             Authentication authentication) {
         tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
-        return ResponseEntity.ok(inventoryLedgerService.getMovementsByLocation(locationId, page, size));
+        return ResponseEntity.ok(inventoryLedgerService.getMovements(null, locationId, page, size));
     }
 
     @GetMapping("/movements/by-product/{productId}")
@@ -97,7 +146,7 @@ public class InventoryLedgerController {
             @RequestParam(defaultValue = "50") @Min(1) @Max(200) int size,
             Authentication authentication) {
         tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
-        return ResponseEntity.ok(inventoryLedgerService.getMovementsByProduct(productId, page, size));
+        return ResponseEntity.ok(inventoryLedgerService.getMovements(productId, null, page, size));
     }
 
     // -------------------------------------------------------------------------

@@ -2,9 +2,14 @@ import { normalizeTenantSlug } from "@/features/auth/shared/scope";
 import { api } from "@/lib/api";
 import type {
   AdjustRequest,
+  InventoryListParams,
+  LocationLookupPageResult,
+  LocationLookupParams,
   MovementPageResult,
   MovementResult,
   OnHandEntry,
+  ProductLookupPageResult,
+  ProductLookupParams,
   ReceiveRequest,
   TransferRequest,
   TransferResult,
@@ -18,38 +23,49 @@ function headers(tenantSlug: string): Record<string, string> {
   return { "X-TENANT-ID": normalizeTenantSlug(tenantSlug) };
 }
 
-// ── On-hand ───────────────────────────────────────────────────────────────────
-
-export async function getAllOnHand(tenantSlug: string): Promise<OnHandEntry[]> {
+export async function getOnHand(
+  tenantSlug: string,
+  params: InventoryListParams = {}
+): Promise<OnHandEntry[]> {
   const res = await api.get<OnHandEntry[]>(`${basePath(tenantSlug)}/on-hand`, {
+    params,
     headers: headers(tenantSlug),
   });
   return res.data;
 }
 
-export async function getOnHandByLocation(
+export async function getMovements(
   tenantSlug: string,
-  locationId: string
-): Promise<OnHandEntry[]> {
-  const res = await api.get<OnHandEntry[]>(
-    `${basePath(tenantSlug)}/on-hand/by-location/${locationId}`,
-    { headers: headers(tenantSlug) }
-  );
+  params: InventoryListParams = {}
+): Promise<MovementPageResult> {
+  const res = await api.get<MovementPageResult>(`${basePath(tenantSlug)}/movements`, {
+    params: { size: 50, ...params },
+    headers: headers(tenantSlug),
+  });
   return res.data;
 }
 
-export async function getOnHandByProduct(
+export async function getProductLookups(
   tenantSlug: string,
-  productId: string
-): Promise<OnHandEntry[]> {
-  const res = await api.get<OnHandEntry[]>(
-    `${basePath(tenantSlug)}/on-hand/by-product/${productId}`,
-    { headers: headers(tenantSlug) }
-  );
+  params: ProductLookupParams = {}
+): Promise<ProductLookupPageResult> {
+  const res = await api.get<ProductLookupPageResult>(`${basePath(tenantSlug)}/lookups/products`, {
+    params: { size: 20, ...params },
+    headers: headers(tenantSlug),
+  });
   return res.data;
 }
 
-// ── Movement history ──────────────────────────────────────────────────────────
+export async function getLocationLookups(
+  tenantSlug: string,
+  params: LocationLookupParams = {}
+): Promise<LocationLookupPageResult> {
+  const res = await api.get<LocationLookupPageResult>(`${basePath(tenantSlug)}/lookups/locations`, {
+    params: { size: 20, ...params },
+    headers: headers(tenantSlug),
+  });
+  return res.data;
+}
 
 export async function getMovementsByLocation(
   tenantSlug: string,
@@ -57,11 +73,7 @@ export async function getMovementsByLocation(
   page = 0,
   size = 50
 ): Promise<MovementPageResult> {
-  const res = await api.get<MovementPageResult>(
-    `${basePath(tenantSlug)}/movements/by-location/${locationId}`,
-    { params: { page, size }, headers: headers(tenantSlug) }
-  );
-  return res.data;
+  return getMovements(tenantSlug, { locationId, page, size });
 }
 
 export async function getMovementsByProduct(
@@ -70,24 +82,16 @@ export async function getMovementsByProduct(
   page = 0,
   size = 50
 ): Promise<MovementPageResult> {
-  const res = await api.get<MovementPageResult>(
-    `${basePath(tenantSlug)}/movements/by-product/${productId}`,
-    { params: { page, size }, headers: headers(tenantSlug) }
-  );
-  return res.data;
+  return getMovements(tenantSlug, { productId, page, size });
 }
-
-// ── Operations ────────────────────────────────────────────────────────────────
 
 export async function receiveStock(
   tenantSlug: string,
   payload: ReceiveRequest
 ): Promise<MovementResult> {
-  const res = await api.post<MovementResult>(
-    `${basePath(tenantSlug)}/receive`,
-    payload,
-    { headers: headers(tenantSlug) }
-  );
+  const res = await api.post<MovementResult>(`${basePath(tenantSlug)}/receive`, payload, {
+    headers: headers(tenantSlug),
+  });
   return res.data;
 }
 
@@ -95,11 +99,9 @@ export async function transferStock(
   tenantSlug: string,
   payload: TransferRequest
 ): Promise<TransferResult> {
-  const res = await api.post<TransferResult>(
-    `${basePath(tenantSlug)}/transfer`,
-    payload,
-    { headers: headers(tenantSlug) }
-  );
+  const res = await api.post<TransferResult>(`${basePath(tenantSlug)}/transfer`, payload, {
+    headers: headers(tenantSlug),
+  });
   return res.data;
 }
 
@@ -107,15 +109,11 @@ export async function adjustStock(
   tenantSlug: string,
   payload: AdjustRequest
 ): Promise<MovementResult> {
-  const res = await api.post<MovementResult>(
-    `${basePath(tenantSlug)}/adjust`,
-    payload,
-    { headers: headers(tenantSlug) }
-  );
+  const res = await api.post<MovementResult>(`${basePath(tenantSlug)}/adjust`, payload, {
+    headers: headers(tenantSlug),
+  });
   return res.data;
 }
-
-// ── Error helper ──────────────────────────────────────────────────────────────
 
 export function extractInventoryErrorMessage(error: unknown, fallback: string): string {
   if (

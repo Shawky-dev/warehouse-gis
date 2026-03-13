@@ -12,16 +12,24 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 class InventoryLedgerControllerAuthorizationMetadataTest {
 
+    private static final String INVENTORY_VIEW = "hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_VIEW)";
+    private static final String INVENTORY_LOOKUP_ANY = "hasAnyAuthority("
+            + "T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_VIEW,"
+            + "T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_RECEIVE,"
+            + "T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_TRANSFER,"
+            + "T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_ADJUST"
+            + ")";
+
     @Test
-    void getAllOnHand_shouldRequireInventoryViewPermission() throws Exception {
+    void getOnHand_shouldRequireInventoryViewPermission() throws Exception {
         Method method = InventoryLedgerController.class.getMethod(
-                "getAllOnHand",
+                "getOnHand",
                 String.class,
+                UUID.class,
+                UUID.class,
                 Authentication.class);
 
-        assertPreAuthorizeValue(
-                method,
-                "hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_VIEW)");
+        assertPreAuthorizeValue(method, INVENTORY_VIEW);
     }
 
     @Test
@@ -32,9 +40,7 @@ class InventoryLedgerControllerAuthorizationMetadataTest {
                 UUID.class,
                 Authentication.class);
 
-        assertPreAuthorizeValue(
-                method,
-                "hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_VIEW)");
+        assertPreAuthorizeValue(method, INVENTORY_VIEW);
     }
 
     @Test
@@ -45,9 +51,47 @@ class InventoryLedgerControllerAuthorizationMetadataTest {
                 UUID.class,
                 Authentication.class);
 
-        assertPreAuthorizeValue(
-                method,
-                "hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_VIEW)");
+        assertPreAuthorizeValue(method, INVENTORY_VIEW);
+    }
+
+    @Test
+    void getProductLookups_shouldRequireAnyInventoryPermission() throws Exception {
+        Method method = InventoryLedgerController.class.getMethod(
+                "getProductLookups",
+                String.class,
+                String.class,
+                int.class,
+                int.class,
+                Authentication.class);
+
+        assertPreAuthorizeValue(method, INVENTORY_LOOKUP_ANY);
+    }
+
+    @Test
+    void getLocationLookups_shouldRequireAnyInventoryPermission() throws Exception {
+        Method method = InventoryLedgerController.class.getMethod(
+                "getLocationLookups",
+                String.class,
+                String.class,
+                int.class,
+                int.class,
+                Authentication.class);
+
+        assertPreAuthorizeValue(method, INVENTORY_LOOKUP_ANY);
+    }
+
+    @Test
+    void getMovements_shouldRequireInventoryViewPermission() throws Exception {
+        Method method = InventoryLedgerController.class.getMethod(
+                "getMovements",
+                String.class,
+                UUID.class,
+                UUID.class,
+                int.class,
+                int.class,
+                Authentication.class);
+
+        assertPreAuthorizeValue(method, INVENTORY_VIEW);
     }
 
     @Test
@@ -60,9 +104,7 @@ class InventoryLedgerControllerAuthorizationMetadataTest {
                 int.class,
                 Authentication.class);
 
-        assertPreAuthorizeValue(
-                method,
-                "hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_VIEW)");
+        assertPreAuthorizeValue(method, INVENTORY_VIEW);
     }
 
     @Test
@@ -75,9 +117,7 @@ class InventoryLedgerControllerAuthorizationMetadataTest {
                 int.class,
                 Authentication.class);
 
-        assertPreAuthorizeValue(
-                method,
-                "hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_VIEW)");
+        assertPreAuthorizeValue(method, INVENTORY_VIEW);
     }
 
     @Test

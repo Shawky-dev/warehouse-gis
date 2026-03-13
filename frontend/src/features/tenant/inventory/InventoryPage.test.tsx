@@ -1,34 +1,38 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { I18nProvider } from "@/i18n";
 import InventoryPage from "@/features/tenant/inventory/InventoryPage";
 import { TENANT_PERMISSIONS } from "@/features/auth/shared/permissions";
 
 const mockUseAuth = vi.fn();
-const mockGetAllOnHand = vi.fn();
+const mockGetOnHand = vi.fn();
+const mockGetMovements = vi.fn();
+const mockGetProductLookups = vi.fn();
+const mockGetLocationLookups = vi.fn();
 
 vi.mock("@/features/auth/context/AuthContext", () => ({
   useAuth: () => mockUseAuth(),
 }));
 
 vi.mock("@/features/tenant/api/inventoryApi", () => ({
-  getAllOnHand: (...args: unknown[]) => mockGetAllOnHand(...args),
-  getMovementsByLocation: vi.fn(),
-  getMovementsByProduct: vi.fn(),
+  getOnHand: (...args: unknown[]) => mockGetOnHand(...args),
+  getMovements: (...args: unknown[]) => mockGetMovements(...args),
+  getProductLookups: (...args: unknown[]) => mockGetProductLookups(...args),
+  getLocationLookups: (...args: unknown[]) => mockGetLocationLookups(...args),
   receiveStock: vi.fn(),
   transferStock: vi.fn(),
   adjustStock: vi.fn(),
   extractInventoryErrorMessage: (_error: unknown, fallback: string) => fallback,
 }));
 
-function renderPage(permissions: string[]) {
+function renderPage(permissions: string[], locale: "en" | "ar" = "en") {
   mockUseAuth.mockReturnValue({
     hasPermission: (permission: string) => permissions.includes(permission),
   });
 
   return render(
-    <I18nProvider initialLocale="en" storageKey="test-locale-inventory-page">
+    <I18nProvider initialLocale={locale} storageKey={`test-locale-inventory-page-${locale}`}>
       <MemoryRouter initialEntries={["/acme/inventory"]}>
         <Routes>
           <Route path="/:tenantSlug/inventory" element={<InventoryPage />} />
@@ -41,11 +45,56 @@ function renderPage(permissions: string[]) {
 describe("InventoryPage", () => {
   beforeEach(() => {
     mockUseAuth.mockReset();
-    mockGetAllOnHand.mockReset();
-    mockGetAllOnHand.mockResolvedValue([]);
+    mockGetOnHand.mockReset();
+    mockGetMovements.mockReset();
+    mockGetProductLookups.mockReset();
+    mockGetLocationLookups.mockReset();
+
+    mockGetOnHand.mockResolvedValue([]);
+    mockGetMovements.mockResolvedValue({
+      content: [],
+      page: 0,
+      size: 25,
+      totalElements: 0,
+      totalPages: 0,
+    });
+    mockGetProductLookups.mockResolvedValue({
+      content: [
+        {
+          id: "product-1",
+          sku: "SKU-1",
+          name: "Sample Product",
+          baseUomCode: "EA",
+          trackLot: true,
+          trackExpiry: true,
+          active: true,
+        },
+      ],
+      page: 0,
+      size: 20,
+      totalElements: 1,
+      totalPages: 1,
+    });
+    mockGetLocationLookups.mockResolvedValue({
+      content: [
+        {
+          id: "location-1",
+          layoutId: "layout-1",
+          layoutName: "Main Layout",
+          label: "Shelf · 1",
+          pathLabel: "Aisle · 1 / Shelf · 1",
+          identifier: "1",
+          side: null,
+        },
+      ],
+      page: 0,
+      size: 20,
+      totalElements: 1,
+      totalPages: 1,
+    });
   });
 
-  it("hides the operations tab for view-only users", async () => {
+  it("hides the operations tab for view-only users and loads on-hand rows", async () => {
     renderPage([TENANT_PERMISSIONS.INVENTORY_VIEW]);
 
     expect(screen.getByRole("button", { name: "On Hand" })).toBeInTheDocument();
@@ -53,19 +102,36 @@ describe("InventoryPage", () => {
     expect(screen.getByRole("button", { name: "Movements" })).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(mockGetAllOnHand).toHaveBeenCalledWith("acme");
+      expect(mockGetOnHand).toHaveBeenCalledWith("acme", { locationId: undefined, productId: undefined });
     });
   });
 
-  it("defaults to the first permitted operation for operation-only users", () => {
+  it("shows picker-based transfer flow for operation-only users", async () => {
     renderPage([TENANT_PERMISSIONS.INVENTORY_TRANSFER]);
 
-    expect(screen.queryByRole("button", { name: "On Hand" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Operations" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Movements" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "On Hand" })).not.toBeInTheDocument();
     expect(screen.getByLabelText("From Location")).toBeInTheDocument();
     expect(screen.getByLabelText("To Location")).toBeInTheDocument();
-    expect(screen.queryByLabelText(/^Location$/)).not.toBeInTheDocument();
-    expect(mockGetAllOnHand).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("Product")).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("UUID")).not.toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(mockGetProductLookups).toHaveBeenCalledWith("acme", { search: undefined });
+      expect(mockGetLocationLookups).toHaveBeenCalledWith("acme", { search: undefined });
+    });
+  });
+
+  it("supports RTL labels without breaking the inventory tabs", async () => {
+    renderPage([TENANT_PERMISSIONS.INVENTORY_VIEW, TENANT_PERMISSIONS.INVENTORY_RECEIVE], "ar");
+
+    expect(screen.getByText("المخزون")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "الرصيد الحالي" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "العمليات" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "العمليات" }));
+
+    expect(await screen.findByText("عمليات المخزون")).toBeInTheDocument();
+    expect(screen.getByLabelText("المنتج")).toBeInTheDocument();
   });
 });
