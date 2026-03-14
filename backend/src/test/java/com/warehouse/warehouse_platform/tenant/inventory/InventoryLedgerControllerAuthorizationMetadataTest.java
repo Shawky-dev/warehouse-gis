@@ -12,156 +12,156 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 class InventoryLedgerControllerAuthorizationMetadataTest {
 
-    private static final String INVENTORY_VIEW = "hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_VIEW)";
-    private static final String INVENTORY_LOOKUP_ANY = "hasAnyAuthority("
-            + "T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_VIEW,"
-            + "T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_RECEIVE,"
-            + "T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_TRANSFER,"
-            + "T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_ADJUST"
-            + ")";
+        private static final String INVENTORY_VIEW = "hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_VIEW)";
+        private static final String INVENTORY_LOOKUP_ANY = "hasAnyAuthority("
+                        + "T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_VIEW,"
+                        + "T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_RECEIVE,"
+                        + "T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_TRANSFER,"
+                        + "T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_ADJUST"
+                        + ")";
 
-    @Test
+        @Test
         void getStock_shouldRequireInventoryViewPermission() throws Exception {
-        Method method = InventoryLedgerController.class.getMethod(
+                Method method = InventoryLedgerController.class.getMethod(
                                 "getStock",
-                String.class,
-                UUID.class,
-                UUID.class,
-                Authentication.class);
+                                String.class,
+                                UUID.class,
+                                UUID.class,
+                                Authentication.class);
 
-        assertPreAuthorizeValue(method, INVENTORY_VIEW);
-    }
+                assertPreAuthorizeValue(method, INVENTORY_VIEW);
+        }
 
-    @Test
+        @Test
         void getStockByLocation_shouldRequireInventoryViewPermission() throws Exception {
-        Method method = InventoryLedgerController.class.getMethod(
+                Method method = InventoryLedgerController.class.getMethod(
                                 "getStockByLocation",
-                String.class,
-                UUID.class,
-                Authentication.class);
+                                String.class,
+                                UUID.class,
+                                Authentication.class);
 
-        assertPreAuthorizeValue(method, INVENTORY_VIEW);
-    }
+                assertPreAuthorizeValue(method, INVENTORY_VIEW);
+        }
 
-    @Test
+        @Test
         void getStockByProduct_shouldRequireInventoryViewPermission() throws Exception {
-        Method method = InventoryLedgerController.class.getMethod(
+                Method method = InventoryLedgerController.class.getMethod(
                                 "getStockByProduct",
-                String.class,
-                UUID.class,
-                Authentication.class);
+                                String.class,
+                                UUID.class,
+                                Authentication.class);
 
-        assertPreAuthorizeValue(method, INVENTORY_VIEW);
-    }
+                assertPreAuthorizeValue(method, INVENTORY_VIEW);
+        }
 
-    @Test
-    void getProductLookups_shouldRequireAnyInventoryPermission() throws Exception {
-        Method method = InventoryLedgerController.class.getMethod(
-                "getProductLookups",
-                String.class,
-                String.class,
-                int.class,
-                int.class,
-                Authentication.class);
+        @Test
+        void getProductLookups_shouldRequireAnyInventoryPermission() throws Exception {
+                Method method = InventoryLedgerController.class.getMethod(
+                                "getProductLookups",
+                                String.class,
+                                String.class,
+                                int.class,
+                                int.class,
+                                Authentication.class);
 
-        assertPreAuthorizeValue(method, INVENTORY_LOOKUP_ANY);
-    }
+                assertPreAuthorizeValue(method, INVENTORY_LOOKUP_ANY);
+        }
 
-    @Test
-    void getLocationLookups_shouldRequireAnyInventoryPermission() throws Exception {
-        Method method = InventoryLedgerController.class.getMethod(
-                "getLocationLookups",
-                String.class,
-                String.class,
-                int.class,
-                int.class,
-                Authentication.class);
+        @Test
+        void getLocationLookups_shouldRequireAnyInventoryPermission() throws Exception {
+                Method method = InventoryLedgerController.class.getMethod(
+                                "getLocationLookups",
+                                String.class,
+                                String.class,
+                                int.class,
+                                int.class,
+                                Authentication.class);
 
-        assertPreAuthorizeValue(method, INVENTORY_LOOKUP_ANY);
-    }
+                assertPreAuthorizeValue(method, INVENTORY_LOOKUP_ANY);
+        }
 
-    @Test
-    void getMovements_shouldRequireInventoryViewPermission() throws Exception {
-        Method method = InventoryLedgerController.class.getMethod(
-                "getMovements",
-                String.class,
-                UUID.class,
-                UUID.class,
-                int.class,
-                int.class,
-                Authentication.class);
+        @Test
+        void getMovements_shouldRequireInventoryViewPermission() throws Exception {
+                Method method = InventoryLedgerController.class.getMethod(
+                                "getMovements",
+                                String.class,
+                                UUID.class,
+                                UUID.class,
+                                int.class,
+                                int.class,
+                                Authentication.class);
 
-        assertPreAuthorizeValue(method, INVENTORY_VIEW);
-    }
+                assertPreAuthorizeValue(method, INVENTORY_VIEW);
+        }
 
-    @Test
-    void getMovementsByLocation_shouldRequireInventoryViewPermission() throws Exception {
-        Method method = InventoryLedgerController.class.getMethod(
-                "getMovementsByLocation",
-                String.class,
-                UUID.class,
-                int.class,
-                int.class,
-                Authentication.class);
+        @Test
+        void getMovementsByLocation_shouldRequireInventoryViewPermission() throws Exception {
+                Method method = InventoryLedgerController.class.getMethod(
+                                "getMovementsByLocation",
+                                String.class,
+                                UUID.class,
+                                int.class,
+                                int.class,
+                                Authentication.class);
 
-        assertPreAuthorizeValue(method, INVENTORY_VIEW);
-    }
+                assertPreAuthorizeValue(method, INVENTORY_VIEW);
+        }
 
-    @Test
-    void getMovementsByProduct_shouldRequireInventoryViewPermission() throws Exception {
-        Method method = InventoryLedgerController.class.getMethod(
-                "getMovementsByProduct",
-                String.class,
-                UUID.class,
-                int.class,
-                int.class,
-                Authentication.class);
+        @Test
+        void getMovementsByProduct_shouldRequireInventoryViewPermission() throws Exception {
+                Method method = InventoryLedgerController.class.getMethod(
+                                "getMovementsByProduct",
+                                String.class,
+                                UUID.class,
+                                int.class,
+                                int.class,
+                                Authentication.class);
 
-        assertPreAuthorizeValue(method, INVENTORY_VIEW);
-    }
+                assertPreAuthorizeValue(method, INVENTORY_VIEW);
+        }
 
-    @Test
-    void receive_shouldRequireInventoryReceivePermission() throws Exception {
-        Method method = InventoryLedgerController.class.getMethod(
-                "receive",
-                String.class,
-                InventoryLedgerController.ReceiveRequest.class,
-                Authentication.class);
+        @Test
+        void receive_shouldRequireInventoryReceivePermission() throws Exception {
+                Method method = InventoryLedgerController.class.getMethod(
+                                "receive",
+                                String.class,
+                                InventoryLedgerController.ReceiveRequest.class,
+                                Authentication.class);
 
-        assertPreAuthorizeValue(
-                method,
-                "hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_RECEIVE)");
-    }
+                assertPreAuthorizeValue(
+                                method,
+                                "hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_RECEIVE)");
+        }
 
-    @Test
-    void transfer_shouldRequireInventoryTransferPermission() throws Exception {
-        Method method = InventoryLedgerController.class.getMethod(
-                "transfer",
-                String.class,
-                InventoryLedgerController.TransferRequest.class,
-                Authentication.class);
+        @Test
+        void transfer_shouldRequireInventoryTransferPermission() throws Exception {
+                Method method = InventoryLedgerController.class.getMethod(
+                                "transfer",
+                                String.class,
+                                InventoryLedgerController.TransferRequest.class,
+                                Authentication.class);
 
-        assertPreAuthorizeValue(
-                method,
-                "hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_TRANSFER)");
-    }
+                assertPreAuthorizeValue(
+                                method,
+                                "hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_TRANSFER)");
+        }
 
-    @Test
-    void adjust_shouldRequireInventoryAdjustPermission() throws Exception {
-        Method method = InventoryLedgerController.class.getMethod(
-                "adjust",
-                String.class,
-                InventoryLedgerController.AdjustRequest.class,
-                Authentication.class);
+        @Test
+        void adjust_shouldRequireInventoryAdjustPermission() throws Exception {
+                Method method = InventoryLedgerController.class.getMethod(
+                                "adjust",
+                                String.class,
+                                InventoryLedgerController.AdjustRequest.class,
+                                Authentication.class);
 
-        assertPreAuthorizeValue(
-                method,
-                "hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_ADJUST)");
-    }
+                assertPreAuthorizeValue(
+                                method,
+                                "hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_ADJUST)");
+        }
 
-    private void assertPreAuthorizeValue(Method method, String expected) {
-        PreAuthorize preAuthorize = method.getAnnotation(PreAuthorize.class);
-        assertNotNull(preAuthorize);
-        assertEquals(expected, preAuthorize.value());
-    }
+        private void assertPreAuthorizeValue(Method method, String expected) {
+                PreAuthorize preAuthorize = method.getAnnotation(PreAuthorize.class);
+                assertNotNull(preAuthorize);
+                assertEquals(expected, preAuthorize.value());
+        }
 }

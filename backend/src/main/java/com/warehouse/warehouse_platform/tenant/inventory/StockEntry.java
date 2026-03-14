@@ -9,7 +9,10 @@ import java.util.UUID;
  */
 public interface StockEntry {
     UUID getLocationId();
+
     UUID getProductId();
+
     String getLotNumber();
+
     BigDecimal getQtyStock();
 }

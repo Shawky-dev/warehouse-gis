@@ -79,7 +79,9 @@ public class StockMovement {
 
     @PrePersist
     public void prePersist() {
-        if (id == null) id = UUID.randomUUID();
-        if (createdAt == null) createdAt = Instant.now();
+        if (id == null)
+            id = UUID.randomUUID();
+        if (createdAt == null)
+            createdAt = Instant.now();
     }
 }

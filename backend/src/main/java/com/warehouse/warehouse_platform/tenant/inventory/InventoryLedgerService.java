@@ -184,7 +184,8 @@ public class InventoryLedgerService {
                 .createdBy(actor)
                 .build();
 
-        return enrichMovement(movementRepository.save(movement), null, Map.of(product.getId(), toProductSummary(product)));
+        return enrichMovement(movementRepository.save(movement), null,
+                Map.of(product.getId(), toProductSummary(product)));
     }
 
     @Transactional(readOnly = true)
@@ -217,7 +218,8 @@ public class InventoryLedgerService {
 
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<StockMovement> result = switch (buildFilterKey(productId, locationId)) {
-            case BOTH -> movementRepository.findByLocationIdAndProductIdOrderByCreatedAtDesc(locationId, productId, pageable);
+            case BOTH ->
+                movementRepository.findByLocationIdAndProductIdOrderByCreatedAtDesc(locationId, productId, pageable);
             case PRODUCT -> movementRepository.findByProductIdOrderByCreatedAtDesc(productId, pageable);
             case LOCATION -> movementRepository.findByLocationIdOrderByCreatedAtDesc(locationId, pageable);
             case NONE -> movementRepository.findAllByOrderByCreatedAtDesc(pageable);
@@ -304,7 +306,8 @@ public class InventoryLedgerService {
                 .orElseThrow(() -> InventoryLedgerException.badRequest(
                         "Inventory operations require an active warehouse layout"));
 
-        List<LayoutBlock> blocks = layoutBlockRepository.findByLayoutIdOrderByParentIdAscPositionAsc(activeLayout.getId());
+        List<LayoutBlock> blocks = layoutBlockRepository
+                .findByLayoutIdOrderByParentIdAscPositionAsc(activeLayout.getId());
         if (blocks.isEmpty()) {
             throw InventoryLedgerException.badRequest(
                     "Inventory operations require at least one selectable location in the active layout");
@@ -343,10 +346,10 @@ public class InventoryLedgerService {
 
     private void assertSufficientStock(UUID locationId, Product product, String lotNumber, BigDecimal required) {
         BigDecimal current = Boolean.TRUE.equals(product.getTrackLot())
-            ? movementRepository.findStockQtyByLocationProductAndLot(locationId, product.getId(), lotNumber)
-                    .orElse(BigDecimal.ZERO)
-            : movementRepository.findStockQtyByLocationAndProduct(locationId, product.getId())
-                    .orElse(BigDecimal.ZERO);
+                ? movementRepository.findStockQtyByLocationProductAndLot(locationId, product.getId(), lotNumber)
+                        .orElse(BigDecimal.ZERO)
+                : movementRepository.findStockQtyByLocationAndProduct(locationId, product.getId())
+                        .orElse(BigDecimal.ZERO);
 
         if (current.compareTo(required) < 0) {
             throw InventoryLedgerException.badRequest(
@@ -386,11 +389,11 @@ public class InventoryLedgerService {
                 .map(row -> {
                     ProductSummary product = products.get(row.getProductId());
                     LocationSummary location = locations.get(row.getLocationId());
-                        return new StockResult(
+                    return new StockResult(
                             row.getLocationId(),
                             row.getProductId(),
                             row.getLotNumber(),
-                                row.getQtyStock(),
+                            row.getQtyStock(),
                             location == null ? null : location.label(),
                             location == null ? null : location.pathLabel(),
                             location == null ? null : location.layoutId(),
@@ -465,7 +468,8 @@ public class InventoryLedgerService {
                 : productSummaryMap;
 
         LocationSummary location = resolvedLocations.get(movement.getLocationId());
-        LocationSummary counterpart = counterpartLocationId == null ? null : resolvedLocations.get(counterpartLocationId);
+        LocationSummary counterpart = counterpartLocationId == null ? null
+                : resolvedLocations.get(counterpartLocationId);
         ProductSummary product = resolvedProducts.get(movement.getProductId());
 
         return new MovementResult(
@@ -509,7 +513,8 @@ public class InventoryLedgerService {
         return ids;
     }
 
-    private Map<UUID, UUID> buildCounterpartLocationMap(List<StockMovement> currentPage, List<StockMovement> pairedTransfers) {
+    private Map<UUID, UUID> buildCounterpartLocationMap(List<StockMovement> currentPage,
+            List<StockMovement> pairedTransfers) {
         Map<UUID, List<StockMovement>> byReference = pairedTransfers.stream()
                 .filter(movement -> movement.getReferenceId() != null)
                 .collect(Collectors.groupingBy(StockMovement::getReferenceId));
@@ -570,7 +575,8 @@ public class InventoryLedgerService {
         }
 
         Map<UUID, LayoutBlock> blockById = layoutScopeBlocks.stream()
-                .collect(Collectors.toMap(LayoutBlock::getId, block -> block, (left, right) -> left, LinkedHashMap::new));
+                .collect(Collectors.toMap(LayoutBlock::getId, block -> block, (left, right) -> left,
+                        LinkedHashMap::new));
         Map<UUID, BlockTemplate> templateById = loadTemplateMap(layoutScopeBlocks);
         Map<UUID, WarehouseLayout> layoutById = warehouseLayoutRepository.findAllById(layoutIds).stream()
                 .collect(Collectors.toMap(WarehouseLayout::getId, layout -> layout));
