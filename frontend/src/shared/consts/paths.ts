@@ -32,8 +32,12 @@ export const PATHS = {
     SUPPLIERS_PATTERN: "/:tenantSlug/suppliers",
     CATEGORIES_PATTERN: "/:tenantSlug/categories",
     WAREHOUSE_LAYOUTS_PATTERN: "/:tenantSlug/warehouse-layouts",
+    WAREHOUSE_TEMPLATES_PATTERN: "/:tenantSlug/warehouse-layouts/templates",
     AUDIT_LOGS_PATTERN: "/:tenantSlug/audit-logs",
     INVENTORY_PATTERN: "/:tenantSlug/inventory",
+    INVENTORY_STOCK_PATTERN: "/:tenantSlug/inventory/stock",
+    INVENTORY_OPERATIONS_PATTERN: "/:tenantSlug/inventory/operations",
+    INVENTORY_MOVEMENTS_PATTERN: "/:tenantSlug/inventory/movements",
     root: (tenantSlug: string) => `/${tenantSlug}`,
     authLogin: (tenantSlug: string) => `/${tenantSlug}/auth/login`,
     products: (tenantSlug: string) => `/${tenantSlug}/products`,
@@ -44,9 +48,13 @@ export const PATHS = {
     categories: (tenantSlug: string) => `/${tenantSlug}/categories`,
     warehouseLayouts: (
       tenantSlug: string,
-      filters?: { layoutId?: string; mode?: string; path?: string; tab?: string }
+      filters?: { layoutId?: string; mode?: string; path?: string }
     ) => buildUrl(`/${tenantSlug}/warehouse-layouts`, filters),
+    warehouseTemplates: (tenantSlug: string) => `/${tenantSlug}/warehouse-layouts/templates`,
     auditLogs: (tenantSlug: string) => `/${tenantSlug}/audit-logs`,
     inventory: (tenantSlug: string) => `/${tenantSlug}/inventory`,
+    inventoryStock: (tenantSlug: string) => `/${tenantSlug}/inventory/stock`,
+    inventoryOperations: (tenantSlug: string) => `/${tenantSlug}/inventory/operations`,
+    inventoryMovements: (tenantSlug: string) => `/${tenantSlug}/inventory/movements`,
   },
 };

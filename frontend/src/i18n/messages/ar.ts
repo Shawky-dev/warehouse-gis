@@ -177,6 +177,7 @@ export const arMessages: Record<keyof typeof enMessages, string> = {
   "tenant.nav.warehouseLayouts": "هياكل المستودع",
   "tenant.nav.warehouseLayout": "هيكل المستودع",
   "tenant.nav.layouts": "الهياكل",
+  "tenant.nav.templates": "القوالب",
   "tenant.nav.layoutBlock": "كتلة هيكل",
   "tenant.nav.aisles": "الممرات",
   "tenant.nav.sides": "الجوانب",

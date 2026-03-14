@@ -195,6 +195,7 @@ function renderPage(initialEntry = "/acme/warehouse-layouts", permissions: strin
             <MemoryRouter initialEntries={[initialEntry]}>
                 <Routes>
                     <Route path="/:tenantSlug/warehouse-layouts" element={<WarehouseLayoutsPage />} />
+                    <Route path="/:tenantSlug/warehouse-layouts/templates" element={<WarehouseLayoutsPage />} />
                 </Routes>
             </MemoryRouter>
         </I18nProvider>
@@ -216,7 +217,7 @@ describe("WarehouseLayoutsPage", () => {
 
     it("shows fork editing state and selected block inspector from query params", async () => {
         renderPage(
-            "/acme/warehouse-layouts?layoutId=layout-fork&mode=fork&path=block-aisle,block-side&tab=builder",
+            "/acme/warehouse-layouts?layoutId=layout-fork&mode=fork&path=block-aisle,block-side",
             [TENANT_PERMISSIONS.WAREHOUSE_VIEW, TENANT_PERMISSIONS.WAREHOUSE_BLOCK_EDIT]
         );
 
@@ -232,7 +233,7 @@ describe("WarehouseLayoutsPage", () => {
         const user = userEvent.setup();
 
         renderPage(
-            "/acme/warehouse-layouts?layoutId=layout-fork&mode=fork&path=block-aisle&tab=builder",
+            "/acme/warehouse-layouts?layoutId=layout-fork&mode=fork&path=block-aisle",
             [TENANT_PERMISSIONS.WAREHOUSE_VIEW, TENANT_PERMISSIONS.WAREHOUSE_BLOCK_EDIT]
         );
 
@@ -258,7 +259,7 @@ describe("WarehouseLayoutsPage", () => {
         const user = userEvent.setup();
 
         renderPage(
-            "/acme/warehouse-layouts?layoutId=layout-fork&mode=fork&path=block-aisle,block-side&tab=builder",
+            "/acme/warehouse-layouts?layoutId=layout-fork&mode=fork&path=block-aisle,block-side",
             [TENANT_PERMISSIONS.WAREHOUSE_VIEW, TENANT_PERMISSIONS.WAREHOUSE_BLOCK_EDIT]
         );
 
@@ -285,7 +286,7 @@ describe("WarehouseLayoutsPage", () => {
         const user = userEvent.setup();
 
         renderPage(
-            "/acme/warehouse-layouts?layoutId=layout-fork&mode=fork&path=block-aisle&tab=builder",
+            "/acme/warehouse-layouts?layoutId=layout-fork&mode=fork&path=block-aisle",
             [TENANT_PERMISSIONS.WAREHOUSE_VIEW, TENANT_PERMISSIONS.WAREHOUSE_BLOCK_EDIT]
         );
 
@@ -314,12 +315,14 @@ describe("WarehouseLayoutsPage", () => {
 
     it("shows template create only with template manage permission", async () => {
         renderPage(
-            "/acme/warehouse-layouts?layoutId=layout-fork&mode=fork&tab=templates",
+            "/acme/warehouse-layouts/templates?layoutId=layout-fork&mode=fork",
             [TENANT_PERMISSIONS.WAREHOUSE_VIEW, TENANT_PERMISSIONS.WAREHOUSE_TEMPLATE_MANAGE]
         );
 
         await waitFor(() => {
             expect(screen.getByRole("button", { name: "Create template" })).toBeInTheDocument();
+            expect(screen.queryByRole("button", { name: "Create classic preset" })).not.toBeInTheDocument();
+            expect(screen.queryByRole("button", { name: "Create layout" })).not.toBeInTheDocument();
             expect(screen.queryByRole("button", { name: "Add block" })).not.toBeInTheDocument();
         });
     });

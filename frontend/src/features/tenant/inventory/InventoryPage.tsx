@@ -1,17 +1,15 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeftRight,
-  List,
-  PackageOpen,
   Plus,
   RefreshCw,
-  SlidersHorizontal,
 } from "lucide-react";
 import { normalizeTenantSlug } from "@/features/auth/shared/scope";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { TENANT_PERMISSIONS } from "@/features/auth/shared/permissions";
 import { useI18n } from "@/i18n";
+import { PATHS } from "@/shared/consts/paths";
 import {
   adjustStock,
   extractInventoryErrorMessage,
@@ -63,6 +61,10 @@ type Tab = "onhand" | "operations" | "movements";
 type Operation = "receive" | "transfer" | "adjust";
 type AdjustmentDirection = "increase" | "decrease";
 
+interface InventoryPageProps {
+  section?: Tab;
+}
+
 interface OperationFormState {
   locationId: string;
   fromLocationId: string;
@@ -87,30 +89,25 @@ const DEFAULT_OPERATION_FORM: OperationFormState = {
   adjustmentDirection: "increase",
 };
 
-export default function InventoryPage() {
+export default function InventoryPage({ section = "onhand" }: InventoryPageProps) {
   const { t, locale } = useI18n();
   const { hasPermission } = useAuth();
+  const navigate = useNavigate();
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
+  const [searchParams] = useSearchParams();
   const slug = normalizeTenantSlug(tenantSlug ?? "");
+  const activeTab = section;
 
   const canView = hasPermission(TENANT_PERMISSIONS.INVENTORY_VIEW);
   const canReceive = hasPermission(TENANT_PERMISSIONS.INVENTORY_RECEIVE);
   const canTransfer = hasPermission(TENANT_PERMISSIONS.INVENTORY_TRANSFER);
   const canAdjust = hasPermission(TENANT_PERMISSIONS.INVENTORY_ADJUST);
-  const canManageOperations = canReceive || canTransfer || canAdjust;
 
   const availableOperations: Operation[] = [
     ...(canReceive ? ["receive" as const] : []),
     ...(canTransfer ? ["transfer" as const] : []),
     ...(canAdjust ? ["adjust" as const] : []),
   ];
-  const availableTabs: Tab[] = [
-    ...(canView ? ["onhand" as const] : []),
-    ...(canManageOperations ? ["operations" as const] : []),
-    ...(canView ? ["movements" as const] : []),
-  ];
-
-  const [activeTab, setActiveTab] = useState<Tab>(availableTabs[0] ?? "onhand");
   const [operation, setOperation] = useState<Operation>(availableOperations[0] ?? "receive");
 
   const [products, setProducts] = useState<ProductLookupItem[]>([]);
@@ -179,18 +176,57 @@ export default function InventoryPage() {
   );
 
   useEffect(() => {
-    const nextTab = availableTabs[0];
-    if (nextTab && !availableTabs.includes(activeTab)) {
-      setActiveTab(nextTab);
-    }
-  }, [activeTab, availableTabs]);
-
-  useEffect(() => {
     const nextOperation = availableOperations[0];
     if (nextOperation && !availableOperations.includes(operation)) {
       setOperation(nextOperation);
     }
   }, [availableOperations, operation]);
+
+  useEffect(() => {
+    if (activeTab !== "operations") {
+      return;
+    }
+
+    const opFromQuery = searchParams.get("operation");
+    const productId = searchParams.get("productId") ?? "";
+    const locationId = searchParams.get("locationId") ?? "";
+
+    const nextOperation =
+      opFromQuery === "receive" || opFromQuery === "transfer" || opFromQuery === "adjust"
+        ? opFromQuery
+        : null;
+
+    if (nextOperation && availableOperations.includes(nextOperation)) {
+      setOperation(nextOperation);
+    }
+
+    if (productId || locationId) {
+      setOpForm((current) => ({
+        ...current,
+        productId: productId || current.productId,
+        locationId: locationId || current.locationId,
+        fromLocationId:
+          (nextOperation ?? operation) === "transfer" ? (locationId || current.fromLocationId) : current.fromLocationId,
+      }));
+    }
+  }, [activeTab, availableOperations, operation, searchParams]);
+
+  useEffect(() => {
+    if (activeTab !== "movements" || !canView) {
+      return;
+    }
+
+    const productId = searchParams.get("productId") ?? "";
+    const locationId = searchParams.get("locationId") ?? "";
+    if (!productId && !locationId) {
+      return;
+    }
+
+    const nextFilters = { productId, locationId };
+    setMovementFilters(nextFilters);
+    setMovPage(0);
+    void loadMovements(nextFilters, 0);
+  }, [activeTab, canView, searchParams]);
 
   useEffect(() => {
     void loadPickers();
@@ -381,36 +417,19 @@ export default function InventoryPage() {
   }
 
   function handleQuickAction(action: "receive" | "transfer" | "adjust" | "movements", row: OnHandEntry) {
+    const params = new URLSearchParams({
+      productId: row.productId,
+      locationId: row.locationId,
+    });
+
     if (action === "movements") {
-      setMovementFilters({
-        productId: row.productId,
-        locationId: row.locationId,
-      });
-      setMovPage(0);
-      setActiveTab("movements");
-      void loadMovements({ productId: row.productId, locationId: row.locationId }, 0);
+      navigate(`${PATHS.TENANT.inventoryMovements(slug)}?${params.toString()}`);
       return;
     }
 
-    setActiveTab("operations");
-    setOperation(action);
-    setOpSuccess(null);
-    setOpError(null);
-    setOpForm({
-      ...DEFAULT_OPERATION_FORM,
-      productId: row.productId,
-      locationId: row.locationId,
-      fromLocationId: action === "transfer" ? row.locationId : "",
-    });
+    params.set("operation", action);
+    navigate(`${PATHS.TENANT.inventoryOperations(slug)}?${params.toString()}`);
   }
-
-  const tabs = [
-    ...(canView ? [{ id: "onhand" as const, icon: PackageOpen, label: t("inventory.tabOnHand") }] : []),
-    ...(canManageOperations
-      ? [{ id: "operations" as const, icon: SlidersHorizontal, label: t("inventory.tabOperations") }]
-      : []),
-    ...(canView ? [{ id: "movements" as const, icon: List, label: t("inventory.tabMovements") }] : []),
-  ];
   const operationHelpKey = {
     receive: "inventory.ops.helper.receive",
     transfer: "inventory.ops.helper.transfer",
@@ -429,24 +448,6 @@ export default function InventoryPage() {
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold">{t("inventory.pageTitle")}</h1>
         <p className="text-sm text-muted-foreground">{t("inventory.pageDescription")}</p>
-      </div>
-
-      <div className="flex gap-1 border-b">
-        {tabs.map(({ id, icon: Icon, label }) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setActiveTab(id)}
-            className={`flex items-center gap-2 border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
-              activeTab === id
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Icon className="h-4 w-4" />
-            {label}
-          </button>
-        ))}
       </div>
 
       {lookupError ? <p className="text-sm text-destructive">{lookupError}</p> : null}
@@ -912,8 +913,8 @@ export default function InventoryPage() {
                               <span className="text-xs text-muted-foreground">
                                 {row.counterpartLocationLabel
                                   ? t("inventory.movements.transferContext")
-                                      .replace("{from}", row.type === "TRANSFER_IN" ? row.counterpartLocationLabel : row.locationLabel ?? row.locationId)
-                                      .replace("{to}", row.type === "TRANSFER_IN" ? row.locationLabel ?? row.locationId : row.counterpartLocationLabel)
+                                    .replace("{from}", row.type === "TRANSFER_IN" ? row.counterpartLocationLabel : row.locationLabel ?? row.locationId)
+                                    .replace("{to}", row.type === "TRANSFER_IN" ? row.locationLabel ?? row.locationId : row.counterpartLocationLabel)
                                   : row.locationPathLabel ?? ""}
                               </span>
                             </div>

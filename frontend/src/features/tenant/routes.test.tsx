@@ -200,6 +200,29 @@ describe("tenant routes RBAC", () => {
     expect(screen.getByText("tenant-warehouse-layouts-page")).toBeInTheDocument();
   });
 
+  it("blocks warehouse templates route when tenant.warehouse.view permission is missing", () => {
+    mockUseAuth.mockReturnValue({
+      status: "authenticated",
+      hasPermission: () => false,
+    });
+
+    renderTenantRoute("/acme/warehouse-layouts/templates");
+
+    expect(screen.queryByText("tenant-warehouse-layouts-page")).not.toBeInTheDocument();
+    expect(screen.getByText("Access denied")).toBeInTheDocument();
+  });
+
+  it("renders warehouse templates route when tenant.warehouse.view permission is present", () => {
+    mockUseAuth.mockReturnValue({
+      status: "authenticated",
+      hasPermission: (permission: string) => permission === TENANT_PERMISSIONS.WAREHOUSE_VIEW,
+    });
+
+    renderTenantRoute("/acme/warehouse-layouts/templates");
+
+    expect(screen.getByText("tenant-warehouse-layouts-page")).toBeInTheDocument();
+  });
+
   it("blocks audit-logs route when tenant.audit.view permission is missing", () => {
     mockUseAuth.mockReturnValue({
       status: "authenticated",
@@ -245,6 +268,19 @@ describe("tenant routes RBAC", () => {
     });
 
     renderTenantRoute("/acme/inventory");
+
+    expect(screen.getByText("tenant-inventory-page")).toBeInTheDocument();
+  });
+
+  it("renders inventory operations subsection when any inventory permission is present", () => {
+    mockUseAuth.mockReturnValue({
+      status: "authenticated",
+      hasPermission: () => false,
+      hasAnyPermission: (permissions: string[]) =>
+        permissions.includes(TENANT_PERMISSIONS.INVENTORY_TRANSFER),
+    });
+
+    renderTenantRoute("/acme/inventory/operations");
 
     expect(screen.getByText("tenant-inventory-page")).toBeInTheDocument();
   });

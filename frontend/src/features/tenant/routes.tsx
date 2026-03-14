@@ -82,6 +82,14 @@ export const tenantRoutes = [
     ),
   },
   {
+    path: PATHS.TENANT.WAREHOUSE_TEMPLATES_PATTERN,
+    element: (
+      <RequirePermission permission={TENANT_PERMISSIONS.WAREHOUSE_VIEW}>
+        <WarehouseLayoutsPage />
+      </RequirePermission>
+    ),
+  },
+  {
     path: PATHS.TENANT.AUDIT_LOGS_PATTERN,
     element: (
       <RequirePermission permission={TENANT_PERMISSIONS.AUDIT_VIEW}>
@@ -93,7 +101,31 @@ export const tenantRoutes = [
     path: PATHS.TENANT.INVENTORY_PATTERN,
     element: (
       <RequireAnyPermission permissions={INVENTORY_ROUTE_PERMISSIONS}>
-        <InventoryPage />
+        <InventoryPage section="onhand" />
+      </RequireAnyPermission>
+    ),
+  },
+  {
+    path: PATHS.TENANT.INVENTORY_STOCK_PATTERN,
+    element: (
+      <RequireAnyPermission permissions={INVENTORY_ROUTE_PERMISSIONS}>
+        <InventoryPage section="onhand" />
+      </RequireAnyPermission>
+    ),
+  },
+  {
+    path: PATHS.TENANT.INVENTORY_OPERATIONS_PATTERN,
+    element: (
+      <RequireAnyPermission permissions={INVENTORY_ROUTE_PERMISSIONS}>
+        <InventoryPage section="operations" />
+      </RequireAnyPermission>
+    ),
+  },
+  {
+    path: PATHS.TENANT.INVENTORY_MOVEMENTS_PATTERN,
+    element: (
+      <RequireAnyPermission permissions={INVENTORY_ROUTE_PERMISSIONS}>
+        <InventoryPage section="movements" />
       </RequireAnyPermission>
     ),
   },

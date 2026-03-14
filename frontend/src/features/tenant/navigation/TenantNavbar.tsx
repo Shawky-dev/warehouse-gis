@@ -13,6 +13,8 @@ import {
   LayoutGrid,
   BookOpen,
   PackageOpen,
+  SlidersHorizontal,
+  List,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -80,6 +82,12 @@ export function TenantNavbar() {
   const canViewCategories = hasPermission(TENANT_PERMISSIONS.CATEGORIES_VIEW);
   const canViewWarehouse = hasPermission(TENANT_PERMISSIONS.WAREHOUSE_VIEW);
   const canViewAudit = hasPermission(TENANT_PERMISSIONS.AUDIT_VIEW);
+  const canViewInventory = hasPermission(TENANT_PERMISSIONS.INVENTORY_VIEW);
+  const canManageOperations = hasAnyPermission([
+    TENANT_PERMISSIONS.INVENTORY_RECEIVE,
+    TENANT_PERMISSIONS.INVENTORY_TRANSFER,
+    TENANT_PERMISSIONS.INVENTORY_ADJUST,
+  ]);
   const canAccessInventory = hasAnyPermission([
     TENANT_PERMISSIONS.INVENTORY_VIEW,
     TENANT_PERMISSIONS.INVENTORY_RECEIVE,
@@ -98,6 +106,11 @@ export function TenantNavbar() {
         icon: LayoutGrid,
         end: true,
         exactMatch: true,
+      },
+      {
+        to: PATHS.TENANT.warehouseTemplates(normalizedSlug),
+        label: t("tenant.nav.templates"),
+        icon: LayoutGrid,
       },
     ];
   }, [canViewWarehouse, normalizedSlug, t]);
@@ -152,9 +165,38 @@ export function TenantNavbar() {
         ...(canAccessInventory
           ? [
             {
-              to: PATHS.TENANT.inventory(normalizedSlug),
+              id: "inventory",
               label: t("tenant.nav.inventory"),
               icon: PackageOpen,
+              children: [
+                ...(canViewInventory
+                  ? [
+                    {
+                      to: PATHS.TENANT.inventoryStock(normalizedSlug),
+                      label: t("inventory.tabOnHand"),
+                      icon: PackageOpen,
+                    },
+                  ]
+                  : []),
+                ...(canManageOperations
+                  ? [
+                    {
+                      to: PATHS.TENANT.inventoryOperations(normalizedSlug),
+                      label: t("inventory.tabOperations"),
+                      icon: SlidersHorizontal,
+                    },
+                  ]
+                  : []),
+                ...(canViewInventory
+                  ? [
+                    {
+                      to: PATHS.TENANT.inventoryMovements(normalizedSlug),
+                      label: t("inventory.tabMovements"),
+                      icon: List,
+                    },
+                  ]
+                  : []),
+              ],
             },
           ]
           : []),
@@ -181,6 +223,8 @@ export function TenantNavbar() {
       normalizedSlug,
       t,
       warehouseChildren,
+      canViewInventory,
+      canManageOperations,
     ]
   );
 

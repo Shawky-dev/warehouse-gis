@@ -5,7 +5,7 @@ import {
     useState,
     type FormEvent,
 } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 import {
     ArrowDown,
     ArrowUp,
@@ -14,7 +14,6 @@ import {
     ChevronRight,
     ClipboardPaste,
     Copy,
-    FolderTree,
     Pencil,
     Plus,
     Sparkles,
@@ -324,6 +323,7 @@ export default function WarehouseLayoutsPage() {
     const slug = normalizeTenantSlug(tenantSlug ?? "");
     const { t } = useI18n();
     const { hasPermission } = useAuth();
+    const { pathname } = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
 
     const canManageLayouts = hasPermission(TENANT_PERMISSIONS.WAREHOUSE_LAYOUT_MANAGE);
@@ -363,7 +363,7 @@ export default function WarehouseLayoutsPage() {
 
     const selectedLayoutId = searchParams.get("layoutId");
     const selectedPath = parsePath(searchParams.get("path"));
-    const pageTab = (searchParams.get("tab") as PageTab | null) ?? "builder";
+    const pageTab: PageTab = pathname === PATHS.TENANT.warehouseTemplates(slug) ? "templates" : "builder";
     const activeLayout = layouts.find((layout) => layout.isActive) ?? null;
     const selectedLayout = layouts.find((layout) => layout.id === selectedLayoutId) ?? null;
     const displayedLayouts = useWarehouseFilters(layouts, layoutSearch, layoutFilter);
@@ -578,7 +578,6 @@ export default function WarehouseLayoutsPage() {
             layoutId: layout.id,
             mode: layout.isActive ? "active" : "fork",
             path: null,
-            tab: "builder",
         });
     };
 
@@ -969,7 +968,7 @@ export default function WarehouseLayoutsPage() {
                     <h1 className="text-xl font-semibold">{t("warehouse.layouts.pageTitle")}</h1>
                     <p className="text-sm text-muted-foreground">{t("warehouse.layouts.pageDescription")}</p>
                 </div>
-                {canManageLayouts ? (
+                {pageTab === "builder" && canManageLayouts ? (
                     <div className="flex flex-wrap gap-2">
                         <Button variant="outline" onClick={() => handleLayoutDialogOpen("classic")}>
                             <Sparkles className="h-4 w-4" />
@@ -986,126 +985,109 @@ export default function WarehouseLayoutsPage() {
             {pageError ? <p className="text-sm text-destructive">{pageError}</p> : null}
             {actionError ? <p className="text-sm text-destructive">{actionError}</p> : null}
 
-            <div className="grid gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1.35fr)]">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>{t("warehouse.layouts.listTitle")}</CardTitle>
-                        <CardDescription>{t("warehouse.layouts.listCount", { count: String(displayedLayouts.length) })}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="flex flex-col gap-3 md:flex-row">
-                            <Input
-                                value={layoutSearch}
-                                onChange={(event) => setLayoutSearch(event.target.value)}
-                                placeholder={t("warehouse.layouts.searchPlaceholder")}
-                            />
-                            <Select value={layoutFilter} onValueChange={(value) => setLayoutFilter(value as LayoutFilter)}>
-                                <SelectTrigger className="w-full md:w-52">
-                                    <SelectValue placeholder={t("warehouse.layouts.filterLabel")} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">{t("warehouse.layouts.filterAll")}</SelectItem>
-                                    <SelectItem value="active">{t("warehouse.layouts.filterActive")}</SelectItem>
-                                    <SelectItem value="inactive">{t("warehouse.layouts.filterInactive")}</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
+            <div className="space-y-6">
+                {pageTab === "builder" ? (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>{t("warehouse.layouts.listTitle")}</CardTitle>
+                            <CardDescription>{t("warehouse.layouts.listCount", { count: String(displayedLayouts.length) })}</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="flex flex-col gap-3 md:flex-row">
+                                <Input
+                                    value={layoutSearch}
+                                    onChange={(event) => setLayoutSearch(event.target.value)}
+                                    placeholder={t("warehouse.layouts.searchPlaceholder")}
+                                />
+                                <Select value={layoutFilter} onValueChange={(value) => setLayoutFilter(value as LayoutFilter)}>
+                                    <SelectTrigger className="w-full md:w-52">
+                                        <SelectValue placeholder={t("warehouse.layouts.filterLabel")} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">{t("warehouse.layouts.filterAll")}</SelectItem>
+                                        <SelectItem value="active">{t("warehouse.layouts.filterActive")}</SelectItem>
+                                        <SelectItem value="inactive">{t("warehouse.layouts.filterInactive")}</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
 
-                        {isLoadingLayouts ? (
-                            <p className="text-sm text-muted-foreground">{t("warehouse.common.loading")}</p>
-                        ) : displayedLayouts.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">{t("warehouse.layouts.empty")}</p>
-                        ) : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>{t("warehouse.layouts.tableName")}</TableHead>
-                                        <TableHead>{t("warehouse.layouts.tableDescription")}</TableHead>
-                                        <TableHead>{t("warehouse.layouts.tableStatus")}</TableHead>
-                                        <TableHead>{t("warehouse.common.actions")}</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {displayedLayouts.map((layout) => (
-                                        <TableRow key={layout.id}>
-                                            <TableCell className="font-medium">{layout.name}</TableCell>
-                                            <TableCell>{layout.description || t("warehouse.common.emptyValue")}</TableCell>
-                                            <TableCell>
-                                                <Badge variant="outline" className="rounded-none">
-                                                    {layout.isActive ? t("warehouse.layouts.statusActive") : t("warehouse.layouts.statusInactive")}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex flex-wrap gap-2">
-                                                    <Button size="sm" variant="outline" onClick={() => handleOpenLayout(layout)}>
-                                                        {layout.isActive ? t("warehouse.layouts.openActiveAction") : t("warehouse.layouts.openForkAction")}
-                                                    </Button>
-                                                    {canManageLayouts ? (
-                                                        <Button size="sm" variant="outline" onClick={() => handleLayoutDialogOpen("edit", layout)}>
-                                                            <Pencil className="h-4 w-4" />
-                                                            {t("warehouse.common.edit")}
-                                                        </Button>
-                                                    ) : null}
-                                                    {canActivateLayouts && !layout.isActive ? (
-                                                        <Button size="sm" variant="outline" onClick={() => handleActivateLayout(layout.id)}>
-                                                            <Check className="h-4 w-4" />
-                                                            {t("warehouse.layouts.activateAction")}
-                                                        </Button>
-                                                    ) : null}
-                                                    {canActivateLayouts && layout.isActive ? (
-                                                        <Button size="sm" variant="outline" onClick={() => handleDeactivateLayout(layout.id)}>
-                                                            {t("warehouse.layouts.deactivateAction")}
-                                                        </Button>
-                                                    ) : null}
-                                                    {canHardDelete ? (
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            onClick={() => setDeleteTarget({ type: "layout", id: layout.id, label: layout.name })}
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
-                                                            {t("warehouse.common.delete")}
-                                                        </Button>
-                                                    ) : null}
-                                                </div>
-                                            </TableCell>
+                            {isLoadingLayouts ? (
+                                <p className="text-sm text-muted-foreground">{t("warehouse.common.loading")}</p>
+                            ) : displayedLayouts.length === 0 ? (
+                                <p className="text-sm text-muted-foreground">{t("warehouse.layouts.empty")}</p>
+                            ) : (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>{t("warehouse.layouts.tableName")}</TableHead>
+                                            <TableHead>{t("warehouse.layouts.tableDescription")}</TableHead>
+                                            <TableHead>{t("warehouse.layouts.tableStatus")}</TableHead>
+                                            <TableHead>{t("warehouse.common.actions")}</TableHead>
                                         </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        )}
-                    </CardContent>
-                </Card>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {displayedLayouts.map((layout) => (
+                                            <TableRow key={layout.id}>
+                                                <TableCell className="font-medium">{layout.name}</TableCell>
+                                                <TableCell>{layout.description || t("warehouse.common.emptyValue")}</TableCell>
+                                                <TableCell>
+                                                    <Badge variant="outline" className="rounded-none">
+                                                        {layout.isActive ? t("warehouse.layouts.statusActive") : t("warehouse.layouts.statusInactive")}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        <Button size="sm" variant="outline" onClick={() => handleOpenLayout(layout)}>
+                                                            {layout.isActive ? t("warehouse.layouts.openActiveAction") : t("warehouse.layouts.openForkAction")}
+                                                        </Button>
+                                                        {canManageLayouts ? (
+                                                            <Button size="sm" variant="outline" onClick={() => handleLayoutDialogOpen("edit", layout)}>
+                                                                <Pencil className="h-4 w-4" />
+                                                                {t("warehouse.common.edit")}
+                                                            </Button>
+                                                        ) : null}
+                                                        {canActivateLayouts && !layout.isActive ? (
+                                                            <Button size="sm" variant="outline" onClick={() => handleActivateLayout(layout.id)}>
+                                                                <Check className="h-4 w-4" />
+                                                                {t("warehouse.layouts.activateAction")}
+                                                            </Button>
+                                                        ) : null}
+                                                        {canActivateLayouts && layout.isActive ? (
+                                                            <Button size="sm" variant="outline" onClick={() => handleDeactivateLayout(layout.id)}>
+                                                                {t("warehouse.layouts.deactivateAction")}
+                                                            </Button>
+                                                        ) : null}
+                                                        {canHardDelete ? (
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                onClick={() => setDeleteTarget({ type: "layout", id: layout.id, label: layout.name })}
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                                {t("warehouse.common.delete")}
+                                                            </Button>
+                                                        ) : null}
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            )}
+                        </CardContent>
+                    </Card>
+                ) : null}
 
                 <Card>
                     <CardHeader>
-                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                            <div>
-                                <CardTitle>{selectedLayoutLabel}</CardTitle>
-                                <CardDescription>
-                                    {selectedLayout
-                                        ? isForkMode
-                                            ? t("warehouse.builder.forkDescription", { active: activeLayout?.name ?? t("warehouse.common.none") })
-                                            : t("warehouse.builder.activeDescription")
-                                        : t("warehouse.builder.selectDescription")}
-                                </CardDescription>
-                            </div>
-                            <div className="flex gap-2">
-                                <Button
-                                    variant={pageTab === "builder" ? "default" : "outline"}
-                                    onClick={() => updateQuery({ tab: "builder" })}
-                                >
-                                    <FolderTree className="h-4 w-4" />
-                                    {t("warehouse.builder.builderTab")}
-                                </Button>
-                                <Button
-                                    variant={pageTab === "templates" ? "default" : "outline"}
-                                    onClick={() => updateQuery({ tab: "templates" })}
-                                >
-                                    {t("warehouse.builder.templatesTab")}
-                                </Button>
-                            </div>
-                        </div>
+                        <CardTitle>{selectedLayoutLabel}</CardTitle>
+                        <CardDescription>
+                            {selectedLayout
+                                ? isForkMode
+                                    ? t("warehouse.builder.forkDescription", { active: activeLayout?.name ?? t("warehouse.common.none") })
+                                    : t("warehouse.builder.activeDescription")
+                                : t("warehouse.builder.selectDescription")}
+                        </CardDescription>
                     </CardHeader>
                     <CardContent>
                         {pageTab === "templates" ? (
@@ -1195,7 +1177,7 @@ export default function WarehouseLayoutsPage() {
                                 <p className="text-sm text-muted-foreground">{t("warehouse.builder.noSelectionMessage")}</p>
                                 {activeLayout ? (
                                     <Button asChild>
-                                        <Link to={PATHS.TENANT.warehouseLayouts(slug, { layoutId: activeLayout.id, mode: "active", tab: "builder" })}>
+                                        <Link to={PATHS.TENANT.warehouseLayouts(slug, { layoutId: activeLayout.id, mode: "active" })}>
                                             {t("warehouse.builder.openActiveLayoutAction")}
                                         </Link>
                                     </Button>
@@ -1211,7 +1193,7 @@ export default function WarehouseLayoutsPage() {
                                     <button
                                         className="transition-colors hover:text-foreground"
                                         type="button"
-                                        onClick={() => updateQuery({ layoutId: selectedLayout.id, path: null, tab: "builder" })}
+                                        onClick={() => updateQuery({ layoutId: selectedLayout.id, path: null })}
                                     >
                                         {selectedLayout.name}
                                     </button>
@@ -1221,7 +1203,7 @@ export default function WarehouseLayoutsPage() {
                                             <button
                                                 className="transition-colors hover:text-foreground"
                                                 type="button"
-                                                onClick={() => updateQuery({ path: crumb.path, tab: "builder" })}
+                                                onClick={() => updateQuery({ path: crumb.path })}
                                             >
                                                 {crumb.label}
                                             </button>
@@ -1327,7 +1309,6 @@ export default function WarehouseLayoutsPage() {
                                                                         path: joinPath(item.path),
                                                                         layoutId: selectedLayout.id,
                                                                         mode: selectedLayout.isActive ? "active" : "fork",
-                                                                        tab: "builder",
                                                                     })}
                                                                 >
                                                                     <Icon className="h-4 w-4 shrink-0 text-primary" />

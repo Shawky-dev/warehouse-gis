@@ -26,16 +26,22 @@ vi.mock("@/features/tenant/api/inventoryApi", () => ({
   extractInventoryErrorMessage: (_error: unknown, fallback: string) => fallback,
 }));
 
-function renderPage(permissions: string[], locale: "en" | "ar" = "en") {
+function renderPage(
+  permissions: string[],
+  locale: "en" | "ar" = "en",
+  path = "/acme/inventory/stock"
+) {
   mockUseAuth.mockReturnValue({
     hasPermission: (permission: string) => permissions.includes(permission),
   });
 
   return render(
     <I18nProvider initialLocale={locale} storageKey={`test-locale-inventory-page-${locale}`}>
-      <MemoryRouter initialEntries={["/acme/inventory"]}>
+      <MemoryRouter initialEntries={[path]}>
         <Routes>
-          <Route path="/:tenantSlug/inventory" element={<InventoryPage />} />
+          <Route path="/:tenantSlug/inventory/stock" element={<InventoryPage section="onhand" />} />
+          <Route path="/:tenantSlug/inventory/operations" element={<InventoryPage section="operations" />} />
+          <Route path="/:tenantSlug/inventory/movements" element={<InventoryPage section="movements" />} />
         </Routes>
       </MemoryRouter>
     </I18nProvider>
@@ -94,12 +100,12 @@ describe("InventoryPage", () => {
     });
   });
 
-  it("hides the operations tab for view-only users and loads on-hand rows", async () => {
+  it("renders stock section for view-only users and loads on-hand rows", async () => {
     renderPage([TENANT_PERMISSIONS.INVENTORY_VIEW]);
 
-    expect(screen.getByRole("button", { name: "On Hand" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Operations" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Movements" })).toBeInTheDocument();
+    expect(screen.getByText("Filters")).toBeInTheDocument();
+    expect(screen.queryByText("Inventory Operations")).not.toBeInTheDocument();
+    expect(screen.queryByText("Movements")).not.toBeInTheDocument();
 
     await waitFor(() => {
       expect(mockGetOnHand).toHaveBeenCalledWith("acme", { locationId: undefined, productId: undefined });
@@ -107,10 +113,10 @@ describe("InventoryPage", () => {
   });
 
   it("shows picker-based transfer flow for operation-only users", async () => {
-    renderPage([TENANT_PERMISSIONS.INVENTORY_TRANSFER]);
+    renderPage([TENANT_PERMISSIONS.INVENTORY_TRANSFER], "en", "/acme/inventory/operations");
 
-    expect(screen.getByRole("button", { name: "Operations" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "On Hand" })).not.toBeInTheDocument();
+    expect(screen.getByText("Inventory Operations")).toBeInTheDocument();
+    expect(screen.queryByText("Filters")).not.toBeInTheDocument();
     expect(screen.getByLabelText("From Location")).toBeInTheDocument();
     expect(screen.getByLabelText("To Location")).toBeInTheDocument();
     expect(screen.getByLabelText("Product")).toBeInTheDocument();
@@ -122,14 +128,16 @@ describe("InventoryPage", () => {
     });
   });
 
-  it("supports RTL labels without breaking the inventory tabs", async () => {
-    renderPage([TENANT_PERMISSIONS.INVENTORY_VIEW, TENANT_PERMISSIONS.INVENTORY_RECEIVE], "ar");
+  it("supports RTL labels on operations section", async () => {
+    renderPage(
+      [TENANT_PERMISSIONS.INVENTORY_VIEW, TENANT_PERMISSIONS.INVENTORY_RECEIVE],
+      "ar",
+      "/acme/inventory/operations"
+    );
 
     expect(screen.getByText("المخزون")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "الرصيد الحالي" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "العمليات" })).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "العمليات" }));
+    expect(screen.getByRole("button", { name: "استلام" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "استلام" }));
 
     expect(await screen.findByText("عمليات المخزون")).toBeInTheDocument();
     expect(screen.getByLabelText("المنتج")).toBeInTheDocument();

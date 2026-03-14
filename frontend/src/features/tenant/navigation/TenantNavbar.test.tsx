@@ -29,7 +29,7 @@ function renderNavbar(permissions: string[] = [TENANT_PERMISSIONS.WAREHOUSE_VIEW
 }
 
 describe("TenantNavbar", () => {
-  it("renders only the layouts entry under the warehouse layouts group", async () => {
+  it("renders layouts and templates entries under the warehouse layouts group", async () => {
     const user = userEvent.setup();
     renderNavbar();
 
@@ -37,6 +37,7 @@ describe("TenantNavbar", () => {
 
     await waitFor(() => {
       expect(screen.getByRole("link", { name: "Layouts" })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Templates" })).toBeInTheDocument();
       expect(screen.queryByRole("link", { name: "Aisle" })).not.toBeInTheDocument();
       expect(screen.queryByRole("link", { name: "Side" })).not.toBeInTheDocument();
     });
@@ -45,6 +46,6 @@ describe("TenantNavbar", () => {
   it("shows the inventory entry when the user has any inventory permission", () => {
     renderNavbar([TENANT_PERMISSIONS.INVENTORY_TRANSFER]);
 
-    expect(screen.getByRole("link", { name: "Inventory" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Inventory/i })).toBeInTheDocument();
   });
 });
