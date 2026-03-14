@@ -438,7 +438,7 @@ public class InventoryLedgerService {
             Map<UUID, ProductSummary> productSummaryMap,
             UUID counterpartLocationId) {
         Map<UUID, LocationSummary> resolvedLocations = locationSummaryMap == null
-                ? buildLocationSummaryMap(List.of(movement.getLocationId(), counterpartLocationId))
+                ? buildLocationSummaryMap(buildLocationIds(movement.getLocationId(), counterpartLocationId))
                 : locationSummaryMap;
         Map<UUID, ProductSummary> resolvedProducts = productSummaryMap == null
                 ? loadProductSummaryMap(List.of(movement.getProductId()))
@@ -474,6 +474,17 @@ public class InventoryLedgerService {
                 counterpartLocationId,
                 counterpart == null ? null : counterpart.label(),
                 counterpart == null ? null : counterpart.pathLabel());
+    }
+
+    private List<UUID> buildLocationIds(UUID locationId, UUID counterpartLocationId) {
+        List<UUID> ids = new ArrayList<>();
+        if (locationId != null) {
+            ids.add(locationId);
+        }
+        if (counterpartLocationId != null) {
+            ids.add(counterpartLocationId);
+        }
+        return ids;
     }
 
     private Map<UUID, UUID> buildCounterpartLocationMap(List<StockMovement> currentPage, List<StockMovement> pairedTransfers) {

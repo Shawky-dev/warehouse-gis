@@ -68,6 +68,41 @@ class InventoryLedgerServiceTest {
     }
 
     @Test
+    void receive_shouldReturnEnrichedResultWithoutCounterpartLocation() {
+        givenActiveLayout();
+        givenActiveLayoutBlocks();
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product()));
+        when(productRepository.findAllById(any())).thenReturn(List.of(product()));
+        when(movementRepository.save(any())).thenAnswer(invocation -> {
+            StockMovement movement = invocation.getArgument(0);
+            return StockMovement.builder()
+                    .id(UUID.fromString("88888888-8888-8888-8888-888888888888"))
+                    .locationId(movement.getLocationId())
+                    .productId(movement.getProductId())
+                    .qty(movement.getQty())
+                    .type(movement.getType())
+                    .createdBy(movement.getCreatedBy())
+                    .build();
+        });
+        when(layoutBlockRepository.findAllById(any())).thenReturn(List.of(leafBlock()));
+        when(blockTemplateRepository.findAllById(any())).thenReturn(List.of(template()));
+        when(warehouseLayoutRepository.findAllById(any())).thenReturn(List.of(activeLayout()));
+
+        InventoryLedgerService.MovementResult result = service.receive(
+                LEAF_LOCATION_ID,
+                PRODUCT_ID,
+                BigDecimal.ONE,
+                null,
+                null,
+                null,
+                "actor");
+
+        assertEquals("Shelf · 2", result.locationLabel());
+        assertEquals("SKU-1", result.productSku());
+        assertEquals(null, result.counterpartLocationId());
+    }
+
+    @Test
     void transfer_shouldRejectWhenNoActiveLayoutExists() {
         when(warehouseLayoutRepository.findByIsActiveTrue()).thenReturn(Optional.empty());
 
