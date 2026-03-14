@@ -593,6 +593,10 @@ public class DispatchService {
             String postedBy,
             Instant voidedAt,
             String voidedBy) {
+        @com.fasterxml.jackson.annotation.JsonProperty
+        public String qrData() {
+            return "DISPATCH:" + id;
+        }
     }
 
     public record DispatchDetailResult(
@@ -608,6 +612,10 @@ public class DispatchService {
             Instant voidedAt,
             String voidedBy,
             List<DispatchLineResult> lines) {
+        @com.fasterxml.jackson.annotation.JsonProperty
+        public String qrData() {
+            return "DISPATCH:" + id;
+        }
     }
 
     public record DispatchLineResult(

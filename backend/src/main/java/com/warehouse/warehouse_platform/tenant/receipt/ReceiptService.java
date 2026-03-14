@@ -583,6 +583,10 @@ public class ReceiptService {
             String postedBy,
             Instant voidedAt,
             String voidedBy) {
+        @com.fasterxml.jackson.annotation.JsonProperty
+        public String qrData() {
+            return "RECEIPT:" + id;
+        }
     }
 
     public record ReceiptDetailResult(
@@ -599,6 +603,10 @@ public class ReceiptService {
             Instant voidedAt,
             String voidedBy,
             List<ReceiptLineResult> lines) {
+        @com.fasterxml.jackson.annotation.JsonProperty
+        public String qrData() {
+            return "RECEIPT:" + id;
+        }
     }
 
     public record ReceiptLineResult(

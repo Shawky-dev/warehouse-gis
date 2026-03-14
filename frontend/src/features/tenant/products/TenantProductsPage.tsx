@@ -40,6 +40,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/shared/components/ui/alert-dialog";
+import { ProductLabel } from "@/features/tenant/labels/ProductLabel";
 
 type FilterActive = "all" | "active" | "inactive";
 
@@ -98,6 +99,7 @@ export default function TenantProductsPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   const [hardDeleteTarget, setHardDeleteTarget] = useState<ProductResult | null>(null);
+  const [labelProduct, setLabelProduct] = useState<ProductResult | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const loadLookups = useCallback(async (applyFirstUom = false) => {
     try {
@@ -405,6 +407,9 @@ export default function TenantProductsPage() {
                       </td>
                       <td className="py-2">
                         <div className="flex flex-wrap gap-1">
+                          <Button size="sm" variant="outline" onClick={() => setLabelProduct(product)}>
+                            {t("labels.printLabel")}
+                          </Button>
                           {canEdit && (
                             <Button size="sm" variant="outline" onClick={() => openEdit(product)}>
                               {t("products.editAction")}
@@ -648,6 +653,17 @@ export default function TenantProductsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={labelProduct !== null} onOpenChange={(open) => { if (!open) setLabelProduct(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("labels.printLabel")}</DialogTitle>
+          </DialogHeader>
+          {labelProduct ? (
+            <ProductLabel sku={labelProduct.sku} name={labelProduct.name} categoryName={labelProduct.categoryName} />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

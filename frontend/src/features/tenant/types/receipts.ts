@@ -10,6 +10,7 @@ export interface ReceiptListItem {
     createdBy: string;
     createdAt: string;
     postedAt: string | null;
+    qrData: string;
 }
 
 export interface ReceiptLine {
@@ -41,6 +42,7 @@ export interface ReceiptDetail {
     voidedAt: string | null;
     voidedBy: string | null;
     lines: ReceiptLine[];
+    qrData: string;
 }
 
 export interface ReceiptListResult {

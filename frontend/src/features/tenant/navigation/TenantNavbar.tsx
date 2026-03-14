@@ -17,7 +17,10 @@ import {
   PackageMinus,
   SlidersHorizontal,
   List,
+  ScanBarcode,
 } from "lucide-react";
+import { CameraScanner } from "@/shared/components/CameraScanner";
+import { useScanNavigation } from "@/features/tenant/scan/useScanNavigation";
 import { Separator } from "@/components/ui/separator";
 import {
   Accordion,
@@ -85,6 +88,8 @@ export function TenantNavbar() {
   const canViewWarehouse = hasPermission(TENANT_PERMISSIONS.WAREHOUSE_VIEW);
   const canViewAudit = hasPermission(TENANT_PERMISSIONS.AUDIT_VIEW);
   const canViewInventory = hasPermission(TENANT_PERMISSIONS.INVENTORY_VIEW);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const { navigateFromResult } = useScanNavigation(normalizedSlug);
   const canViewReceipts = hasPermission(TENANT_PERMISSIONS.RECEIPTS_VIEW);
   const canViewDispatches = hasPermission(TENANT_PERMISSIONS.DISPATCHES_VIEW);
   const canViewCounting = hasPermission(TENANT_PERMISSIONS.COUNTING_VIEW);
@@ -291,7 +296,17 @@ export function TenantNavbar() {
     <aside className="flex min-h-screen w-56 shrink-0 flex-col border-e bg-background">
       <div className="flex h-14 shrink-0 items-center gap-2 px-5 text-sm font-semibold">
         <Warehouse className="h-5 w-5 text-primary" />
-        <span>WarehouseGIS</span>
+        <span className="flex-1">WarehouseGIS</span>
+        {canViewInventory ? (
+          <button
+            type="button"
+            className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+            title={t("scan.camera.title")}
+            onClick={() => setIsScannerOpen(true)}
+          >
+            <ScanBarcode className="h-4 w-4" />
+          </button>
+        ) : null}
       </div>
 
       <Separator />
@@ -387,6 +402,16 @@ export function TenantNavbar() {
           );
         })}
       </nav>
+      <CameraScanner
+        tenantSlug={normalizedSlug}
+        open={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onResolved={(result) => {
+          setIsScannerOpen(false);
+          navigateFromResult(result);
+        }}
+        title={t("scan.camera.title")}
+      />
     </aside>
   );
 }

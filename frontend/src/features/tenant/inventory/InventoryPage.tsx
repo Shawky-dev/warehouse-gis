@@ -57,6 +57,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ScanInput } from "@/shared/components/ScanInput";
+import type { ScanResolveResult } from "@/features/tenant/types/scan";
+import { LotLabel } from "@/features/tenant/labels/LotLabel";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 type Tab = "stock" | "operations" | "movements";
 type Operation = "receive" | "transfer" | "adjust";
@@ -127,6 +136,7 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
   const [stockError, setStockError] = useState<string | null>(null);
 
   const [opForm, setOpForm] = useState<OperationFormState>(DEFAULT_OPERATION_FORM);
+  const [lotLabelRow, setLotLabelRow] = useState<StockEntry | null>(null);
   const [opSubmitting, setOpSubmitting] = useState(false);
   const [opSuccess, setOpSuccess] = useState<string | null>(null);
   const [opError, setOpError] = useState<string | null>(null);
@@ -177,6 +187,46 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
     () => locations.filter((location) => location.id !== opForm.fromLocationId),
     [locations, opForm.fromLocationId]
   );
+
+  function handleOpProductScan(result: ScanResolveResult) {
+    if (!result.productId) return;
+    setProducts((current) => {
+      if (current.some((p) => p.id === result.productId)) return current;
+      return [...current, {
+        id: result.productId!,
+        sku: result.productSku ?? "",
+        name: result.productName ?? "",
+        baseUomCode: "",
+        trackLot: result.trackLot ?? false,
+        trackExpiry: result.trackExpiry ?? false,
+        active: true,
+      }];
+    });
+    setOpForm((current) => ({
+      ...current,
+      productId: result.productId!,
+      ...(result.type === "LOT" && result.lotNumber ? { lotNumber: result.lotNumber } : {}),
+    }));
+  }
+
+  function handleOpLocationScan(result: ScanResolveResult, field: "locationId" | "fromLocationId" | "toLocationId") {
+    if (!result.locationId) return;
+    setLocations((current) => {
+      if (current.some((l) => l.id === result.locationId)) return current;
+      return [...current, {
+        id: result.locationId!,
+        layoutId: "",
+        layoutName: null,
+        label: result.locationPathLabel ?? result.scanCode ?? result.locationId!,
+        pathLabel: result.locationPathLabel ?? result.scanCode ?? result.locationId!,
+        identifier: null,
+        side: null,
+        locationKind: result.locationKindName ?? null,
+        scanCode: result.scanCode ?? null,
+      }];
+    });
+    setOpForm((current) => ({ ...current, [field]: result.locationId! }));
+  }
 
   const sortedStock = useMemo(
     () =>
@@ -585,6 +635,11 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
                         </TableCell>
                         <TableCell>
                           <div className={`flex flex-wrap gap-2 ${isRtl ? "justify-end" : ""}`}>
+                            {row.trackLot && row.lotNumber ? (
+                              <Button type="button" variant="outline" size="sm" onClick={() => setLotLabelRow(row)}>
+                                {t("labels.printLabel")}
+                              </Button>
+                            ) : null}
                             {canReceive ? (
                               <Button type="button" variant="outline" size="sm" onClick={() => handleQuickAction("receive", row)}>
                                 {t("inventory.actions.receive")}
@@ -668,71 +723,103 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
               <form className="grid gap-4 md:grid-cols-2" onSubmit={handleOperationSubmit}>
                 {operation === "transfer" ? (
                   <>
-                    <PickerField
-                      id="op-from-location"
-                      label={t("inventory.ops.fromLocationId")}
-                      value={selectedFromLocation}
-                      options={locations}
-                      onSearch={searchLocations}
-                      onChange={(next) =>
-                        setOpForm((current) => ({
-                          ...current,
-                          fromLocationId: next?.id ?? "",
-                          toLocationId: current.toLocationId === next?.id ? "" : current.toLocationId,
-                        }))
-                      }
-                      placeholder={t("inventory.lookups.locationPlaceholder")}
-                      emptyMessage={t("inventory.lookups.noLocations")}
-                      loading={lookupLoading}
-                      disabled={!hasSelectableLocations}
-                      renderOption={renderLocationOption}
-                      getOptionLabel={getLocationLabel}
-                    />
-                    <PickerField
-                      id="op-to-location"
-                      label={t("inventory.ops.toLocationId")}
-                      value={selectedToLocation}
-                      options={transferDestinationOptions}
-                      onSearch={searchLocations}
-                      onChange={(next) => setOpForm((current) => ({ ...current, toLocationId: next?.id ?? "" }))}
-                      placeholder={t("inventory.lookups.locationPlaceholder")}
-                      emptyMessage={t("inventory.lookups.noLocations")}
-                      loading={lookupLoading}
-                      disabled={!hasSelectableLocations}
-                      renderOption={renderLocationOption}
-                      getOptionLabel={getLocationLabel}
-                    />
+                    <div className="space-y-2">
+                      <ScanInput
+                        tenantSlug={slug}
+                        onResolved={(result) => handleOpLocationScan(result, "fromLocationId")}
+                        acceptTypes={["LOCATION"]}
+                        placeholder={t("scan.placeholder")}
+                      />
+                      <PickerField
+                        id="op-from-location"
+                        label={t("inventory.ops.fromLocationId")}
+                        value={selectedFromLocation}
+                        options={locations}
+                        onSearch={searchLocations}
+                        onChange={(next) =>
+                          setOpForm((current) => ({
+                            ...current,
+                            fromLocationId: next?.id ?? "",
+                            toLocationId: current.toLocationId === next?.id ? "" : current.toLocationId,
+                          }))
+                        }
+                        placeholder={t("inventory.lookups.locationPlaceholder")}
+                        emptyMessage={t("inventory.lookups.noLocations")}
+                        loading={lookupLoading}
+                        disabled={!hasSelectableLocations}
+                        renderOption={renderLocationOption}
+                        getOptionLabel={getLocationLabel}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <ScanInput
+                        tenantSlug={slug}
+                        onResolved={(result) => handleOpLocationScan(result, "toLocationId")}
+                        acceptTypes={["LOCATION"]}
+                        placeholder={t("scan.placeholder")}
+                      />
+                      <PickerField
+                        id="op-to-location"
+                        label={t("inventory.ops.toLocationId")}
+                        value={selectedToLocation}
+                        options={transferDestinationOptions}
+                        onSearch={searchLocations}
+                        onChange={(next) => setOpForm((current) => ({ ...current, toLocationId: next?.id ?? "" }))}
+                        placeholder={t("inventory.lookups.locationPlaceholder")}
+                        emptyMessage={t("inventory.lookups.noLocations")}
+                        loading={lookupLoading}
+                        disabled={!hasSelectableLocations}
+                        renderOption={renderLocationOption}
+                        getOptionLabel={getLocationLabel}
+                      />
+                    </div>
                   </>
                 ) : (
-                  <PickerField
-                    id="op-location"
-                    label={t("inventory.ops.locationId")}
-                    value={selectedOpLocation}
-                    options={locations}
-                    onSearch={searchLocations}
-                    onChange={(next) => setOpForm((current) => ({ ...current, locationId: next?.id ?? "" }))}
-                    placeholder={t("inventory.lookups.locationPlaceholder")}
-                    emptyMessage={t("inventory.lookups.noLocations")}
-                    loading={lookupLoading}
-                    disabled={!hasSelectableLocations}
-                    renderOption={renderLocationOption}
-                    getOptionLabel={getLocationLabel}
-                  />
+                  <div className="space-y-2">
+                    <ScanInput
+                      tenantSlug={slug}
+                      onResolved={(result) => handleOpLocationScan(result, "locationId")}
+                      acceptTypes={["LOCATION"]}
+                      placeholder={t("scan.placeholder")}
+                    />
+                    <PickerField
+                      id="op-location"
+                      label={t("inventory.ops.locationId")}
+                      value={selectedOpLocation}
+                      options={locations}
+                      onSearch={searchLocations}
+                      onChange={(next) => setOpForm((current) => ({ ...current, locationId: next?.id ?? "" }))}
+                      placeholder={t("inventory.lookups.locationPlaceholder")}
+                      emptyMessage={t("inventory.lookups.noLocations")}
+                      loading={lookupLoading}
+                      disabled={!hasSelectableLocations}
+                      renderOption={renderLocationOption}
+                      getOptionLabel={getLocationLabel}
+                    />
+                  </div>
                 )}
 
-                <PickerField
-                  id="op-product"
-                  label={t("inventory.ops.productId")}
-                  value={selectedOpProduct}
-                  options={products}
-                  onSearch={searchProducts}
-                  onChange={(next) => setOpForm((current) => ({ ...current, productId: next?.id ?? "" }))}
-                  placeholder={t("inventory.lookups.productPlaceholder")}
-                  emptyMessage={t("inventory.lookups.noProducts")}
-                  loading={lookupLoading}
-                  renderOption={renderProductOption}
-                  getOptionLabel={getProductLabel}
-                />
+                <div className="space-y-2">
+                  <ScanInput
+                    tenantSlug={slug}
+                    onResolved={handleOpProductScan}
+                    acceptTypes={["PRODUCT", "LOT"]}
+                    placeholder={t("scan.placeholder")}
+                  />
+                  <PickerField
+                    id="op-product"
+                    label={t("inventory.ops.productId")}
+                    value={selectedOpProduct}
+                    options={products}
+                    onSearch={searchProducts}
+                    onChange={(next) => setOpForm((current) => ({ ...current, productId: next?.id ?? "" }))}
+                    placeholder={t("inventory.lookups.productPlaceholder")}
+                    emptyMessage={t("inventory.lookups.noProducts")}
+                    loading={lookupLoading}
+                    renderOption={renderProductOption}
+                    getOptionLabel={getProductLabel}
+                  />
+                </div>
 
                 {operation === "adjust" ? (
                   <div className="space-y-2">
@@ -1020,6 +1107,20 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
           </Card>
         </div>
       ) : null}
+      <Dialog open={lotLabelRow !== null} onOpenChange={(open) => { if (!open) setLotLabelRow(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("labels.lot.title")}</DialogTitle>
+          </DialogHeader>
+          {lotLabelRow?.lotNumber ? (
+            <LotLabel
+              sku={lotLabelRow.productSku ?? lotLabelRow.productId}
+              productName={lotLabelRow.productName ?? lotLabelRow.productSku ?? lotLabelRow.productId}
+              lotNumber={lotLabelRow.lotNumber}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

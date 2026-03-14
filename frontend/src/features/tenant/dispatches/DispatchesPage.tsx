@@ -42,6 +42,9 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
+import { ScanInput } from "@/shared/components/ScanInput";
+import { DocumentQR } from "@/features/tenant/labels/DocumentQR";
+import type { ScanResolveResult } from "@/features/tenant/types/scan";
 
 interface DispatchLineFormState {
     productId: string;
@@ -107,6 +110,48 @@ export default function DispatchesPage() {
         () => products.find((product) => product.id === lineForm.productId) ?? null,
         [products, lineForm.productId]
     );
+
+    function handleProductScanned(result: ScanResolveResult) {
+        if (!result.productId) return;
+        setProducts((prev) => {
+            if (prev.some((p) => p.id === result.productId)) return prev;
+            return [
+                ...prev,
+                {
+                    id: result.productId!,
+                    sku: result.productSku ?? "",
+                    name: result.productName ?? result.productSku ?? result.productId!,
+                    baseUomCode: "",
+                    trackLot: result.trackLot ?? false,
+                    trackExpiry: result.trackExpiry ?? false,
+                    active: true,
+                },
+            ];
+        });
+        setLineForm((prev) => ({ ...prev, productId: result.productId! }));
+    }
+
+    function handleLocationScanned(result: ScanResolveResult) {
+        if (!result.locationId) return;
+        setLocations((prev) => {
+            if (prev.some((l) => l.id === result.locationId)) return prev;
+            return [
+                ...prev,
+                {
+                    id: result.locationId!,
+                    layoutId: "",
+                    layoutName: null,
+                    label: result.locationPathLabel ?? result.locationId!,
+                    pathLabel: result.locationPathLabel ?? result.locationId!,
+                    identifier: null,
+                    side: null,
+                    locationKind: result.locationKindName ?? null,
+                    scanCode: result.scanCode ?? null,
+                },
+            ];
+        });
+        setLineForm((prev) => ({ ...prev, sourceLocationId: result.locationId! }));
+    }
 
     useEffect(() => {
         void Promise.all([loadDispatches(0), loadLookupData()]);
@@ -343,6 +388,10 @@ export default function DispatchesPage() {
                         {detail.postedAt ? (
                             <p><strong>{t("dispatches.form.postedAt")}: </strong>{new Date(detail.postedAt).toLocaleString()}</p>
                         ) : null}
+                        <DocumentQR
+                            qrData={detail.qrData}
+                            label={detail.reference ?? t("dispatches.referenceFallback")}
+                        />
                     </CardContent>
                 </Card>
 
@@ -363,6 +412,12 @@ export default function DispatchesPage() {
                             <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                                 <div className="space-y-2 xl:col-span-2">
                                     <Label>{t("dispatches.form.productSearch")}</Label>
+                                    <ScanInput
+                                        tenantSlug={slug}
+                                        acceptTypes={["PRODUCT"]}
+                                        onResolved={handleProductScanned}
+                                        placeholder={t("scan.placeholder")}
+                                    />
                                     <Input
                                         value={productSearch}
                                         onChange={(event) => void handleSearchProducts(event.target.value)}
@@ -371,6 +426,12 @@ export default function DispatchesPage() {
                                 </div>
                                 <div className="space-y-2 xl:col-span-2">
                                     <Label>{t("dispatches.form.locationSearch")}</Label>
+                                    <ScanInput
+                                        tenantSlug={slug}
+                                        acceptTypes={["LOCATION"]}
+                                        onResolved={handleLocationScanned}
+                                        placeholder={t("scan.placeholder")}
+                                    />
                                     <Input
                                         value={locationSearch}
                                         onChange={(event) => void handleSearchLocations(event.target.value)}

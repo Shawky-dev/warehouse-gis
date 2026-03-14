@@ -110,4 +110,6 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, UU
         List<StockMovement> findByReferenceId(UUID referenceId);
 
         List<StockMovement> findByReferenceIdIn(List<UUID> referenceIds);
+
+        boolean existsByProductIdAndLotNumber(UUID productId, String lotNumber);
 }

@@ -30,6 +30,8 @@ public interface LayoutBlockRepository extends JpaRepository<LayoutBlock, UUID> 
 
        boolean existsByScanCodeAndIdNot(String scanCode, UUID id);
 
+       java.util.Optional<LayoutBlock> findByScanCode(String scanCode);
+
        boolean existsByParentId(UUID parentId);
 
        @Query("SELECT MAX(lb.position) FROM LayoutBlock lb WHERE lb.layoutId = :layoutId AND lb.parentId IS NULL")

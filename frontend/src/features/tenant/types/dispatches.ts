@@ -12,6 +12,7 @@ export interface DispatchListItem {
     postedBy: string | null;
     voidedAt: string | null;
     voidedBy: string | null;
+    qrData: string;
 }
 
 export interface DispatchLine {
@@ -41,6 +42,7 @@ export interface DispatchDetail {
     voidedAt: string | null;
     voidedBy: string | null;
     lines: DispatchLine[];
+    qrData: string;
 }
 
 export interface DispatchListResult {

@@ -494,6 +494,10 @@ public class CountSessionService {
             String voidedBy,
             int locationCount,
             long lineCount) {
+        @com.fasterxml.jackson.annotation.JsonProperty
+        public String qrData() {
+            return "COUNT:" + id;
+        }
     }
 
     public record CountSessionDetailResult(
@@ -508,6 +512,10 @@ public class CountSessionService {
             String voidedBy,
             List<UUID> locationIds,
             List<CountLineResult> lines) {
+        @com.fasterxml.jackson.annotation.JsonProperty
+        public String qrData() {
+            return "COUNT:" + id;
+        }
     }
 
     public record CountLineResult(

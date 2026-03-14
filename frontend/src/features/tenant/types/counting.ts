@@ -12,6 +12,7 @@ export interface CountSessionListItem {
     voidedBy: string | null;
     locationCount: number;
     lineCount: number;
+    qrData: string;
 }
 
 export interface CountLine {
@@ -40,6 +41,7 @@ export interface CountSessionDetail {
     voidedBy: string | null;
     locationIds: string[];
     lines: CountLine[];
+    qrData: string;
 }
 
 export interface CountSessionListResult {

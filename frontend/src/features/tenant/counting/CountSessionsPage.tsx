@@ -41,6 +41,9 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
+import { ScanInput } from "@/shared/components/ScanInput";
+import { DocumentQR } from "@/features/tenant/labels/DocumentQR";
+import type { ScanResolveResult } from "@/features/tenant/types/scan";
 
 export default function CountSessionsPage() {
     const { t } = useI18n();
@@ -81,6 +84,18 @@ export default function CountSessionsPage() {
 
     const [isPostConfirmOpen, setIsPostConfirmOpen] = useState(false);
     const [isVoidConfirmOpen, setIsVoidConfirmOpen] = useState(false);
+
+    const [scanFilter, setScanFilter] = useState<{ productId?: string; locationId?: string; lotNumber?: string } | null>(null);
+
+    function handleLineScan(result: ScanResolveResult) {
+        if (result.type === "PRODUCT") {
+            setScanFilter({ productId: result.productId });
+        } else if (result.type === "LOCATION") {
+            setScanFilter({ locationId: result.locationId });
+        } else if (result.type === "LOT") {
+            setScanFilter({ productId: result.productId, lotNumber: result.lotNumber });
+        }
+    }
 
     function normalizeQtyValue(value: unknown): string {
         if (value === null || value === undefined) {
@@ -415,6 +430,7 @@ export default function CountSessionsPage() {
                             {unfilledCount}
                         </p>
                         {lineError ? <p className="text-sm text-destructive">{lineError}</p> : null}
+                        <DocumentQR qrData={detail.qrData} label={detail.name} />
                     </CardContent>
                 </Card>
 
@@ -423,6 +439,21 @@ export default function CountSessionsPage() {
                         <CardTitle>{t("counting.linesTitle")}</CardTitle>
                         <CardDescription>{t("counting.linesDescription")}</CardDescription>
                     </CardHeader>
+                    <CardContent className="space-y-3 p-4 pb-0">
+                        <div className="flex items-center gap-2">
+                            <ScanInput
+                                tenantSlug={slug}
+                                onResolved={handleLineScan}
+                                acceptTypes={["PRODUCT", "LOCATION", "LOT"]}
+                                placeholder={t("scan.placeholder")}
+                            />
+                            {scanFilter ? (
+                                <Button variant="ghost" size="sm" onClick={() => setScanFilter(null)}>
+                                    {t("scan.filter.clear")}
+                                </Button>
+                            ) : null}
+                        </div>
+                    </CardContent>
                     <CardContent className="p-0">
                         <Table>
                             <TableHeader>
@@ -447,8 +478,14 @@ export default function CountSessionsPage() {
                                                     ? "text-red-700"
                                                     : "text-muted-foreground";
 
+                                    const isHighlighted = scanFilter
+                                        ? (!scanFilter.productId || line.productId === scanFilter.productId) &&
+                                          (!scanFilter.locationId || line.locationId === scanFilter.locationId) &&
+                                          (!scanFilter.lotNumber || line.lotNumber === scanFilter.lotNumber)
+                                        : false;
+
                                     return (
-                                        <TableRow key={line.id}>
+                                        <TableRow key={line.id} className={isHighlighted ? "bg-yellow-50 dark:bg-yellow-950/20" : undefined}>
                                             <TableCell>{renderLocationCell(line.locationPathLabel, line.locationId)}</TableCell>
                                             <TableCell>{line.productName ?? line.productSku ?? line.productId}</TableCell>
                                             <TableCell>{line.lotNumber ?? "—"}</TableCell>

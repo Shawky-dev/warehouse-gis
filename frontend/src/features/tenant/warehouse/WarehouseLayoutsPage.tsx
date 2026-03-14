@@ -109,6 +109,7 @@ import {
     getLucideIconLabel,
     normalizeLucideIconName,
 } from "@/shared/lib/lucide-icons";
+import { LocationLabel } from "@/features/tenant/labels/LocationLabel";
 
 type LayoutFilter = "all" | "active" | "inactive";
 type LayoutDialogMode = "create" | "edit" | "classic" | null;
@@ -379,6 +380,7 @@ export default function WarehouseLayoutsPage() {
     const [selectedBlockSide, setSelectedBlockSide] = useState("__none__");
     const [selectedBlockLocationKindId, setSelectedBlockLocationKindId] = useState("");
     const [isScanCodeCopied, setIsScanCodeCopied] = useState(false);
+    const [isLocationLabelOpen, setIsLocationLabelOpen] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
     const [layoutSearch, setLayoutSearch] = useState("");
     const [layoutFilter, setLayoutFilter] = useState<LayoutFilter>("all");
@@ -1612,6 +1614,15 @@ export default function WarehouseLayoutsPage() {
                                                                 >
                                                                     {isScanCodeCopied ? t("warehouse.scanCode.copied") : <Copy className="h-4 w-4" />}
                                                                 </Button>
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    className="shrink-0"
+                                                                    onClick={() => setIsLocationLabelOpen(true)}
+                                                                >
+                                                                    {t("labels.printLabel")}
+                                                                </Button>
                                                             </div>
                                                         </div>
                                                     ) : null}
@@ -2067,6 +2078,22 @@ export default function WarehouseLayoutsPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            {selectedFlattenedNode?.node.block.scanCode ? (
+                <Dialog open={isLocationLabelOpen} onOpenChange={setIsLocationLabelOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>{t("labels.printLabel")}</DialogTitle>
+                        </DialogHeader>
+                        <LocationLabel
+                            scanCode={selectedFlattenedNode.node.block.scanCode}
+                            fullCode={selectedFlattenedNode.node.block.fullCode}
+                            locationKindName={selectedFlattenedNode.node.block.locationKindName}
+                            pathLabel={selectedFlattenedNode.node.block.identifier}
+                        />
+                    </DialogContent>
+                </Dialog>
+            ) : null}
         </div>
     );
 }
