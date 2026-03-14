@@ -181,3 +181,10 @@ databaseChangeLog:
         - sqlFile:
             path: db/migration/tenant/V26__create_dispatch_documents.sql
             relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-c6-count-sessions-27
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V27__create_count_sessions.sql
+            relativeToChangelogFile: false

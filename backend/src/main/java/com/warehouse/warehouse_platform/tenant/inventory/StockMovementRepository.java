@@ -23,6 +23,16 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, UU
                         """, nativeQuery = true)
         List<StockEntry> findAllStock();
 
+        @Query(value = """
+                        SELECT location_id   AS locationId,
+                          product_id    AS productId,
+                          lot_number    AS lotNumber,
+                          qty_stock     AS qtyStock
+                        FROM   v_stock
+                        WHERE  location_id IN (:locationIds)
+                        """, nativeQuery = true)
+        List<StockEntry> findStockByLocationIds(@Param("locationIds") List<UUID> locationIds);
+
         /** Stock for a single location. */
         @Query(value = """
                         SELECT location_id   AS locationId,
