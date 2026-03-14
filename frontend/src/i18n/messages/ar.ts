@@ -573,6 +573,8 @@ export const arMessages: Record<keyof typeof enMessages, string> = {
   "warehouse.builder.treeTitle": "شجرة الكتل",
   "warehouse.builder.treeDescription": "استعرض الهيكل المحدد عبر شجرة كتل معيارية ومتداخلة.",
   "warehouse.builder.addBlockAction": "إضافة كتلة",
+  "warehouse.builder.printLabelsAction": "طباعة الملصقات",
+  "warehouse.builder.selectForPrint": "تحديد للطباعة",
   "warehouse.builder.addBlockSubmitAction": "إنشاء كتلة أو أكثر",
   "warehouse.builder.emptyTree": "لا يحتوي هذا الهيكل على كتل بعد.",
   "warehouse.builder.inspectorTitle": "فاحص الكتلة",
@@ -999,4 +1001,7 @@ export const arMessages: Record<keyof typeof enMessages, string> = {
   "labels.lot.title": "ملصق الدفعة",
   "labels.document.title": "رمز QR للمستند",
   "labels.document.printQr": "طباعة رمز QR",
+  "labels.bulkPrintTitle": "طباعة ملصقات المواقع",
+  "labels.bulkPrintDescription": "تم تحديد {count} موقع/مواقع",
+  "labels.bulkPrint": "طباعة الورقة",
 };

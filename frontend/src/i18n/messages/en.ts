@@ -571,6 +571,8 @@ export const enMessages = {
   "warehouse.builder.treeTitle": "Block tree",
   "warehouse.builder.treeDescription": "Traverse the selected layout with a generic nested block tree.",
   "warehouse.builder.addBlockAction": "Add block",
+  "warehouse.builder.printLabelsAction": "Print Labels",
+  "warehouse.builder.selectForPrint": "Select for print",
   "warehouse.builder.addBlockSubmitAction": "Create block(s)",
   "warehouse.builder.emptyTree": "This layout has no blocks yet.",
   "warehouse.builder.inspectorTitle": "Block inspector",
@@ -997,4 +999,7 @@ export const enMessages = {
   "labels.lot.title": "Lot Label",
   "labels.document.title": "Document QR",
   "labels.document.printQr": "Print QR",
+  "labels.bulkPrintTitle": "Print Location Labels",
+  "labels.bulkPrintDescription": "{count} location(s) selected",
+  "labels.bulkPrint": "Print Sheet",
 } as const;

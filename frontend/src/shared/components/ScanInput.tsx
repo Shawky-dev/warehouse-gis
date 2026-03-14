@@ -27,6 +27,23 @@ export function ScanInput({
   const [cameraOpen, setCameraOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  function playScanBeep() {
+    try {
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 1200;
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.08);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.08);
+    } catch {
+      // Web Audio not available — ignore
+    }
+  }
+
   async function handleSubmit(code: string) {
     const trimmed = code.trim();
     if (!trimmed) return;
@@ -40,6 +57,8 @@ export function ScanInput({
         return;
       }
       setValue("");
+      playScanBeep();
+      navigator.vibrate?.(50);
       onResolved(result);
     } catch {
       setError("Code not recognised");
@@ -67,6 +86,8 @@ export function ScanInput({
 
   function handleCameraResolved(result: ScanResolveResult) {
     setCameraOpen(false);
+    playScanBeep();
+    navigator.vibrate?.(50);
     onResolved(result);
   }
 

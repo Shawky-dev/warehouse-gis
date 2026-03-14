@@ -16,6 +16,7 @@ import {
     Copy,
     Pencil,
     Plus,
+    Printer,
     Sparkles,
     Trash2,
 } from "lucide-react";
@@ -110,6 +111,8 @@ import {
     normalizeLucideIconName,
 } from "@/shared/lib/lucide-icons";
 import { LocationLabel } from "@/features/tenant/labels/LocationLabel";
+import { LocationLabelSheet } from "@/features/tenant/labels/LocationLabelSheet";
+import { Checkbox } from "@/components/ui/checkbox";
 
 type LayoutFilter = "all" | "active" | "inactive";
 type LayoutDialogMode = "create" | "edit" | "classic" | null;
@@ -381,6 +384,8 @@ export default function WarehouseLayoutsPage() {
     const [selectedBlockLocationKindId, setSelectedBlockLocationKindId] = useState("");
     const [isScanCodeCopied, setIsScanCodeCopied] = useState(false);
     const [isLocationLabelOpen, setIsLocationLabelOpen] = useState(false);
+    const [selectedPrintIds, setSelectedPrintIds] = useState<Set<string>>(new Set());
+    const [isBulkPrintOpen, setIsBulkPrintOpen] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
     const [layoutSearch, setLayoutSearch] = useState("");
     const [layoutFilter, setLayoutFilter] = useState<LayoutFilter>("all");
@@ -1382,32 +1387,40 @@ export default function WarehouseLayoutsPage() {
                                                     <CardTitle>{t("warehouse.builder.treeTitle")}</CardTitle>
                                                     <CardDescription>{t("warehouse.builder.treeDescription")}</CardDescription>
                                                 </div>
-                                                {canEditBlocks ? (
-                                                    <div className="flex flex-wrap gap-2">
-                                                        {blockClipboard ? (
-                                                            <Button variant="outline" onClick={handleOpenPasteDialog}>
-                                                                <ClipboardPaste className="h-4 w-4" />
-                                                                {t("warehouse.builder.pasteSubtreeAction")}
-                                                            </Button>
-                                                        ) : null}
-                                                        <Button
-                                                            variant="outline"
-                                                            onClick={() => {
-                                                                setBlockForm({
-                                                                    blockTemplateId: templates[0]?.id ?? "",
-                                                                    parentId: selectedFlattenedNode?.node.block.id ?? "__root__",
-                                                                    position: "",
-                                                                    quantity: "1",
-                                                                    side: "__none__",
-                                                                });
-                                                                setIsAddBlockOpen(true);
-                                                            }}
-                                                        >
-                                                            <Plus className="h-4 w-4" />
-                                                            {t("warehouse.builder.addBlockAction")}
+                                                <div className="flex flex-wrap gap-2">
+                                                    {selectedPrintIds.size > 0 ? (
+                                                        <Button variant="outline" onClick={() => setIsBulkPrintOpen(true)}>
+                                                            <Printer className="h-4 w-4" />
+                                                            {t("warehouse.builder.printLabelsAction")} ({selectedPrintIds.size})
                                                         </Button>
-                                                    </div>
-                                                ) : null}
+                                                    ) : null}
+                                                    {canEditBlocks ? (
+                                                        <>
+                                                            {blockClipboard ? (
+                                                                <Button variant="outline" onClick={handleOpenPasteDialog}>
+                                                                    <ClipboardPaste className="h-4 w-4" />
+                                                                    {t("warehouse.builder.pasteSubtreeAction")}
+                                                                </Button>
+                                                            ) : null}
+                                                            <Button
+                                                                variant="outline"
+                                                                onClick={() => {
+                                                                    setBlockForm({
+                                                                        blockTemplateId: templates[0]?.id ?? "",
+                                                                        parentId: selectedFlattenedNode?.node.block.id ?? "__root__",
+                                                                        position: "",
+                                                                        quantity: "1",
+                                                                        side: "__none__",
+                                                                    });
+                                                                    setIsAddBlockOpen(true);
+                                                                }}
+                                                            >
+                                                                <Plus className="h-4 w-4" />
+                                                                {t("warehouse.builder.addBlockAction")}
+                                                            </Button>
+                                                        </>
+                                                    ) : null}
+                                                </div>
                                             </div>
                                         </CardHeader>
                                         <CardContent>
@@ -1482,6 +1495,25 @@ export default function WarehouseLayoutsPage() {
                                                                         </Badge>
                                                                     ) : null}
                                                                 </button>
+                                                                {item.node.block.scanCode ? (
+                                                                    <Checkbox
+                                                                        checked={selectedPrintIds.has(item.node.block.id)}
+                                                                        onCheckedChange={(checked) => {
+                                                                            setSelectedPrintIds((prev) => {
+                                                                                const next = new Set(prev);
+                                                                                if (checked) {
+                                                                                    next.add(item.node.block.id);
+                                                                                } else {
+                                                                                    next.delete(item.node.block.id);
+                                                                                }
+                                                                                return next;
+                                                                            });
+                                                                        }}
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                        aria-label={t("warehouse.builder.selectForPrint")}
+                                                                        className="shrink-0"
+                                                                    />
+                                                                ) : null}
                                                             </div>
                                                         );
                                                     })}
@@ -2094,6 +2126,27 @@ export default function WarehouseLayoutsPage() {
                     </DialogContent>
                 </Dialog>
             ) : null}
+
+            <Dialog open={isBulkPrintOpen} onOpenChange={setIsBulkPrintOpen}>
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>{t("labels.bulkPrintTitle")}</DialogTitle>
+                        <DialogDescription>
+                            {t("labels.bulkPrintDescription", { count: String(selectedPrintIds.size) })}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <LocationLabelSheet
+                        items={flattenedNodes
+                            .filter((n) => selectedPrintIds.has(n.node.block.id) && n.node.block.scanCode)
+                            .map((n) => ({
+                                scanCode: n.node.block.scanCode!,
+                                displayLabel: n.node.block.fullCode ?? n.node.block.identifier ?? n.node.block.scanCode!,
+                                locationKindName: n.node.block.locationKindName,
+                            }))}
+                        printButtonLabel={t("labels.bulkPrint")}
+                    />
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

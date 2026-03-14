@@ -407,6 +407,7 @@ export default function CountSessionsPage() {
 
     if (selectedSessionId && detail) {
         const isOpen = detail.status === "OPEN";
+        const isPosted = detail.status === "POSTED";
 
         return (
             <div className="flex flex-col gap-4 p-6">
