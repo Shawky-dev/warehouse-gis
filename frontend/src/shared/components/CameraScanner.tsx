@@ -167,7 +167,7 @@ export function CameraScanner({
       clearTimeout(timer);
       const scanner = scannerRef.current;
       if (scanner) {
-        scanner.stop().then(() => scanner.clear()).catch(() => {});
+        scanner.stop().then(() => scanner.clear()).catch(() => { });
         scannerRef.current = null;
       }
       isProcessing.current = false;

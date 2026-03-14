@@ -407,7 +407,6 @@ export default function CountSessionsPage() {
 
     if (selectedSessionId && detail) {
         const isOpen = detail.status === "OPEN";
-        const isPosted = detail.status === "POSTED";
 
         return (
             <div className="flex flex-col gap-4 p-6">
@@ -496,8 +495,8 @@ export default function CountSessionsPage() {
 
                                     const isHighlighted = scanFilter
                                         ? (!scanFilter.productId || line.productId === scanFilter.productId) &&
-                                          (!scanFilter.locationId || line.locationId === scanFilter.locationId) &&
-                                          (!scanFilter.lotNumber || line.lotNumber === scanFilter.lotNumber)
+                                        (!scanFilter.locationId || line.locationId === scanFilter.locationId) &&
+                                        (!scanFilter.lotNumber || line.lotNumber === scanFilter.lotNumber)
                                         : false;
 
                                     return (
