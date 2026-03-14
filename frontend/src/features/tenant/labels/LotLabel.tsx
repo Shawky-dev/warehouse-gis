@@ -41,7 +41,16 @@ export function LotLabel({ sku, productName, lotNumber, expiryDate }: LotLabelPr
       </div>
       <style>{`
         @media print {
-          body > *:not(#printable-label) { display: none !important; }
+          body * { visibility: hidden; }
+          #printable-label, #printable-label * { visibility: visible; }
+          #printable-label {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+          }
+          #printable-label svg { width: 200px !important; height: 200px !important; }
         }
       `}</style>
     </div>
