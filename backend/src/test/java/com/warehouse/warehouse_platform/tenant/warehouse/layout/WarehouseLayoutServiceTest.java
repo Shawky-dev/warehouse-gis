@@ -53,12 +53,12 @@ class WarehouseLayoutServiceTest {
     @BeforeEach
     void setUp() {
         service = new WarehouseLayoutService(layoutRepository, layoutBlockRepository, blockTemplateRepository,
-            tenantAuditService, warehouseLocationKindService);
+                tenantAuditService, warehouseLocationKindService);
         when(warehouseLocationKindService.getDefaultLocationKind()).thenReturn(WarehouseLocationKind.builder()
-            .id(UUID.fromString("41000000-0000-0000-0000-000000000001"))
-            .name("Storage")
-            .sortOrder(0)
-            .build());
+                .id(UUID.fromString("41000000-0000-0000-0000-000000000001"))
+                .name("Storage")
+                .sortOrder(0)
+                .build());
     }
 
     // -------------------------------------------------------------------------

@@ -62,8 +62,10 @@ class LayoutBlockServiceTest {
                 service = new LayoutBlockService(
                                 layoutBlockRepository, blockTemplateRepository, layoutRepository, tenantAuditService,
                                 warehouseLocationKindService);
-                when(warehouseLocationKindService.getDefaultLocationKind()).thenReturn(locationKind(STORAGE_KIND_ID, "Storage"));
-                when(warehouseLocationKindService.getRequired(STAGING_KIND_ID)).thenReturn(locationKind(STAGING_KIND_ID, "Staging"));
+                when(warehouseLocationKindService.getDefaultLocationKind())
+                                .thenReturn(locationKind(STORAGE_KIND_ID, "Storage"));
+                when(warehouseLocationKindService.getRequired(STAGING_KIND_ID))
+                                .thenReturn(locationKind(STAGING_KIND_ID, "Staging"));
         }
 
         // -------------------------------------------------------------------------
@@ -337,8 +339,10 @@ class LayoutBlockServiceTest {
                 assertEquals(1, result.createdBlocks().get(0).position());
                 assertEquals(2, result.createdBlocks().get(1).position());
                 assertEquals(4, savedBlocks.stream().map(LayoutBlock::getId).distinct().count());
-                assertEquals(2, savedBlocks.stream().filter(b -> b.getParentId() == null).map(LayoutBlock::getId).distinct().count());
-                assertEquals(2, savedBlocks.stream().filter(b -> b.getParentId() != null).map(LayoutBlock::getId).distinct().count());
+                assertEquals(2, savedBlocks.stream().filter(b -> b.getParentId() == null).map(LayoutBlock::getId)
+                                .distinct().count());
+                assertEquals(2, savedBlocks.stream().filter(b -> b.getParentId() != null).map(LayoutBlock::getId)
+                                .distinct().count());
                 assertTrue(savedBlocks.stream().anyMatch(b -> "L".equals(b.getSide())));
                 verify(tenantAuditService).record(eq("LAYOUT_BLOCK_SUBTREE_COPY"), eq("LAYOUT_BLOCK"),
                                 eq(sourceRootId.toString()), eq(null), any());
@@ -429,7 +433,8 @@ class LayoutBlockServiceTest {
                 when(layoutBlockRepository.existsByScanCodeAndIdNot(anyString(), any())).thenReturn(false);
                 when(layoutBlockRepository.save(any())).thenAnswer(inv -> {
                         LayoutBlock b = inv.getArgument(0);
-                        if (b.getId() == null) b.setId(UUID.randomUUID());
+                        if (b.getId() == null)
+                                b.setId(UUID.randomUUID());
                         b.setCreatedAt(Instant.now());
                         b.setUpdatedAt(Instant.now());
                         return b;
@@ -451,7 +456,8 @@ class LayoutBlockServiceTest {
                 when(layoutBlockRepository.existsByScanCodeAndIdNot(anyString(), any())).thenReturn(false);
                 when(layoutBlockRepository.save(any())).thenAnswer(inv -> {
                         LayoutBlock b = inv.getArgument(0);
-                        if (b.getId() == null) b.setId(UUID.randomUUID());
+                        if (b.getId() == null)
+                                b.setId(UUID.randomUUID());
                         b.setCreatedAt(Instant.now());
                         b.setUpdatedAt(Instant.now());
                         return b;
@@ -490,7 +496,8 @@ class LayoutBlockServiceTest {
                 when(layoutBlockRepository.save(any())).thenAnswer(inv -> {
                         LayoutBlock b = inv.getArgument(0);
                         if (b.getId() == null)
-                                b.setId(UUID.fromString(String.format("00000000-0000-0000-0000-%012d", seq.incrementAndGet())));
+                                b.setId(UUID.fromString(
+                                                String.format("00000000-0000-0000-0000-%012d", seq.incrementAndGet())));
                         b.setCreatedAt(Instant.now());
                         b.setUpdatedAt(Instant.now());
                         allNewBlocks.add(b);
