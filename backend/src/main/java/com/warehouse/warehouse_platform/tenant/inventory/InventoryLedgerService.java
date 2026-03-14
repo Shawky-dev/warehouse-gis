@@ -89,6 +89,32 @@ public class InventoryLedgerService {
     }
 
     @Transactional
+    public MovementResult pick(
+            UUID locationId,
+            UUID productId,
+            BigDecimal qty,
+            String lotNumber,
+            UUID sourceDocumentId,
+            String actor) {
+        validateQtyPositive(qty, "pick qty must be positive");
+        assertSelectableLocation(locationId);
+        Product product = loadProduct(productId);
+        String normalizedLotNumber = normalizeOptional(lotNumber);
+
+        StockMovement movement = StockMovement.builder()
+                .locationId(locationId)
+                .productId(product.getId())
+                .qty(qty.negate())
+                .type(MovementType.PICK)
+                .sourceDocumentId(sourceDocumentId)
+                .lotNumber(normalizedLotNumber)
+                .createdBy(actor)
+                .build();
+
+        return enrichMovement(movementRepository.save(movement), null, null);
+    }
+
+    @Transactional
     public TransferResult transfer(
             UUID fromLocationId,
             UUID toLocationId,

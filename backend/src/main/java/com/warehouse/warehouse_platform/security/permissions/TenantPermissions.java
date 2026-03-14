@@ -49,6 +49,11 @@ public final class TenantPermissions {
     public static final String RECEIPTS_EDIT = "tenant.receipts.edit";
     public static final String RECEIPTS_POST = "tenant.receipts.post";
     public static final String RECEIPTS_VOID = "tenant.receipts.void";
+    public static final String DISPATCHES_VIEW = "tenant.dispatches.view";
+    public static final String DISPATCHES_CREATE = "tenant.dispatches.create";
+    public static final String DISPATCHES_EDIT = "tenant.dispatches.edit";
+    public static final String DISPATCHES_POST = "tenant.dispatches.post";
+    public static final String DISPATCHES_VOID = "tenant.dispatches.void";
 
     private TenantPermissions() {
     }

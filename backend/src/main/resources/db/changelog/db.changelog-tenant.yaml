@@ -174,3 +174,10 @@ databaseChangeLog:
         - sqlFile:
             path: db/migration/tenant/V25__grant_receipt_permissions_to_admin.sql
             relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-c5-dispatch-documents-26
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V26__create_dispatch_documents.sql
+            relativeToChangelogFile: false
