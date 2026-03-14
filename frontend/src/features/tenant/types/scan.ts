@@ -3,6 +3,7 @@ export type ScanType =
   | "LOCATION"
   | "LOT"
   | "RECEIPT"
+  | "RECEIPT_LINE"
   | "DISPATCH"
   | "COUNT_SESSION";
 
@@ -26,6 +27,9 @@ export interface ScanResolveResult {
   receiptId?: string;
   dispatchId?: string;
   countSessionId?: string;
+  // RECEIPT_LINE (Stock Unit)
+  receiptLineId?: string;
+  lineQty?: string;
   // Display
   displayLabel?: string;
 }

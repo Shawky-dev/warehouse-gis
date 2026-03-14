@@ -18,7 +18,7 @@ import { listSuppliers } from "@/features/tenant/api/f0Api";
 import { getDocumentMovements, getLocationLookups, getProductLookups } from "@/features/tenant/api/inventoryApi";
 import type { MovementResult, ProductLookupItem, LocationLookupItem } from "@/features/tenant/types/inventory";
 import type { SupplierResult } from "@/features/tenant/types/f0";
-import type { ReceiptDetail, ReceiptListItem, ReceiptStatus } from "@/features/tenant/types/receipts";
+import type { ReceiptDetail, ReceiptLine, ReceiptListItem, ReceiptStatus } from "@/features/tenant/types/receipts";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
@@ -44,8 +44,11 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
+import { Printer } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { ScanInput } from "@/shared/components/ScanInput";
 import { DocumentQR } from "@/features/tenant/labels/DocumentQR";
+import { LocationLabelSheet } from "@/features/tenant/labels/LocationLabelSheet";
 import type { ScanResolveResult } from "@/features/tenant/types/scan";
 
 interface ReceiptLineFormState {
@@ -113,6 +116,8 @@ export default function ReceiptsPage() {
 
     const [docMovements, setDocMovements] = useState<MovementResult[]>([]);
     const [docMovementsLoading, setDocMovementsLoading] = useState(false);
+    const [selectedLabelLine, setSelectedLabelLine] = useState<ReceiptLine | null>(null);
+    const [isBulkLabelPrintOpen, setIsBulkLabelPrintOpen] = useState(false);
 
     const selectedProduct = useMemo(
         () => products.find((product) => product.id === lineForm.productId) ?? null,
@@ -617,6 +622,47 @@ export default function ReceiptsPage() {
                 {isPosted ? (
                     <Card>
                         <CardHeader>
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="text-base">{t("receipts.stockUnitLabels.title")}</CardTitle>
+                                <Button variant="outline" size="sm" onClick={() => setIsBulkLabelPrintOpen(true)}>
+                                    <Printer className="h-4 w-4" />
+                                    {t("receipts.stockUnitLabels.printAll")}
+                                </Button>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                                {detail.lines.map((line) => (
+                                    <div key={line.id} className="flex flex-col items-center gap-2 rounded-lg border p-3">
+                                        <QRCodeSVG value={line.stockUnitQrData} size={80} />
+                                        <p className="text-center text-xs font-medium leading-tight">
+                                            {line.productName ?? line.productSku ?? line.productId}
+                                        </p>
+                                        {line.lotNumber ? (
+                                            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium">
+                                                {line.lotNumber}
+                                            </span>
+                                        ) : null}
+                                        <p className="font-mono text-[10px] tabular-nums text-muted-foreground">×{line.qty}</p>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="w-full text-xs"
+                                            onClick={() => setSelectedLabelLine(line)}
+                                        >
+                                            <Printer className="h-3 w-3" />
+                                            {t("receipts.stockUnitLabels.printLabel")}
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
+                ) : null}
+
+                {isPosted ? (
+                    <Card>
+                        <CardHeader>
                             <CardTitle className="text-base">{t("inventory.movements.documentMovements")}</CardTitle>
                         </CardHeader>
                         <CardContent className="p-0">
@@ -661,6 +707,37 @@ export default function ReceiptsPage() {
                         </CardContent>
                     </Card>
                 ) : null}
+
+                <Dialog open={selectedLabelLine !== null} onOpenChange={(open) => { if (!open) setSelectedLabelLine(null); }}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>{t("receipts.stockUnitLabels.printLabel")}</DialogTitle>
+                        </DialogHeader>
+                        {selectedLabelLine ? (
+                            <DocumentQR
+                                qrData={selectedLabelLine.stockUnitQrData}
+                                label={`${selectedLabelLine.productName ?? selectedLabelLine.productSku ?? selectedLabelLine.productId}${selectedLabelLine.lotNumber ? " / Lot " + selectedLabelLine.lotNumber : ""}`}
+                                size={160}
+                            />
+                        ) : null}
+                    </DialogContent>
+                </Dialog>
+
+                <Dialog open={isBulkLabelPrintOpen} onOpenChange={setIsBulkLabelPrintOpen}>
+                    <DialogContent className="max-w-2xl">
+                        <DialogHeader>
+                            <DialogTitle>{t("receipts.stockUnitLabels.title")}</DialogTitle>
+                        </DialogHeader>
+                        <LocationLabelSheet
+                            items={detail.lines.map((line) => ({
+                                scanCode: line.stockUnitQrData,
+                                displayLabel: `${line.productName ?? line.productSku ?? line.productId} ×${line.qty}`,
+                                locationKindName: line.lotNumber ? `Lot: ${line.lotNumber}` : null,
+                            }))}
+                            printButtonLabel={t("receipts.stockUnitLabels.printAll")}
+                        />
+                    </DialogContent>
+                </Dialog>
 
                 <AlertDialog open={isPostConfirmOpen} onOpenChange={setIsPostConfirmOpen}>
                     <AlertDialogContent>

@@ -26,6 +26,7 @@ export interface ReceiptLine {
     expiryDate: string | null;
     notes: string | null;
     position: number;
+    stockUnitQrData: string;
 }
 
 export interface ReceiptDetail {

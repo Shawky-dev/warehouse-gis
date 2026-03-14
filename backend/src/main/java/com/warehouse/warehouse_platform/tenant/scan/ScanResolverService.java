@@ -9,6 +9,8 @@ import com.warehouse.warehouse_platform.tenant.product.Product;
 import com.warehouse.warehouse_platform.tenant.product.ProductRepository;
 import com.warehouse.warehouse_platform.tenant.receipt.ReceiptDocument;
 import com.warehouse.warehouse_platform.tenant.receipt.ReceiptDocumentRepository;
+import com.warehouse.warehouse_platform.tenant.receipt.ReceiptLine;
+import com.warehouse.warehouse_platform.tenant.receipt.ReceiptLineRepository;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlock;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlockRepository;
 import org.springframework.http.HttpStatus;
@@ -26,6 +28,7 @@ public class ScanResolverService {
     private final LayoutBlockRepository layoutBlockRepository;
     private final StockMovementRepository stockMovementRepository;
     private final ReceiptDocumentRepository receiptDocumentRepository;
+    private final ReceiptLineRepository receiptLineRepository;
     private final DispatchDocumentRepository dispatchDocumentRepository;
     private final CountSessionRepository countSessionRepository;
 
@@ -34,12 +37,14 @@ public class ScanResolverService {
             LayoutBlockRepository layoutBlockRepository,
             StockMovementRepository stockMovementRepository,
             ReceiptDocumentRepository receiptDocumentRepository,
+            ReceiptLineRepository receiptLineRepository,
             DispatchDocumentRepository dispatchDocumentRepository,
             CountSessionRepository countSessionRepository) {
         this.productRepository = productRepository;
         this.layoutBlockRepository = layoutBlockRepository;
         this.stockMovementRepository = stockMovementRepository;
         this.receiptDocumentRepository = receiptDocumentRepository;
+        this.receiptLineRepository = receiptLineRepository;
         this.dispatchDocumentRepository = dispatchDocumentRepository;
         this.countSessionRepository = countSessionRepository;
     }
@@ -111,7 +116,44 @@ public class ScanResolverService {
             }
         }
 
-        // Step 4: RECEIPT:{uuid}
+        // Step 4: RECEIPT_LINE:{uuid} — Stock Unit QR generated at receipt post
+        if (code.startsWith("RECEIPT_LINE:")) {
+            UUID id = tryParseUuid(code.substring(13));
+            if (id != null) {
+                Optional<ReceiptLine> lineOpt = receiptLineRepository.findById(id);
+                if (lineOpt.isPresent()) {
+                    ReceiptLine line = lineOpt.get();
+                    UUID productId = line.getProductId();
+                    UUID locationId = line.getDestinationLocationId();
+                    Product product = productId != null ? productRepository.findById(productId).orElse(null) : null;
+                    LayoutBlock block = locationId != null ? layoutBlockRepository.findById(locationId).orElse(null) : null;
+                    String productLabel = product != null
+                            ? product.getName() + " (" + product.getSku() + ")"
+                            : line.getProductId().toString();
+                    String locationLabel = block != null && block.getFullCode() != null && !block.getFullCode().isBlank()
+                            ? block.getFullCode()
+                            : block != null ? block.getScanCode() : line.getDestinationLocationId().toString();
+                    String displayLabel = productLabel
+                            + (line.getLotNumber() != null ? " / Lot " + line.getLotNumber() : "")
+                            + " @ " + locationLabel;
+                    return ScanResolveResult.builder()
+                            .type(ScanType.RECEIPT_LINE)
+                            .receiptLineId(id)
+                            .receiptId(line.getReceiptId())
+                            .productId(productId)
+                            .productSku(product != null ? product.getSku() : null)
+                            .productName(product != null ? product.getName() : null)
+                            .locationId(locationId)
+                            .locationPathLabel(locationLabel)
+                            .lotNumber(line.getLotNumber())
+                            .lineQty(line.getQty())
+                            .displayLabel(displayLabel)
+                            .build();
+                }
+            }
+        }
+
+        // Step 5: RECEIPT:{uuid}
         if (code.startsWith("RECEIPT:")) {
             UUID id = tryParseUuid(code.substring(8));
             if (id != null) {
@@ -130,7 +172,7 @@ public class ScanResolverService {
             }
         }
 
-        // Step 5: DISPATCH:{uuid}
+        // Step 6: DISPATCH:{uuid}
         if (code.startsWith("DISPATCH:")) {
             UUID id = tryParseUuid(code.substring(9));
             if (id != null) {
@@ -149,7 +191,7 @@ public class ScanResolverService {
             }
         }
 
-        // Step 6: COUNT:{uuid}
+        // Step 7: COUNT:{uuid}
         if (code.startsWith("COUNT:")) {
             UUID id = tryParseUuid(code.substring(6));
             if (id != null) {

@@ -3,6 +3,7 @@ package com.warehouse.warehouse_platform.tenant.scan;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Getter
@@ -32,6 +33,10 @@ public class ScanResolveResult {
     private final UUID receiptId;
     private final UUID dispatchId;
     private final UUID countSessionId;
+
+    // RECEIPT_LINE (Stock Unit)
+    private final UUID receiptLineId;
+    private final BigDecimal lineQty;
 
     /** Human-readable label shown in the UI after a successful resolve. */
     private final String displayLabel;

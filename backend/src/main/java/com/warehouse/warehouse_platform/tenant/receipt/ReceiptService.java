@@ -622,5 +622,10 @@ public class ReceiptService {
             LocalDate expiryDate,
             String notes,
             int position) {
+
+        @com.fasterxml.jackson.annotation.JsonProperty
+        public String stockUnitQrData() {
+            return "RECEIPT_LINE:" + id;
+        }
     }
 }

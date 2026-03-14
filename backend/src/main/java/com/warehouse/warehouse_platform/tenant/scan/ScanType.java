@@ -5,6 +5,7 @@ public enum ScanType {
     LOCATION,
     LOT,
     RECEIPT,
+    RECEIPT_LINE,
     DISPATCH,
     COUNT_SESSION
 }
