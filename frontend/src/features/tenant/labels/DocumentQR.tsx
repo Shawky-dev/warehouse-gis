@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { QRCodeSVG } from "qrcode.react";
 
 interface DocumentQRProps {
@@ -7,15 +8,23 @@ interface DocumentQRProps {
 }
 
 export function DocumentQR({ qrData, label, size = 96 }: DocumentQRProps) {
+  const rawId = useId();
+  const printId = `dqr-${rawId.replace(/[^a-zA-Z0-9]/g, "")}`;
+
   function handlePrint() {
+    document.body.dataset.printTarget = printId;
+    const cleanup = () => {
+      delete document.body.dataset.printTarget;
+      window.removeEventListener("afterprint", cleanup);
+    };
+    window.addEventListener("afterprint", cleanup);
     window.print();
   }
 
   return (
     <div className="flex items-center gap-4">
-      <div id="printable-label" className="flex flex-col items-center gap-1">
+      <div id={printId} className="flex flex-col items-center gap-1">
         <QRCodeSVG value={qrData} size={size} />
-        {/* Shown only when printing — hidden on screen */}
         <p className="hidden text-sm font-medium print:block">{label}</p>
         <p className="hidden font-mono text-xs print:block">{qrData}</p>
       </div>
@@ -34,19 +43,17 @@ export function DocumentQR({ qrData, label, size = 96 }: DocumentQRProps) {
 
       <style>{`
         @media print {
-          /* Hide everything, then reveal only the printable label */
-          body * { visibility: hidden; }
-          #printable-label,
-          #printable-label * { visibility: visible; }
-          #printable-label {
+          body[data-print-target="${printId}"] * { visibility: hidden; }
+          body[data-print-target="${printId}"] #${printId},
+          body[data-print-target="${printId}"] #${printId} * { visibility: visible; }
+          body[data-print-target="${printId}"] #${printId} {
             position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
             text-align: center;
           }
-          /* Scale QR up for a decent print size */
-          #printable-label svg {
+          body[data-print-target="${printId}"] #${printId} svg {
             width: 200px !important;
             height: 200px !important;
           }

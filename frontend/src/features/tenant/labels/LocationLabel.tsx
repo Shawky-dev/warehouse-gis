@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { QRCodeSVG } from "qrcode.react";
 
 interface LocationLabelProps {
@@ -8,16 +9,24 @@ interface LocationLabelProps {
 }
 
 export function LocationLabel({ scanCode, fullCode, locationKindName, pathLabel }: LocationLabelProps) {
+  const rawId = useId();
+  const printId = `loc-${rawId.replace(/[^a-zA-Z0-9]/g, "")}`;
   const displayLabel = fullCode ?? pathLabel ?? scanCode;
 
   function handlePrint() {
+    document.body.dataset.printTarget = printId;
+    const cleanup = () => {
+      delete document.body.dataset.printTarget;
+      window.removeEventListener("afterprint", cleanup);
+    };
+    window.addEventListener("afterprint", cleanup);
     window.print();
   }
 
   return (
     <div>
       <div
-        id="printable-label"
+        id={printId}
         className="flex flex-col items-center gap-3 rounded-lg border p-6 print:border-none print:p-0"
       >
         <QRCodeSVG value={scanCode} size={160} />
@@ -40,16 +49,20 @@ export function LocationLabel({ scanCode, fullCode, locationKindName, pathLabel 
       </div>
       <style>{`
         @media print {
-          body * { visibility: hidden; }
-          #printable-label, #printable-label * { visibility: visible; }
-          #printable-label {
+          body[data-print-target="${printId}"] * { visibility: hidden; }
+          body[data-print-target="${printId}"] #${printId},
+          body[data-print-target="${printId}"] #${printId} * { visibility: visible; }
+          body[data-print-target="${printId}"] #${printId} {
             position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
             text-align: center;
           }
-          #printable-label svg { width: 200px !important; height: 200px !important; }
+          body[data-print-target="${printId}"] #${printId} svg {
+            width: 200px !important;
+            height: 200px !important;
+          }
         }
       `}</style>
     </div>
