@@ -341,7 +341,8 @@ public class LayoutBlockService {
         List<BlockResult> finalRoots = createdRoots.stream()
                 .map(r -> {
                     LayoutBlock refreshed = layoutBlockRepository.findById(r.id()).orElse(null);
-                    if (refreshed == null) return r;
+                    if (refreshed == null)
+                        return r;
                     return toResult(refreshed, requireTemplate(templatesById, refreshed.getBlockTemplateId()));
                 })
                 .toList();
@@ -360,7 +361,8 @@ public class LayoutBlockService {
      * hierarchy (e.g. "A-01-02"). Falls back to appending the block's UUID prefix
      * if a collision is detected.
      */
-    private String generateScanCode(LayoutBlock block, List<LayoutBlock> ancestors, Map<UUID, BlockTemplate> templateMap) {
+    private String generateScanCode(LayoutBlock block, List<LayoutBlock> ancestors,
+            Map<UUID, BlockTemplate> templateMap) {
         List<String> parts = new ArrayList<>();
         for (LayoutBlock ancestor : ancestors) {
             BlockTemplate t = templateMap.get(ancestor.getBlockTemplateId());
@@ -381,11 +383,14 @@ public class LayoutBlockService {
         if (template == null || template.getIdentifierFormat() == null) {
             return String.valueOf(block.getPosition() + 1);
         }
-        return switch (template.getIdentifierFormat()) {
-            case ALPHA -> toAlphabeticIdentifier(block.getPosition());
-            case NUMERIC -> String.format("%02d", block.getPosition() + 1);
-            default -> String.valueOf(block.getPosition() + 1);
-        };
+        BlockTemplate.IdentifierFormat format = template.getIdentifierFormat();
+        if (format == BlockTemplate.IdentifierFormat.ALPHA) {
+            return toAlphabeticIdentifier(block.getPosition());
+        }
+        if (format == BlockTemplate.IdentifierFormat.NUMERIC) {
+            return String.format("%02d", block.getPosition() + 1);
+        }
+        return String.valueOf(block.getPosition() + 1);
     }
 
     /**
@@ -398,7 +403,8 @@ public class LayoutBlockService {
         Set<UUID> visited = new HashSet<>();
         while (current != null && visited.add(current)) {
             LayoutBlock b = layoutBlockRepository.findById(current).orElse(null);
-            if (b == null) break;
+            if (b == null)
+                break;
             ancestors.add(0, b); // prepend so list is root-first
             current = b.getParentId();
         }
@@ -414,7 +420,8 @@ public class LayoutBlockService {
         Set<UUID> visited = new HashSet<>();
         while (current != null && visited.add(current)) {
             LayoutBlock b = blockById.get(current);
-            if (b == null) break;
+            if (b == null)
+                break;
             ancestors.add(0, b);
             current = b.getParentId();
         }
@@ -445,7 +452,8 @@ public class LayoutBlockService {
      * Reloads the full layout tree once to build ancestor chains efficiently.
      */
     private void assignScanCodes(UUID layoutId, List<LayoutBlock> newBlocks) {
-        if (newBlocks.isEmpty()) return;
+        if (newBlocks.isEmpty())
+            return;
 
         List<LayoutBlock> allBlocks = layoutBlockRepository.findByLayoutIdOrderByParentIdAscPositionAsc(layoutId);
         Map<UUID, LayoutBlock> blockById = allBlocks.stream()
@@ -573,7 +581,8 @@ public class LayoutBlockService {
                 .parentId(parentId)
                 .position(position)
                 .side(source.getSide())
-                .locationKind(source.getLocationKind() != null ? source.getLocationKind() : warehouseLocationKindService.getDefaultLocationKind())
+                .locationKind(source.getLocationKind() != null ? source.getLocationKind()
+                        : warehouseLocationKindService.getDefaultLocationKind())
                 // scanCode and fullCode are generated separately via assignScanCodes()
                 .build();
     }
@@ -676,14 +685,18 @@ public class LayoutBlockService {
             return null;
         }
 
-        return switch (sideConfig) {
-            case NONE -> throw WarehouseManagementException.badRequest(
+        if (sideConfig == BlockTemplate.SideConfig.NONE) {
+            throw WarehouseManagementException.badRequest(
                     "side is not allowed when the template side configuration is NONE");
-            case LR -> normalizeAgainstAllowed(normalized, List.of("L", "R"), "side must be one of: L, R");
-            case AB -> normalizeAgainstAllowed(normalized, List.of("A", "B"), "side must be one of: A, B");
-            case CUSTOM -> normalizeAgainstAllowed(normalized, parseSideOptions(template),
-                    "side must match one of the template's custom side options");
-        };
+        }
+        if (sideConfig == BlockTemplate.SideConfig.LR) {
+            return normalizeAgainstAllowed(normalized, List.of("L", "R"), "side must be one of: L, R");
+        }
+        if (sideConfig == BlockTemplate.SideConfig.AB) {
+            return normalizeAgainstAllowed(normalized, List.of("A", "B"), "side must be one of: A, B");
+        }
+        return normalizeAgainstAllowed(normalized, parseSideOptions(template),
+                "side must match one of the template's custom side options");
     }
 
     private String normalizeAgainstAllowed(String value, List<String> allowed, String errorMessage) {
@@ -739,11 +752,13 @@ public class LayoutBlockService {
         if (format == null) {
             return null;
         }
-        return switch (format) {
-            case NUMERIC -> String.valueOf(block.getPosition() + 1);
-            case ALPHA -> toAlphabeticIdentifier(block.getPosition());
-            case CUSTOM, FREE_TEXT -> null;
-        };
+        if (format == BlockTemplate.IdentifierFormat.NUMERIC) {
+            return String.valueOf(block.getPosition() + 1);
+        }
+        if (format == BlockTemplate.IdentifierFormat.ALPHA) {
+            return toAlphabeticIdentifier(block.getPosition());
+        }
+        return null;
     }
 
     private String toAlphabeticIdentifier(int position) {
