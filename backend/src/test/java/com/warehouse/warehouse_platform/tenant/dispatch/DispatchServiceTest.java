@@ -4,6 +4,7 @@ import com.warehouse.warehouse_platform.tenant.inventory.InventoryLedgerService;
 import com.warehouse.warehouse_platform.tenant.inventory.StockMovementRepository;
 import com.warehouse.warehouse_platform.tenant.product.Product;
 import com.warehouse.warehouse_platform.tenant.product.ProductRepository;
+import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplateRepository;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlock;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlockRepository;
 import com.warehouse.warehouse_platform.tenant.warehouse.locationkind.WarehouseLocationKind;
@@ -40,6 +41,8 @@ class DispatchServiceTest {
     @Mock
     LayoutBlockRepository layoutBlockRepository;
     @Mock
+    BlockTemplateRepository blockTemplateRepository;
+    @Mock
     StockMovementRepository stockMovementRepository;
     @Mock
     InventoryLedgerService inventoryLedgerService;
@@ -59,6 +62,7 @@ class DispatchServiceTest {
                 dispatchLineRepository,
                 productRepository,
                 layoutBlockRepository,
+                blockTemplateRepository,
                 stockMovementRepository,
                 inventoryLedgerService);
     }
@@ -183,7 +187,7 @@ class DispatchServiceTest {
                 new BigDecimal("2.0000"),
                 "LOT-A",
                 null,
-                null,
+                "Void dispatch NO_REF (" + DISPATCH_ID + ")",
                 DISPATCH_ID,
                 "VOID_DISPATCH",
                 "actor");
@@ -193,7 +197,7 @@ class DispatchServiceTest {
                 new BigDecimal("3.0000"),
                 null,
                 null,
-                null,
+                "Void dispatch NO_REF (" + DISPATCH_ID + ")",
                 DISPATCH_ID,
                 "VOID_DISPATCH",
                 "actor");

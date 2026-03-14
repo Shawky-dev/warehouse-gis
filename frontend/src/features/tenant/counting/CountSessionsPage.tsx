@@ -358,6 +358,13 @@ export default function CountSessionsPage() {
         }
     };
 
+    const renderLocationCell = (pathLabel: string | null, locationId: string) => (
+        <div className="flex flex-col">
+            <span>{pathLabel ?? "—"}</span>
+            <span className="text-xs text-muted-foreground">{locationId}</span>
+        </div>
+    );
+
     if (selectedSessionId && detailLoading) {
         return (
             <div className="flex flex-col gap-4 p-6">
@@ -388,7 +395,9 @@ export default function CountSessionsPage() {
                             <span>{detail.name}</span>
                             <Badge className={statusBadgeClass(detail.status)}>{t(`counting.status.${detail.status}`)}</Badge>
                         </CardTitle>
-                        <CardDescription>{new Date(detail.createdAt).toLocaleString()}</CardDescription>
+                        <CardDescription>
+                            {new Date(detail.createdAt).toLocaleString()} • {detail.id}
+                        </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-3 text-sm">
                         <p><strong>{t("counting.form.createdBy")}: </strong>{detail.createdBy}</p>
@@ -440,7 +449,7 @@ export default function CountSessionsPage() {
 
                                     return (
                                         <TableRow key={line.id}>
-                                            <TableCell>{line.locationPathLabel ?? line.locationId}</TableCell>
+                                            <TableCell>{renderLocationCell(line.locationPathLabel, line.locationId)}</TableCell>
                                             <TableCell>{line.productName ?? line.productSku ?? line.productId}</TableCell>
                                             <TableCell>{line.lotNumber ?? "—"}</TableCell>
                                             <TableCell className="text-end font-mono tabular-nums">{line.expectedQty}</TableCell>
@@ -622,7 +631,12 @@ export default function CountSessionsPage() {
                                         className="cursor-pointer"
                                         onClick={() => setSelectedSessionId(session.id)}
                                     >
-                                        <TableCell>{session.name}</TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-col">
+                                                <span>{session.name}</span>
+                                                <span className="text-xs text-muted-foreground">{session.id}</span>
+                                            </div>
+                                        </TableCell>
                                         <TableCell>
                                             <Badge className={statusBadgeClass(session.status)}>{t(`counting.status.${session.status}`)}</Badge>
                                         </TableCell>

@@ -4,6 +4,7 @@ import com.warehouse.warehouse_platform.tenant.inventory.InventoryLedgerService;
 import com.warehouse.warehouse_platform.tenant.product.Product;
 import com.warehouse.warehouse_platform.tenant.product.ProductRepository;
 import com.warehouse.warehouse_platform.tenant.supplier.SupplierRepository;
+import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplateRepository;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlock;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlockRepository;
 import com.warehouse.warehouse_platform.tenant.warehouse.locationkind.WarehouseLocationKind;
@@ -42,6 +43,8 @@ class ReceiptServiceTest {
     @Mock
     LayoutBlockRepository layoutBlockRepository;
     @Mock
+    BlockTemplateRepository blockTemplateRepository;
+    @Mock
     InventoryLedgerService inventoryLedgerService;
 
     ReceiptService service;
@@ -60,6 +63,7 @@ class ReceiptServiceTest {
                 supplierRepository,
                 productRepository,
                 layoutBlockRepository,
+                blockTemplateRepository,
                 inventoryLedgerService);
     }
 
@@ -209,7 +213,7 @@ class ReceiptServiceTest {
                 PRODUCT_ID,
                 new BigDecimal("-2.0000"),
                 "LOT-A",
-                "Void receipt " + RECEIPT_ID,
+                "Void receipt NO_REF (" + RECEIPT_ID + ")",
                 RECEIPT_ID,
                 "VOID_RECEIPT",
                 "actor");
@@ -218,7 +222,7 @@ class ReceiptServiceTest {
                 PRODUCT_ID,
                 new BigDecimal("-3.0000"),
                 null,
-                "Void receipt " + RECEIPT_ID,
+                "Void receipt NO_REF (" + RECEIPT_ID + ")",
                 RECEIPT_ID,
                 "VOID_RECEIPT",
                 "actor");

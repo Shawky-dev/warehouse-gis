@@ -311,6 +311,13 @@ export default function ReceiptsPage() {
         }
     };
 
+    const renderLocationCell = (pathLabel: string | null, locationId: string) => (
+        <div className="flex flex-col">
+            <span>{pathLabel ?? "—"}</span>
+            <span className="text-xs text-muted-foreground">{locationId}</span>
+        </div>
+    );
+
     if (selectedReceiptId && detailLoading) {
         return (
             <div className="flex flex-col gap-4 p-6">
@@ -495,7 +502,7 @@ export default function ReceiptsPage() {
                                 {detail.lines.map((line) => (
                                     <TableRow key={line.id}>
                                         <TableCell>{line.productName ?? line.productSku ?? line.productId}</TableCell>
-                                        <TableCell>{line.locationPathLabel ?? line.destinationLocationId}</TableCell>
+                                        <TableCell>{renderLocationCell(line.locationPathLabel, line.destinationLocationId)}</TableCell>
                                         <TableCell className="text-end">{line.qty}</TableCell>
                                         <TableCell>{line.lotNumber ?? "—"}</TableCell>
                                         <TableCell>{line.expiryDate ?? "—"}</TableCell>
@@ -630,7 +637,12 @@ export default function ReceiptsPage() {
                                         className="cursor-pointer"
                                         onClick={() => setSelectedReceiptId(receipt.id)}
                                     >
-                                        <TableCell>{receipt.reference || t("receipts.referenceFallback")}</TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-col">
+                                                <span>{receipt.reference || t("receipts.referenceFallback")}</span>
+                                                <span className="text-xs text-muted-foreground">{receipt.id}</span>
+                                            </div>
+                                        </TableCell>
                                         <TableCell>{receipt.supplierName || t("receipts.supplierFallback")}</TableCell>
                                         <TableCell>
                                             <Badge className={statusBadgeClass(receipt.status)}>{t(`receipts.status.${receipt.status}`)}</Badge>

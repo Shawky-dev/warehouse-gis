@@ -5,6 +5,7 @@ import com.warehouse.warehouse_platform.tenant.inventory.StockEntry;
 import com.warehouse.warehouse_platform.tenant.inventory.StockMovementRepository;
 import com.warehouse.warehouse_platform.tenant.product.Product;
 import com.warehouse.warehouse_platform.tenant.product.ProductRepository;
+import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplateRepository;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlock;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlockRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,6 +38,8 @@ class CountSessionServiceTest {
     @Mock
     LayoutBlockRepository layoutBlockRepository;
     @Mock
+    BlockTemplateRepository blockTemplateRepository;
+    @Mock
     ProductRepository productRepository;
     @Mock
     StockMovementRepository stockMovementRepository;
@@ -56,6 +59,7 @@ class CountSessionServiceTest {
                 countSessionRepository,
                 countLineRepository,
                 layoutBlockRepository,
+                blockTemplateRepository,
                 productRepository,
                 stockMovementRepository,
                 inventoryLedgerService);
@@ -164,7 +168,7 @@ class CountSessionServiceTest {
                 PRODUCT_ID,
                 new BigDecimal("3.0000"),
                 "LOT-A",
-                "Count session " + SESSION_ID,
+                "Count session Cycle Count (" + SESSION_ID + ")",
                 SESSION_ID,
                 "COUNT_ADJUSTMENT",
                 "actor");
@@ -173,7 +177,7 @@ class CountSessionServiceTest {
                 PRODUCT_ID,
                 new BigDecimal("-2.0000"),
                 null,
-                "Count session " + SESSION_ID,
+                "Count session Cycle Count (" + SESSION_ID + ")",
                 SESSION_ID,
                 "COUNT_ADJUSTMENT",
                 "actor");

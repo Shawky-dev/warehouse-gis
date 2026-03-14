@@ -5,6 +5,8 @@ import com.warehouse.warehouse_platform.tenant.inventory.StockEntry;
 import com.warehouse.warehouse_platform.tenant.inventory.StockMovementRepository;
 import com.warehouse.warehouse_platform.tenant.product.Product;
 import com.warehouse.warehouse_platform.tenant.product.ProductRepository;
+import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplate;
+import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplateRepository;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlock;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlockRepository;
 import jakarta.persistence.criteria.Predicate;
@@ -19,10 +21,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -36,6 +40,7 @@ public class CountSessionService {
     private final CountSessionRepository countSessionRepository;
     private final CountLineRepository countLineRepository;
     private final LayoutBlockRepository layoutBlockRepository;
+    private final BlockTemplateRepository blockTemplateRepository;
     private final ProductRepository productRepository;
     private final StockMovementRepository stockMovementRepository;
     private final InventoryLedgerService inventoryLedgerService;
@@ -44,12 +49,14 @@ public class CountSessionService {
             CountSessionRepository countSessionRepository,
             CountLineRepository countLineRepository,
             LayoutBlockRepository layoutBlockRepository,
+            BlockTemplateRepository blockTemplateRepository,
             ProductRepository productRepository,
             StockMovementRepository stockMovementRepository,
             InventoryLedgerService inventoryLedgerService) {
         this.countSessionRepository = countSessionRepository;
         this.countLineRepository = countLineRepository;
         this.layoutBlockRepository = layoutBlockRepository;
+        this.blockTemplateRepository = blockTemplateRepository;
         this.productRepository = productRepository;
         this.stockMovementRepository = stockMovementRepository;
         this.inventoryLedgerService = inventoryLedgerService;
@@ -149,7 +156,7 @@ public class CountSessionService {
                     line.getProductId(),
                     variance,
                     line.getLotNumber(),
-                    "Count session " + sessionId,
+                    "Count session " + session.getName() + " (" + sessionId + ")",
                     sessionId,
                     COUNT_ADJUSTMENT_REASON_CODE,
                     normalizedActor);
@@ -312,7 +319,14 @@ public class CountSessionService {
 
             if (normalizedSearch != null) {
                 String like = "%" + normalizedSearch.toLowerCase(Locale.ROOT) + "%";
-                predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("name")), like));
+                Predicate nameMatch = criteriaBuilder.like(criteriaBuilder.lower(root.get("name")), like);
+                UUID parsedId = tryParseUuid(normalizedSearch);
+                if (parsedId != null) {
+                    Predicate idMatch = criteriaBuilder.equal(root.get("id"), parsedId);
+                    predicates.add(criteriaBuilder.or(nameMatch, idMatch));
+                } else {
+                    predicates.add(criteriaBuilder.or(nameMatch));
+                }
             }
 
             return criteriaBuilder.and(predicates.toArray(Predicate[]::new));
@@ -325,6 +339,14 @@ public class CountSessionService {
         }
         String normalized = search.trim();
         return normalized.isEmpty() ? null : normalized;
+    }
+
+    private UUID tryParseUuid(String value) {
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
     }
 
     private CountSessionDetailResult toDetailResult(
@@ -370,7 +392,7 @@ public class CountSessionService {
                 line.getId(),
                 line.getSessionId(),
                 line.getLocationId(),
-                location != null ? location.getFullCode() : null,
+                resolveLocationPathLabel(location, line.getLocationId()),
                 line.getProductId(),
                 product != null ? product.getSku() : null,
                 product != null ? product.getName() : null,
@@ -378,6 +400,78 @@ public class CountSessionService {
                 line.getExpectedQty(),
                 line.getCountedQty(),
                 variance);
+    }
+
+    private String resolveLocationPathLabel(LayoutBlock location, UUID fallbackId) {
+        if (location == null) {
+            return fallbackId != null ? fallbackId.toString() : null;
+        }
+        if (location.getFullCode() != null && !location.getFullCode().isBlank()) {
+            return location.getFullCode();
+        }
+        if (location.getScanCode() != null && !location.getScanCode().isBlank()) {
+            return location.getScanCode();
+        }
+        String computedPath = buildLocationPath(location);
+        if (computedPath != null && !computedPath.isBlank()) {
+            return computedPath;
+        }
+        if (location.getId() != null) {
+            return location.getId().toString();
+        }
+        return fallbackId != null ? fallbackId.toString() : null;
+    }
+
+    private String buildLocationPath(LayoutBlock leaf) {
+        List<LayoutBlock> chain = new ArrayList<>();
+        LayoutBlock current = leaf;
+        Set<UUID> visited = new HashSet<>();
+
+        while (current != null && current.getId() != null && visited.add(current.getId())) {
+            chain.add(0, current);
+            UUID parentId = current.getParentId();
+            if (parentId == null) {
+                break;
+            }
+            current = layoutBlockRepository.findById(parentId).orElse(null);
+        }
+
+        return chain.stream()
+                .map(this::formatPathSegment)
+                .filter(segment -> segment != null && !segment.isBlank())
+                .collect(Collectors.joining("->"));
+    }
+
+    private String formatPathSegment(LayoutBlock block) {
+        BlockTemplate template = blockTemplateRepository.findById(block.getBlockTemplateId()).orElse(null);
+        String identifier = resolveIdentifier(block, template);
+        if (identifier != null && !identifier.isBlank()) {
+            return identifier;
+        }
+        return String.valueOf(block.getPosition() + 1);
+    }
+
+    private String resolveIdentifier(LayoutBlock block, BlockTemplate template) {
+        if (template == null || template.getIdentifierFormat() == null) {
+            return null;
+        }
+        if (template.getIdentifierFormat() == BlockTemplate.IdentifierFormat.NUMERIC) {
+            return String.valueOf(block.getPosition() + 1);
+        }
+        if (template.getIdentifierFormat() == BlockTemplate.IdentifierFormat.ALPHA) {
+            return toAlphabeticIdentifier(block.getPosition());
+        }
+        return null;
+    }
+
+    private String toAlphabeticIdentifier(int position) {
+        int value = position;
+        StringBuilder builder = new StringBuilder();
+        do {
+            builder.append((char) ('A' + (value % 26)));
+            value = (value / 26) - 1;
+        } while (value >= 0);
+        return builder.reverse().toString();
     }
 
     public record CountSessionPageResult(

@@ -296,6 +296,13 @@ export default function DispatchesPage() {
         }
     };
 
+    const renderLocationCell = (pathLabel: string | null, locationId: string) => (
+        <div className="flex flex-col">
+            <span>{pathLabel ?? "—"}</span>
+            <span className="text-xs text-muted-foreground">{locationId}</span>
+        </div>
+    );
+
     if (selectedDispatchId && detailLoading) {
         return (
             <div className="flex flex-col gap-4 p-6">
@@ -468,7 +475,7 @@ export default function DispatchesPage() {
                                 {detail.lines.map((line) => (
                                     <TableRow key={line.id}>
                                         <TableCell>{line.productName ?? line.productSku ?? line.productId}</TableCell>
-                                        <TableCell>{line.locationPathLabel ?? line.sourceLocationId}</TableCell>
+                                        <TableCell>{renderLocationCell(line.locationPathLabel, line.sourceLocationId)}</TableCell>
                                         <TableCell className="text-end">{line.qty}</TableCell>
                                         <TableCell>{line.lotNumber ?? "—"}</TableCell>
                                         <TableCell>{line.notes ?? "—"}</TableCell>
@@ -602,7 +609,12 @@ export default function DispatchesPage() {
                                         className="cursor-pointer"
                                         onClick={() => setSelectedDispatchId(dispatch.id)}
                                     >
-                                        <TableCell>{dispatch.reference || t("dispatches.referenceFallback")}</TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-col">
+                                                <span>{dispatch.reference || t("dispatches.referenceFallback")}</span>
+                                                <span className="text-xs text-muted-foreground">{dispatch.id}</span>
+                                            </div>
+                                        </TableCell>
                                         <TableCell>{dispatch.destination || t("dispatches.destinationFallback")}</TableCell>
                                         <TableCell>
                                             <Badge className={statusBadgeClass(dispatch.status)}>{t(`dispatches.status.${dispatch.status}`)}</Badge>

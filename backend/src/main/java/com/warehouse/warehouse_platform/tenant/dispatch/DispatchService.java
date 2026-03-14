@@ -4,6 +4,8 @@ import com.warehouse.warehouse_platform.tenant.inventory.InventoryLedgerService;
 import com.warehouse.warehouse_platform.tenant.inventory.StockMovementRepository;
 import com.warehouse.warehouse_platform.tenant.product.Product;
 import com.warehouse.warehouse_platform.tenant.product.ProductRepository;
+import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplate;
+import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplateRepository;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlock;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlockRepository;
 import jakarta.persistence.criteria.Predicate;
@@ -18,10 +20,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -37,6 +41,7 @@ public class DispatchService {
     private final DispatchLineRepository dispatchLineRepository;
     private final ProductRepository productRepository;
     private final LayoutBlockRepository layoutBlockRepository;
+    private final BlockTemplateRepository blockTemplateRepository;
     private final StockMovementRepository stockMovementRepository;
     private final InventoryLedgerService inventoryLedgerService;
 
@@ -45,12 +50,14 @@ public class DispatchService {
             DispatchLineRepository dispatchLineRepository,
             ProductRepository productRepository,
             LayoutBlockRepository layoutBlockRepository,
+            BlockTemplateRepository blockTemplateRepository,
             StockMovementRepository stockMovementRepository,
             InventoryLedgerService inventoryLedgerService) {
         this.dispatchDocumentRepository = dispatchDocumentRepository;
         this.dispatchLineRepository = dispatchLineRepository;
         this.productRepository = productRepository;
         this.layoutBlockRepository = layoutBlockRepository;
+        this.blockTemplateRepository = blockTemplateRepository;
         this.stockMovementRepository = stockMovementRepository;
         this.inventoryLedgerService = inventoryLedgerService;
     }
@@ -234,7 +241,9 @@ public class DispatchService {
                     line.getQty(),
                     line.getLotNumber(),
                     null,
-                    line.getNotes(),
+                    buildDocumentLineNote("Void dispatch", dispatch.getReference(), dispatch.getDestination(),
+                            dispatchId,
+                            line.getNotes()),
                     dispatchId,
                     VOID_REASON_CODE,
                     normalizedActor);
@@ -383,7 +392,13 @@ public class DispatchService {
                 String like = "%" + normalizedSearch.toLowerCase(Locale.ROOT) + "%";
                 Predicate referenceMatch = criteriaBuilder.like(criteriaBuilder.lower(root.get("reference")), like);
                 Predicate destinationMatch = criteriaBuilder.like(criteriaBuilder.lower(root.get("destination")), like);
-                predicates.add(criteriaBuilder.or(referenceMatch, destinationMatch));
+                UUID parsedId = tryParseUuid(normalizedSearch);
+                if (parsedId != null) {
+                    Predicate idMatch = criteriaBuilder.equal(root.get("id"), parsedId);
+                    predicates.add(criteriaBuilder.or(referenceMatch, destinationMatch, idMatch));
+                } else {
+                    predicates.add(criteriaBuilder.or(referenceMatch, destinationMatch));
+                }
             }
 
             return criteriaBuilder.and(predicates.toArray(Predicate[]::new));
@@ -396,6 +411,33 @@ public class DispatchService {
         }
         String normalized = search.trim();
         return normalized.isEmpty() ? null : normalized;
+    }
+
+    private UUID tryParseUuid(String value) {
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    private String buildDocumentLineNote(
+            String prefix,
+            String reference,
+            String destination,
+            UUID documentId,
+            String lineNotes) {
+        String normalizedLineNotes = normalizeOptional(lineNotes, 500, "notes");
+        String normalizedReference = normalizeOptional(reference, 120, "reference");
+        String normalizedDestination = normalizeOptional(destination, 200, "destination");
+        String suffix = normalizedReference != null ? normalizedReference
+                : normalizedDestination != null ? normalizedDestination : "NO_REF";
+        String documentPart = prefix + " " + suffix + " (" + documentId + ")";
+
+        if (normalizedLineNotes == null) {
+            return documentPart;
+        }
+        return normalizedLineNotes + " | " + documentPart;
     }
 
     private DispatchListItem toListItem(DispatchDocument dispatch) {
@@ -452,11 +494,83 @@ public class DispatchService {
                 product != null ? product.getSku() : null,
                 product != null ? product.getName() : null,
                 line.getSourceLocationId(),
-                location != null ? location.getFullCode() : null,
+                resolveLocationPathLabel(location, line.getSourceLocationId()),
                 line.getQty(),
                 line.getLotNumber(),
                 line.getNotes(),
                 line.getPosition());
+    }
+
+    private String resolveLocationPathLabel(LayoutBlock location, UUID fallbackId) {
+        if (location == null) {
+            return fallbackId != null ? fallbackId.toString() : null;
+        }
+        if (location.getFullCode() != null && !location.getFullCode().isBlank()) {
+            return location.getFullCode();
+        }
+        if (location.getScanCode() != null && !location.getScanCode().isBlank()) {
+            return location.getScanCode();
+        }
+        String computedPath = buildLocationPath(location);
+        if (computedPath != null && !computedPath.isBlank()) {
+            return computedPath;
+        }
+        if (location.getId() != null) {
+            return location.getId().toString();
+        }
+        return fallbackId != null ? fallbackId.toString() : null;
+    }
+
+    private String buildLocationPath(LayoutBlock leaf) {
+        List<LayoutBlock> chain = new ArrayList<>();
+        LayoutBlock current = leaf;
+        Set<UUID> visited = new HashSet<>();
+
+        while (current != null && current.getId() != null && visited.add(current.getId())) {
+            chain.add(0, current);
+            UUID parentId = current.getParentId();
+            if (parentId == null) {
+                break;
+            }
+            current = layoutBlockRepository.findById(parentId).orElse(null);
+        }
+
+        return chain.stream()
+                .map(this::formatPathSegment)
+                .filter(segment -> segment != null && !segment.isBlank())
+                .collect(Collectors.joining("->"));
+    }
+
+    private String formatPathSegment(LayoutBlock block) {
+        BlockTemplate template = blockTemplateRepository.findById(block.getBlockTemplateId()).orElse(null);
+        String identifier = resolveIdentifier(block, template);
+        if (identifier != null && !identifier.isBlank()) {
+            return identifier;
+        }
+        return String.valueOf(block.getPosition() + 1);
+    }
+
+    private String resolveIdentifier(LayoutBlock block, BlockTemplate template) {
+        if (template == null || template.getIdentifierFormat() == null) {
+            return null;
+        }
+        if (template.getIdentifierFormat() == BlockTemplate.IdentifierFormat.NUMERIC) {
+            return String.valueOf(block.getPosition() + 1);
+        }
+        if (template.getIdentifierFormat() == BlockTemplate.IdentifierFormat.ALPHA) {
+            return toAlphabeticIdentifier(block.getPosition());
+        }
+        return null;
+    }
+
+    private String toAlphabeticIdentifier(int position) {
+        int value = position;
+        StringBuilder builder = new StringBuilder();
+        do {
+            builder.append((char) ('A' + (value % 26)));
+            value = (value / 26) - 1;
+        } while (value >= 0);
+        return builder.reverse().toString();
     }
 
     public record DispatchPageResult(
