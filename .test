@@ -1,0 +1,395 @@
+1. Current State Summary
+Tech Stack
+Backend: Spring Boot 3.5.10 / Java 21, Hibernate JPA, PostgreSQL, Liquibase migrations, Hibernate Spatial (loaded but unused)
+Auth: Spring Security + OAuth2 Resource Server, RBAC with 56 tenant permissions
+Multi-tenancy: Schema-per-tenant — each tenant gets its own PostgreSQL schema
+Frontend: React 19, TypeScript, React Router 7, Vite, Tailwind + Shadcn/ui, custom i18n (EN/AR), Axios with interceptors
+What Exists Today
+Database Entities
+Entity	Table	Notes
+StockMovement	stock_movements	Immutable ledger. Types: RECEIVE, TRANSFER_IN, TRANSFER_OUT, ADJUST, PICK. Has lot_number, expiry_date, reference_id, notes, created_by. No source document link.
+OnHandEntry	v_on_hand (view)	Aggregates SUM(qty) grouped by (location_id, product_id) — lot_number NOT in key
+WarehouseLayout	warehouse_layouts	Active/inactive, one-active constraint
+BlockTemplate	block_templates	Reusable node types with identifier_format, side_config, icon_name
+LayoutBlock	layout_blocks	Tree nodes: parent_id, position, side. Leaf = selectable location. No location_kind, no scan_code, no stored full path code.
+Product	products	Has track_lot, track_expiry booleans. Soft-delete.
+Supplier, ProductSupplier, ProductCategory, UnitOfMeasure	—	Full CRUD, soft-delete
+AuditLog	audit_log	JSONB before/after state, all entity mutations
+Services / Business Logic
+Service	What it does
+InventoryLedgerService	receive(), transfer() (atomic pair), adjust(), getOnHand(), getMovements(), product/location lookups. Stock sufficiency validation. Lot/expiry validation per product flags.
+WarehouseLayoutService	Layout CRUD, activation, classic preset builder
+LayoutBlockService	Full tree management: add, batch-add, copy-subtree, move, reassign-template, delete. Position shifting.
+TenantProductManagementService	Full product CRUD with supplier associations
+TenantAuditService	Entity change logging
+API Endpoints
+/{tenantSlug}/inventory — receive, transfer, adjust, on-hand, movements, product/location lookups
+/{tenantSlug}/warehouse-layouts — layout CRUD + activate/deactivate
+/{tenantSlug}/warehouse-layouts/{id}/blocks — full block tree management
+/{tenantSlug}/products, /suppliers, /categories, /units-of-measure, /audit-logs
+Frontend
+Inventory page (3 tabs): Stock (on-hand table), Operations (receive/transfer/adjust forms), Movements (ledger history)
+Warehouse Layout Builder (full-featured: block tree, templates, drag/reorder, batch creation)
+Product catalog, suppliers, UOMs, categories — full management
+RBAC: roles/permissions editor, user management
+Paths constant: src/shared/consts/paths.ts
+i18n: 772 keys in messages/en.ts and messages/ar.ts
+What Does NOT Exist
+No location_kind field on LayoutBlock (STORAGE, STAGING, QUARANTINE, etc.)
+No scan_code on LayoutBlock
+No stored/computed full location path code
+No Receipt document (header + lines + lifecycle)
+No Dispatch document (header + lines + lifecycle)
+No Count Session
+No scan resolver endpoint
+No QR/label generation
+No source document link on stock_movements (only reference_id for transfer pairs)
+No reason codes on movements
+v_on_hand view doesn't include lot_number in grouping key — lot stock is invisible at the view level
+2. Plan Critique
+Feature 1 — Location Identity
+Assessment: Valid and foundational — schema gaps must be filled
+
+The current LayoutBlock has no scan_code, no location_kind, and no stored full path code. pathLabel is computed dynamically at query time in the location lookup, not stored.
+
+Specific gaps:
+
+backend/.../warehouse/block/LayoutBlock.java — missing locationKind (enum) and scanCode (unique VARCHAR)
+V13__replace_f1_with_block_system.sql — layout_blocks table has no kind/scan columns
+The plan is correct that only leaf nodes hold stock — this is already enforced by the listLocationLookups() query that excludes parent blocks
+One correction to the plan: "stable full location code" should be distinguished from scan_code. The full path label (e.g., A-01-L1-S2) can be computed and stored on write, but you still need a short unique scan_code separately. Both are needed but they're different columns.
+
+The location_kind enum cleanly handles Feature 2 (Special Locations) without a separate table.
+
+Feature 2 — Special Locations
+Assessment: Correct design, fully covered by Feature 1 — not a separate feature
+
+The plan is right: STAGING, QUARANTINE, DAMAGED, DISPATCH are just location_kind values, not a status engine. This is the correct approach given the immutable ledger design.
+
+However, the plan implies these are "system-defined" areas. In practice, they should be manager-designated: a warehouse manager marks a block node as kind=STAGING. There's no need to auto-create them. Merge this into Feature 1's scope.
+
+Risk: The permission model needs a new permission for setting location kinds — or it falls under existing WAREHOUSE_BLOCK_EDIT. Reuse WAREHOUSE_BLOCK_EDIT.
+
+Feature 3 — Simple Lot/Batch Tracking
+Assessment: Data fields exist; the aggregation gap is the real problem
+
+Product.trackLot, Product.trackExpiry, StockMovement.lotNumber, StockMovement.expiryDate — all already in the schema.
+
+The critical gap is v_on_hand:
+
+
+-- Current: lot-tracked stock is invisible as separate lines
+SELECT location_id, product_id, SUM(qty) AS qty_on_hand
+FROM stock_movements GROUP BY location_id, product_id
+
+-- Needed: lot_number must be in the grouping key
+SELECT location_id, product_id, lot_number, SUM(qty) AS qty_on_hand
+FROM stock_movements GROUP BY location_id, product_id, lot_number
+This is a breaking change — every query hitting OnHandEntry/v_on_hand will now return more rows, and the OnHandEntry projection interface needs lotNumber added. The getOnHand() service method and the frontend on-hand display all change.
+
+No Lot table needed for Phase 1. Distinct lots can be queried from stock_movements. Don't build a Lot entity — it's premature.
+
+Feature 4 — Receipts
+Assessment: Valid, does not exist, significant addition
+
+The existing POST /inventory/receive creates one RECEIVE movement per call — no document header, no multi-line batch, no lifecycle. It will still be useful for ad-hoc receives but is not a receipt document.
+
+The plan is correct: DRAFT → POSTED → VOID, posting creates RECEIVE movements. Key design point — when posting, the stock_movements.source_document_id (from Feature 11) must be set to the receipt ID for traceability.
+
+Conflict: The existing ad-hoc receive endpoint should remain for now. Receipts are an additive layer on top.
+
+Feature 5 — Putaway
+Assessment: No backend needed — the plan is correct
+
+Transfer (POST /inventory/transfer) already works. Putaway is purely a UI workflow: after posting a receipt to STAGING, a worker picks items and calls transfer to the final bin. No new backend module needed.
+
+Recommendation: Drop this as a numbered feature. It's a UI pattern, not a feature chunk.
+
+Feature 6 — Dispatches
+Assessment: Valid, symmetric with Receipts, does not exist
+
+The PICK movement type exists in the ledger. No DispatchDocument exists. Same design pattern as receipts — needs header, lines, DRAFT → POSTED → VOID lifecycle.
+
+Stock sufficiency validation (which already exists in InventoryLedgerService.transfer()) must be repeated at dispatch post time. Since lot tracking changes the stock key (Feature 3), dispatch picking by lot must check stock per (location, product, lot).
+
+Feature 7 — Count Sessions
+Assessment: Valid, does not exist, depends on lot-level on-hand
+
+The ADJUST movement type exists. A count session needs to snapshot expected stock (from v_on_hand at session-open time) and compare against physically counted quantities. Posting creates ADJUST movements only for variances.
+
+Dependency: Must come after the v_on_hand lot grouping fix (Feature 3) — otherwise, expected quantities for lot-tracked items will be wrong.
+
+Feature 8 — QR/Barcode Labels
+Assessment: Backend part is covered by Feature 1; frontend is pure UI work
+
+Once scan_code is on LayoutBlock and products have SKUs, label printing is a frontend concern (generate QR SVG client-side, print-friendly layout). No new backend endpoints needed.
+
+The scan_code for a product can be its SKU. The scan_code for a location comes from Feature 1. Lots can encode as {productSku}:{lotNumber}.
+
+Recommendation: Collapse into Feature 1 (backend scan_code) + a small frontend label component. Not a standalone chunk.
+
+Feature 9 — Scan Workflow
+Assessment: Valid, needs one new backend endpoint + frontend components
+
+A unified scan resolver is needed:
+
+
+GET /{tenantSlug}/scan/resolve?code=XYZ
+→ { type: "PRODUCT" | "LOCATION" | "LOT", id: "...", ... }
+This endpoint checks:
+
+Is XYZ a product SKU?
+Is XYZ a location scan_code?
+Is XYZ a lot pattern ({sku}:{lot})?
+This is small backend work but has a large frontend payoff — scan input auto-fills forms everywhere.
+
+Feature 10 — Minimal Operational Reporting
+Assessment: Partial exists, rest depends on upstream features
+
+Already working:
+
+Stock by location: GET /inventory/on-hand ✓
+Movement history: GET /inventory/movements ✓
+Missing (and dependent on upstream):
+
+Stock by lot (needs v_on_hand fix from Feature 3)
+Stock in operational areas filtered by location_kind (needs Feature 1)
+Receipt/dispatch history (needs Features 4/6)
+Count variance summary (needs Feature 7)
+Recommendation: Don't build a separate reporting module. Add query params to existing endpoints (filter by location_kind, add lot to on-hand response). Build this incrementally alongside each upstream feature.
+
+Feature 11 — Operational Traceability
+Assessment: Valid, needs schema addition — do it early
+
+Currently stock_movements has only reference_id (used for transfer pairs). There is no link from a RECEIVE movement to its receipt document, or from a PICK to its dispatch.
+
+Needs two new columns on stock_movements:
+
+source_document_id UUID — links to receipt_id, dispatch_id, or count_session_id
+reason_code VARCHAR(50) — optional reason for adjustments
+These columns should be added before Receipt and Dispatch documents are built, otherwise you'll need a second migration later.
+
+3. Implementation Roadmap
+Listed in dependency order. Each chunk is independently testable.
+
+Chunk 1 — Location Kind + Scan Code (Medium)
+Scope: Add location_kind and scan_code to LayoutBlock. Add auto-generated full_code (stored path label like A-01-L1-S2).
+
+Files affected:
+
+backend/.../warehouse/block/LayoutBlock.java — add 3 new fields
+backend/.../warehouse/block/LayoutBlockService.java — generate scan_code on insert/copy, validate uniqueness, allow setting location_kind
+backend/.../warehouse/block/LayoutBlockController.java — add kind to update metadata request
+backend/resources/db/migration/tenant/V18__add_location_identity.sql — add columns, unique index on scan_code
+frontend/.../types/warehouse.ts — add locationKind, scanCode, fullCode to WarehouseBlockResult
+frontend/.../warehouse/WarehouseLayoutsPage.tsx — show kind badge, allow kind selection on leaf nodes
+frontend/src/i18n/messages/en.ts + ar.ts — kind labels
+Dependencies: None — this is the foundation.
+
+Migration risk: Additive only. Existing rows get location_kind = STORAGE by default, scan_code auto-generated from current path. Nullable initially.
+
+GIS relevance: Critical — the GIS layer will reference locations by scan_code and color-code by location_kind.
+
+Chunk 2 — Lot-Level On-Hand View (Small, but breaking)
+Scope: Add lot_number to the v_on_hand grouping key. Update all downstream types and queries.
+
+Files affected:
+
+V19__update_v_on_hand_lot_grouping.sql — DROP VIEW v_on_hand; CREATE VIEW v_on_hand AS ... GROUP BY location_id, product_id, lot_number
+backend/.../inventory/OnHandEntry.java — add lotNumber to projection
+backend/.../inventory/StockMovementRepository.java — update native queries for on-hand
+backend/.../inventory/InventoryLedgerService.java — update getOnHand() result mapping, update stock sufficiency check (must now match lot when lot is required)
+frontend/.../types/inventory.ts — add lotNumber to OnHandEntry
+frontend/.../inventory/InventoryPage.tsx — show lot column in stock tab when applicable
+Dependencies: None, but do this before Receipts/Dispatches/Count Sessions.
+
+Migration risk: Breaking — the view returns more rows for lot-tracked products. Frontend on-hand table changes. Test the transfer sufficiency check — it must now sum stock at (location, product, lot) for lot-tracked products.
+
+Chunk 3 — Stock Movement Traceability Fields (Small)
+Scope: Add source_document_id and reason_code to stock_movements. Update the entity and service to accept/pass these fields.
+
+Files affected:
+
+V20__add_movement_traceability.sql — add nullable source_document_id UUID, reason_code VARCHAR(50) to stock_movements
+backend/.../inventory/StockMovement.java — add fields
+backend/.../inventory/InventoryLedgerService.java — update all operation methods to accept optional sourceDocumentId and reasonCode
+backend/.../inventory/InventoryLedgerController.java — update AdjustRequest to accept optional reasonCode
+frontend/.../types/inventory.ts — add sourceDocumentId, reasonCode to MovementResult
+frontend/.../inventory/InventoryPage.tsx — show reason code in movements tab; add optional reason field to adjust form
+Dependencies: None. Do before Receipts/Dispatches.
+
+Migration risk: Additive only (nullable columns). No existing behavior changes.
+
+Chunk 4 — Receipt Documents (Large)
+Scope: Multi-line inbound document with header, lines, DRAFT → POSTED → VOID lifecycle. Posting calls InventoryLedgerService.receive() for each line and stamps source_document_id.
+
+Files affected:
+
+Backend (new files):
+
+tenant/receipt/ReceiptDocument.java — id, supplier_id (nullable), reference (VARCHAR), notes, status (DRAFT/POSTED/VOID), created_by, posted_at, posted_by, voided_at, voided_by
+tenant/receipt/ReceiptLine.java — id, receipt_id, product_id, destination_location_id (must be non-DISPATCH kind), qty, lot_number, expiry_date, notes
+tenant/receipt/ReceiptStatus.java (enum)
+tenant/receipt/ReceiptDocumentRepository.java
+tenant/receipt/ReceiptLineRepository.java
+tenant/receipt/ReceiptService.java — createDraft, addLine, removeLine, updateLine, post (validates, calls ledger receive per line, stamps source_document_id), void (reverses stock via ADJUST with reason=VOID_RECEIPT)
+tenant/receipt/ReceiptController.java — /{tenantSlug}/receipts
+V21__create_receipt_documents.sql
+Backend (modified):
+
+Add permissions: RECEIPTS_VIEW, RECEIPTS_CREATE, RECEIPTS_EDIT, RECEIPTS_POST, RECEIPTS_VOID to permission system
+Frontend (new files):
+
+features/tenant/receipts/ directory
+ReceiptsPage.tsx — list receipts, create new, view/edit draft, post, void
+api/receiptsApi.ts
+types/receipts.ts
+Frontend (modified):
+
+routes.tsx — add /:tenantSlug/receipts route
+TenantNavbar.tsx — add Receipts nav item
+shared/consts/paths.ts — add RECEIPTS path constants
+i18n/messages/en.ts + ar.ts — receipt translations
+Dependencies: Chunks 1, 2, 3
+
+Migration risk: New tables only. The existing POST /inventory/receive endpoint stays — it's still valid for ad-hoc adjustments.
+
+Chunk 5 — Dispatch Documents (Large)
+Scope: Symmetric with Chunk 4 for outbound. Posting creates PICK movements.
+
+Files affected:
+
+Backend (new files):
+
+tenant/dispatch/DispatchDocument.java — id, destination (VARCHAR), reference, notes, status
+tenant/dispatch/DispatchLine.java — id, dispatch_id, product_id, source_location_id, qty, lot_number
+tenant/dispatch/DispatchService.java — createDraft, addLine, removeLine, post (validates stock sufficiency per line at (location, product, lot), creates PICK movements, stamps source_document_id), void (reverses via RECEIVE with reason=VOID_DISPATCH)
+tenant/dispatch/DispatchController.java — /{tenantSlug}/dispatches
+V22__create_dispatch_documents.sql
+Frontend (new files):
+
+features/tenant/dispatches/ directory
+DispatchesPage.tsx, api/dispatchesApi.ts, types/dispatches.ts
+Frontend (modified):
+
+routes.tsx, TenantNavbar.tsx, paths.ts, i18n files
+Dependencies: Chunks 1, 2, 3
+
+Migration risk: New tables only.
+
+Chunk 6 — Count Sessions (Large)
+Scope: Controlled stocktaking. Open session for selected locations, capture physical counts, post variances as ADJUST movements.
+
+Files affected:
+
+Backend (new files):
+
+tenant/counting/CountSession.java — id, name, status (OPEN/COUNTING/POSTED/VOID), location_ids (JSON array or junction table), opened_at, posted_at
+tenant/counting/CountLine.java — id, session_id, location_id, product_id, lot_number (nullable), expected_qty (snapshotted at open), counted_qty (entered by user), variance
+tenant/counting/CountSessionService.java:
+openSession(locationIds, name) — creates session, snapshots v_on_hand for selected locations into CountLines as expected_qty
+updateCount(sessionId, lineId, countedQty) — enters physical count
+postSession(sessionId) — for each line where variance ≠ 0: call adjust(variance, sourceDocumentId=sessionId, reasonCode=COUNT_ADJUSTMENT)
+voidSession(sessionId) — only if not POSTED
+tenant/counting/CountSessionController.java — /{tenantSlug}/count-sessions
+V23__create_count_sessions.sql
+Frontend (new files):
+
+features/tenant/counting/ directory
+CountSessionsPage.tsx, api/countingApi.ts, types/counting.ts
+Frontend (modified):
+
+routes.tsx, TenantNavbar.tsx, paths.ts, i18n files
+Dependencies: Chunks 2 (lot-level expected stock), 3 (source_document_id on adjustments)
+
+Migration risk: New tables only.
+
+Chunk 7 — Scan Resolver + Label Components (Medium)
+Scope: One backend endpoint to resolve a scanned code. Frontend scan input component that auto-fills forms. Print-friendly label templates for locations, products, lots.
+
+Files affected:
+
+Backend (new files):
+
+tenant/scan/ScanController.java — GET /{tenantSlug}/scan/resolve?code=XYZ
+tenant/scan/ScanResolverService.java:
+Check if code matches a product SKU → return {type: PRODUCT, product: {...}}
+Check if code matches a layout_blocks.scan_code → return {type: LOCATION, location: {...}}
+Check if code matches {sku}:{lotNumber} pattern and lot exists in movements → return {type: LOT, product: {...}, lotNumber: "..."}
+Frontend (new files):
+
+shared/components/ScanInput.tsx — text input with scan icon, fires callback on Enter/paste with resolved entity
+features/tenant/labels/LocationLabel.tsx — print-friendly QR label for a location
+features/tenant/labels/ProductLabel.tsx — print-friendly QR label for a product
+Frontend (modified):
+
+ReceiptsPage.tsx — embed ScanInput in product and location fields
+DispatchesPage.tsx — same
+CountSessionsPage.tsx — same
+InventoryPage.tsx (Operations tab) — add scan input to receive/transfer/adjust forms
+Dependencies: Chunk 1 (scan_code on locations), Chunks 4/5/6 (forms to auto-fill)
+
+Migration risk: None. Additive.
+
+Chunk 8 — Reporting Gaps + location_kind Filtering (Small)
+Scope: Extend existing endpoints with missing filters. No new module.
+
+Files affected:
+
+Backend (modified only):
+
+InventoryLedgerService.getOnHand() — add optional locationKind filter param (queries through the block join)
+InventoryLedgerController.java — expose locationKind query param on GET /on-hand
+StockMovementRepository.java — add movement queries filtered by source_document_type (receipt vs dispatch vs count)
+Frontend (modified only):
+
+InventoryPage.tsx (Stock tab) — add location kind filter dropdown
+Add receipt history link from movement (show receipt ID, make it clickable to receipt)
+Dependencies: All previous chunks
+
+Migration risk: None. Additive query params.
+
+4. GIS Readiness Checklist
+These are the conditions that must be true before Phase 2 (GIS) can begin:
+
+
+Foundations
+[ ] Every leaf LayoutBlock has a stable, unique scan_code — Chunk 1
+[ ] Every leaf LayoutBlock has a location_kind that GIS can use for color-coding — Chunk 1
+[ ] v_on_hand correctly breaks out stock by (location, product, lot) — Chunk 2
+[ ] Every stock movement links back to its source document — Chunk 3
+
+Operational Workflows
+[ ] Inbound stock enters via Receipt documents (not just raw receives) — Chunk 4
+[ ] Outbound stock leaves via Dispatch documents (not just raw picks) — Chunk 5
+[ ] Stocktaking is done via Count Sessions with variance posting — Chunk 6
+[ ] Stock in operational areas (STAGING, QUARANTINE) is clearly identified by location_kind — Chunk 1
+
+Integration Surface
+[ ] Scan resolver endpoint exists: GET /scan/resolve?code=XYZ — Chunk 7
+[ ] Location scan_codes are printable (QR labels) so workers can scan physical locations — Chunk 7
+
+GIS Phase Can Start When
+[ ] Phase 2 can attach (x, y, z) or polygon geometry to LayoutBlock rows by ID
+[ ] Phase 2 can query on-hand stock per location and render it on the map
+[ ] Phase 2 can show "what kind" each zone is (STAGING in yellow, QUARANTINE in red, etc.)
+[ ] Phase 2 can highlight active receipt/dispatch documents on the map
+[ ] Phase 2 can accept a scanned location code and pan the map to it
+Build Order Summary
+#	Chunk	Complexity	Blocks
+1	Location Kind + Scan Code	Medium	Nothing
+2	Lot-Level On-Hand View	Small	Nothing (do early)
+3	Movement Traceability Fields	Small	Nothing (do early)
+4	Receipt Documents	Large	1, 2, 3
+5	Dispatch Documents	Large	1, 2, 3
+6	Count Sessions	Large	2, 3
+7	Scan Resolver + Labels	Medium	1, 4, 5, 6
+8	Reporting Gaps	Small	All
+Dropped from original plan as separate features: Putaway (UI pattern only, no backend), standalone lot table (unnecessary), standalone reporting module (extend existing endpoints instead), label generation as a module (collapse into Chunk 1 + Chunk 7).
+
+
+
+
+
+
+

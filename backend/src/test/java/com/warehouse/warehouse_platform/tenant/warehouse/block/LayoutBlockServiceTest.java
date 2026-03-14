@@ -17,10 +17,13 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -407,6 +410,129 @@ class LayoutBlockServiceTest {
                 assertEquals("South", result.side());
                 verify(tenantAuditService).record(eq("LAYOUT_BLOCK_UPDATE_METADATA"), eq("LAYOUT_BLOCK"),
                                 eq(blockId.toString()), any(), any());
+        }
+
+        // -------------------------------------------------------------------------
+        // C1-A: locationKind + scanCode
+        // -------------------------------------------------------------------------
+
+        @Test
+        void addBlock_setsDefaultStorageKind() {
+                when(layoutRepository.existsById(LAYOUT_ID)).thenReturn(true);
+                when(blockTemplateRepository.findById(TEMPLATE_ID)).thenReturn(Optional.of(template(
+                                TEMPLATE_ID, BlockTemplate.IdentifierFormat.NUMERIC, BlockTemplate.SideConfig.NONE,
+                                null)));
+                when(layoutBlockRepository.findMaxRootPosition(LAYOUT_ID)).thenReturn(null);
+                when(layoutBlockRepository.existsByScanCodeAndIdNot(anyString(), any())).thenReturn(false);
+                when(layoutBlockRepository.save(any())).thenAnswer(inv -> {
+                        LayoutBlock b = inv.getArgument(0);
+                        if (b.getId() == null) b.setId(UUID.randomUUID());
+                        b.setCreatedAt(Instant.now());
+                        b.setUpdatedAt(Instant.now());
+                        return b;
+                });
+
+                LayoutBlockService.BlockResult result = service.addBlock(LAYOUT_ID, TEMPLATE_ID, null, 0, null);
+
+                assertEquals(LocationKind.STORAGE, result.locationKind());
+        }
+
+        @Test
+        void addBlock_generatesScanCode() {
+                when(layoutRepository.existsById(LAYOUT_ID)).thenReturn(true);
+                when(blockTemplateRepository.findById(TEMPLATE_ID)).thenReturn(Optional.of(template(
+                                TEMPLATE_ID, BlockTemplate.IdentifierFormat.NUMERIC, BlockTemplate.SideConfig.NONE,
+                                null)));
+                when(layoutBlockRepository.findMaxRootPosition(LAYOUT_ID)).thenReturn(null);
+                when(layoutBlockRepository.existsByScanCodeAndIdNot(anyString(), any())).thenReturn(false);
+                when(layoutBlockRepository.save(any())).thenAnswer(inv -> {
+                        LayoutBlock b = inv.getArgument(0);
+                        if (b.getId() == null) b.setId(UUID.randomUUID());
+                        b.setCreatedAt(Instant.now());
+                        b.setUpdatedAt(Instant.now());
+                        return b;
+                });
+
+                LayoutBlockService.BlockResult result = service.addBlock(LAYOUT_ID, TEMPLATE_ID, null, 0, null);
+
+                assertNotNull(result.scanCode());
+                assertNotNull(result.fullCode());
+                assertTrue(result.scanCode().length() > 0);
+        }
+
+        @Test
+        void copySubtree_generatesNewScanCode() {
+                UUID sourceRootId = UUID.fromString("aa110000-0000-0000-0000-000000000000");
+                UUID sourceChildId = UUID.fromString("aa110000-0000-0000-0000-000000000001");
+                LayoutBlock sourceRoot = block(sourceRootId, LAYOUT_ID, null, 0);
+                sourceRoot.setScanCode("OLD-ROOT-CODE");
+                sourceRoot.setFullCode("OLD-ROOT-CODE");
+                LayoutBlock sourceChild = block(sourceChildId, LAYOUT_ID, sourceRootId, 0);
+                sourceChild.setScanCode("OLD-CHILD-CODE");
+                sourceChild.setFullCode("OLD-CHILD-CODE");
+
+                List<LayoutBlock> allNewBlocks = new ArrayList<>();
+                AtomicInteger seq = new AtomicInteger();
+
+                when(layoutRepository.existsById(LAYOUT_ID)).thenReturn(true);
+                when(layoutBlockRepository.findById(sourceRootId)).thenReturn(Optional.of(sourceRoot));
+                when(layoutBlockRepository.findById(sourceChildId)).thenReturn(Optional.of(sourceChild));
+                when(layoutBlockRepository.findByLayoutIdOrderByParentIdAscPositionAsc(LAYOUT_ID))
+                                .thenReturn(List.of(sourceRoot, sourceChild));
+                when(blockTemplateRepository.findAllById(any())).thenReturn(List.of(
+                                template(TEMPLATE_ID, BlockTemplate.IdentifierFormat.NUMERIC,
+                                                BlockTemplate.SideConfig.NONE, null)));
+                when(layoutBlockRepository.existsByScanCodeAndIdNot(anyString(), any())).thenReturn(false);
+                when(layoutBlockRepository.save(any())).thenAnswer(inv -> {
+                        LayoutBlock b = inv.getArgument(0);
+                        if (b.getId() == null)
+                                b.setId(UUID.fromString("bb" + String.format("%06d", seq.incrementAndGet())
+                                                + "00-0000-0000-0000-000000000000"));
+                        b.setCreatedAt(Instant.now());
+                        b.setUpdatedAt(Instant.now());
+                        allNewBlocks.add(b);
+                        return b;
+                });
+
+                service.copySubtree(LAYOUT_ID, sourceRootId, null, 1, 1);
+
+                // Cloned blocks must not carry the source's scan codes
+                allNewBlocks.stream()
+                                .filter(b -> !b.getId().equals(sourceRootId) && !b.getId().equals(sourceChildId))
+                                .forEach(b -> {
+                                        assertNotEquals("OLD-ROOT-CODE", b.getScanCode());
+                                        assertNotEquals("OLD-CHILD-CODE", b.getScanCode());
+                                });
+        }
+
+        @Test
+        void updateLocationKind_changesKindAndPersists() {
+                UUID blockId = UUID.fromString("cc220000-0000-0000-0000-000000000000");
+                LayoutBlock b = block(blockId, LAYOUT_ID, null, 0);
+
+                when(layoutRepository.existsById(LAYOUT_ID)).thenReturn(true);
+                when(layoutBlockRepository.findById(blockId)).thenReturn(Optional.of(b));
+                when(blockTemplateRepository.findById(TEMPLATE_ID)).thenReturn(Optional.of(template(
+                                TEMPLATE_ID, BlockTemplate.IdentifierFormat.NUMERIC, BlockTemplate.SideConfig.NONE,
+                                null)));
+                when(layoutBlockRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+                LayoutBlockService.BlockResult result = service.updateLocationKind(LAYOUT_ID, blockId,
+                                LocationKind.STAGING);
+
+                assertEquals(LocationKind.STAGING, result.locationKind());
+                verify(layoutBlockRepository).save(any());
+        }
+
+        @Test
+        void updateLocationKind_rejectsNullKind() {
+                UUID blockId = UUID.fromString("dd330000-0000-0000-0000-000000000000");
+
+                when(layoutRepository.existsById(LAYOUT_ID)).thenReturn(true);
+
+                WarehouseManagementException ex = assertThrows(WarehouseManagementException.class,
+                                () -> service.updateLocationKind(LAYOUT_ID, blockId, null));
+                assertEquals("BAD_REQUEST", ex.getCode());
         }
 
         // -------------------------------------------------------------------------

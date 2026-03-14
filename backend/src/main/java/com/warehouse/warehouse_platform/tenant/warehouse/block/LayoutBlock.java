@@ -2,6 +2,8 @@ package com.warehouse.warehouse_platform.tenant.warehouse.block;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
@@ -50,6 +52,17 @@ public class LayoutBlock {
 
     @Column(length = 50)
     private String side;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "location_kind", length = 20, nullable = false)
+    @lombok.Builder.Default
+    private LocationKind locationKind = LocationKind.STORAGE;
+
+    @Column(name = "scan_code", unique = true, length = 60)
+    private String scanCode;
+
+    @Column(name = "full_code", length = 200)
+    private String fullCode;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

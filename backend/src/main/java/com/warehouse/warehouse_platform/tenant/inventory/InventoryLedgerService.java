@@ -6,6 +6,7 @@ import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplate;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplateRepository;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlock;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlockRepository;
+import com.warehouse.warehouse_platform.tenant.warehouse.block.LocationKind;
 import com.warehouse.warehouse_platform.tenant.warehouse.layout.WarehouseLayout;
 import com.warehouse.warehouse_platform.tenant.warehouse.layout.WarehouseLayoutRepository;
 import jakarta.persistence.criteria.Predicate;
@@ -583,7 +584,9 @@ public class InventoryLedgerService {
                 summary.label(),
                 summary.pathLabel(),
                 summary.identifier(),
-                summary.side());
+                summary.side(),
+                summary.locationKind(),
+                summary.scanCode());
     }
 
     private LocationSummary toLocationSummary(
@@ -600,7 +603,9 @@ public class InventoryLedgerService {
                 label,
                 pathLabel,
                 resolveIdentifier(block, templateById.get(block.getBlockTemplateId())),
-                block.getSide());
+                block.getSide(),
+                block.getLocationKind(),
+                block.getScanCode());
     }
 
     private String buildPathLabel(
@@ -732,7 +737,9 @@ public class InventoryLedgerService {
             String label,
             String pathLabel,
             String identifier,
-            String side) {
+            String side,
+            LocationKind locationKind,
+            String scanCode) {
     }
 
     public record ProductLookupItem(
@@ -760,7 +767,9 @@ public class InventoryLedgerService {
             String label,
             String pathLabel,
             String identifier,
-            String side) {
+            String side,
+            LocationKind locationKind,
+            String scanCode) {
     }
 
     public record LocationLookupPageResult(

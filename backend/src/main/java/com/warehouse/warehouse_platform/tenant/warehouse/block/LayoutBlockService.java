@@ -10,10 +10,13 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class LayoutBlockService {
@@ -79,9 +82,19 @@ public class LayoutBlockService {
                 .parentId(parentId)
                 .position(resolvedPosition)
                 .side(normalizeSide(side, template))
+                .locationKind(LocationKind.STORAGE)
                 .build();
 
         LayoutBlock saved = saveBlock(block);
+
+        // Compute and persist scan/full code
+        List<LayoutBlock> ancestors = loadAncestorChain(parentId);
+        Map<UUID, BlockTemplate> templateMap = buildTemplateMap(ancestors, template);
+        String code = generateScanCode(saved, ancestors, templateMap);
+        saved.setScanCode(code);
+        saved.setFullCode(code);
+        saved = saveBlock(saved);
+
         BlockResult result = toResult(saved, template);
         tenantAuditService.record("LAYOUT_BLOCK_ADD", "LAYOUT_BLOCK", result.id().toString(), null, result);
         return result;
@@ -110,6 +123,9 @@ public class LayoutBlockService {
         int resolvedPosition = resolvePosition(layoutId, parentId, null, position);
         shiftPositions(layoutId, parentId, resolvedPosition, count, null);
 
+        List<LayoutBlock> ancestors = loadAncestorChain(parentId);
+        Map<UUID, BlockTemplate> templateMap = buildTemplateMap(ancestors, template);
+
         List<BlockResult> createdBlocks = new ArrayList<>();
         String normalizedSide = normalizeSide(side, template);
         for (int index = 0; index < count; index++) {
@@ -119,8 +135,13 @@ public class LayoutBlockService {
                     .parentId(parentId)
                     .position(resolvedPosition + index)
                     .side(normalizedSide)
+                    .locationKind(LocationKind.STORAGE)
                     .build();
             LayoutBlock saved = saveBlock(block);
+            String code = generateScanCode(saved, ancestors, templateMap);
+            saved.setScanCode(code);
+            saved.setFullCode(code);
+            saved = saveBlock(saved);
             createdBlocks.add(toResult(saved, template));
         }
 
@@ -213,6 +234,24 @@ public class LayoutBlockService {
         return after;
     }
 
+    @Transactional
+    public BlockResult updateLocationKind(UUID layoutId, UUID blockId, LocationKind kind) {
+        if (kind == null) {
+            throw WarehouseManagementException.badRequest("locationKind must not be null");
+        }
+        assertLayoutExists(layoutId);
+        LayoutBlock block = loadBlock(blockId);
+        assertBelongsToLayout(block, layoutId);
+
+        BlockTemplate template = loadTemplate(block.getBlockTemplateId());
+        BlockResult before = toResult(block, template);
+        block.setLocationKind(kind);
+        LayoutBlock saved = saveBlock(block);
+        BlockResult after = toResult(saved, template);
+        tenantAuditService.record("LAYOUT_BLOCK_UPDATE_KIND", "LAYOUT_BLOCK", blockId.toString(), before, after);
+        return after;
+    }
+
     /**
      * Removes a block (and cascades deletion to all its descendants via DB ON
      * DELETE CASCADE).
@@ -266,6 +305,7 @@ public class LayoutBlockService {
         shiftPositions(layoutId, targetParentId, resolvedPosition, copies, null);
 
         List<BlockResult> createdRoots = new ArrayList<>();
+        List<LayoutBlock> allNewBlocks = new ArrayList<>();
         int totalCreated = 0;
         for (int copyIndex = 0; copyIndex < copies; copyIndex++) {
             Map<UUID, UUID> clonedIds = new HashMap<>();
@@ -273,6 +313,7 @@ public class LayoutBlockService {
             LayoutBlock clonedRoot = cloneBlock(sourceBlock, layoutId, targetParentId, rootPosition, clonedIds);
             LayoutBlock savedRoot = saveBlock(clonedRoot);
             clonedIds.put(sourceBlockId, savedRoot.getId());
+            allNewBlocks.add(savedRoot);
             createdRoots.add(toResult(savedRoot, requireTemplate(templatesById, savedRoot.getBlockTemplateId())));
             totalCreated++;
             totalCreated += cloneChildrenRecursively(
@@ -281,12 +322,140 @@ public class LayoutBlockService {
                     layoutId,
                     sourceBlockId,
                     savedRoot.getId(),
-                    clonedIds);
+                    clonedIds,
+                    allNewBlocks);
         }
 
-        BatchBlockResult result = new BatchBlockResult(createdRoots, totalCreated, createdRoots.size());
+        // Assign unique scan/full codes to all newly created blocks
+        assignScanCodes(layoutId, allNewBlocks);
+
+        // Rebuild results with scan codes set
+        List<BlockResult> finalRoots = createdRoots.stream()
+                .map(r -> {
+                    LayoutBlock refreshed = layoutBlockRepository.findById(r.id()).orElse(null);
+                    if (refreshed == null) return r;
+                    return toResult(refreshed, requireTemplate(templatesById, refreshed.getBlockTemplateId()));
+                })
+                .toList();
+
+        BatchBlockResult result = new BatchBlockResult(finalRoots, totalCreated, finalRoots.size());
         tenantAuditService.record("LAYOUT_BLOCK_SUBTREE_COPY", "LAYOUT_BLOCK", sourceBlockId.toString(), null, result);
         return result;
+    }
+
+    // -------------------------------------------------------------------------
+    // Scan code helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Generates a unique scan code derived from the block's position in the
+     * hierarchy (e.g. "A-01-02"). Falls back to appending the block's UUID prefix
+     * if a collision is detected.
+     */
+    private String generateScanCode(LayoutBlock block, List<LayoutBlock> ancestors, Map<UUID, BlockTemplate> templateMap) {
+        List<String> parts = new ArrayList<>();
+        for (LayoutBlock ancestor : ancestors) {
+            BlockTemplate t = templateMap.get(ancestor.getBlockTemplateId());
+            parts.add(compactSegment(ancestor, t));
+        }
+        BlockTemplate ownTemplate = templateMap.get(block.getBlockTemplateId());
+        parts.add(compactSegment(block, ownTemplate));
+
+        String code = String.join("-", parts);
+
+        if (layoutBlockRepository.existsByScanCodeAndIdNot(code, block.getId())) {
+            code = code + "-" + block.getId().toString().replace("-", "").substring(0, 8);
+        }
+        return code;
+    }
+
+    private String compactSegment(LayoutBlock block, BlockTemplate template) {
+        if (template == null || template.getIdentifierFormat() == null) {
+            return String.valueOf(block.getPosition() + 1);
+        }
+        return switch (template.getIdentifierFormat()) {
+            case ALPHA -> toAlphabeticIdentifier(block.getPosition());
+            case NUMERIC -> String.format("%02d", block.getPosition() + 1);
+            default -> String.valueOf(block.getPosition() + 1);
+        };
+    }
+
+    /**
+     * Loads the ancestor chain from root down to (but not including) the given
+     * parentId's block.
+     */
+    private List<LayoutBlock> loadAncestorChain(UUID parentId) {
+        List<LayoutBlock> ancestors = new ArrayList<>();
+        UUID current = parentId;
+        Set<UUID> visited = new HashSet<>();
+        while (current != null && visited.add(current)) {
+            LayoutBlock b = layoutBlockRepository.findById(current).orElse(null);
+            if (b == null) break;
+            ancestors.add(0, b); // prepend so list is root-first
+            current = b.getParentId();
+        }
+        return ancestors;
+    }
+
+    /**
+     * Builds an ancestor chain from a pre-loaded block map (for bulk operations).
+     */
+    private List<LayoutBlock> buildAncestorChainFromMap(LayoutBlock block, Map<UUID, LayoutBlock> blockById) {
+        List<LayoutBlock> ancestors = new ArrayList<>();
+        UUID current = block.getParentId();
+        Set<UUID> visited = new HashSet<>();
+        while (current != null && visited.add(current)) {
+            LayoutBlock b = blockById.get(current);
+            if (b == null) break;
+            ancestors.add(0, b);
+            current = b.getParentId();
+        }
+        return ancestors;
+    }
+
+    /**
+     * Builds a template map containing the given template plus all templates
+     * referenced by the ancestor chain.
+     */
+    private Map<UUID, BlockTemplate> buildTemplateMap(List<LayoutBlock> ancestors, BlockTemplate ownTemplate) {
+        Map<UUID, BlockTemplate> map = new HashMap<>();
+        map.put(ownTemplate.getId(), ownTemplate);
+        List<UUID> ancestorTemplateIds = ancestors.stream()
+                .map(LayoutBlock::getBlockTemplateId)
+                .filter(id -> !id.equals(ownTemplate.getId()))
+                .distinct()
+                .toList();
+        if (!ancestorTemplateIds.isEmpty()) {
+            blockTemplateRepository.findAllById(ancestorTemplateIds)
+                    .forEach(t -> map.put(t.getId(), t));
+        }
+        return map;
+    }
+
+    /**
+     * Assigns scan/full codes to a list of newly created blocks in bulk.
+     * Reloads the full layout tree once to build ancestor chains efficiently.
+     */
+    private void assignScanCodes(UUID layoutId, List<LayoutBlock> newBlocks) {
+        if (newBlocks.isEmpty()) return;
+
+        List<LayoutBlock> allBlocks = layoutBlockRepository.findByLayoutIdOrderByParentIdAscPositionAsc(layoutId);
+        Map<UUID, LayoutBlock> blockById = allBlocks.stream()
+                .collect(Collectors.toMap(LayoutBlock::getId, b -> b));
+        Set<UUID> allTemplateIds = allBlocks.stream()
+                .map(LayoutBlock::getBlockTemplateId)
+                .collect(Collectors.toSet());
+        Map<UUID, BlockTemplate> templateById = new HashMap<>();
+        blockTemplateRepository.findAllById(allTemplateIds)
+                .forEach(t -> templateById.put(t.getId(), t));
+
+        for (LayoutBlock block : newBlocks) {
+            List<LayoutBlock> ancestors = buildAncestorChainFromMap(block, blockById);
+            String code = generateScanCode(block, ancestors, templateById);
+            block.setScanCode(code);
+            block.setFullCode(code);
+            saveBlock(block);
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -396,6 +565,8 @@ public class LayoutBlockService {
                 .parentId(parentId)
                 .position(position)
                 .side(source.getSide())
+                .locationKind(source.getLocationKind() != null ? source.getLocationKind() : LocationKind.STORAGE)
+                // scanCode and fullCode are generated separately via assignScanCodes()
                 .build();
     }
 
@@ -405,12 +576,14 @@ public class LayoutBlockService {
             UUID layoutId,
             UUID sourceParentId,
             UUID clonedParentId,
-            Map<UUID, UUID> clonedIds) {
+            Map<UUID, UUID> clonedIds,
+            List<LayoutBlock> allNewBlocks) {
         int createdCount = 0;
         for (LayoutBlock child : childrenByParentId.getOrDefault(sourceParentId, List.of())) {
             LayoutBlock clonedChild = cloneBlock(child, layoutId, clonedParentId, child.getPosition(), clonedIds);
             LayoutBlock savedChild = saveBlock(clonedChild);
             clonedIds.put(child.getId(), savedChild.getId());
+            allNewBlocks.add(savedChild);
             requireTemplate(templatesById, savedChild.getBlockTemplateId());
             createdCount++;
             createdCount += cloneChildrenRecursively(
@@ -419,7 +592,8 @@ public class LayoutBlockService {
                     layoutId,
                     child.getId(),
                     savedChild.getId(),
-                    clonedIds);
+                    clonedIds,
+                    allNewBlocks);
         }
         return createdCount;
     }
@@ -583,6 +757,9 @@ public class LayoutBlockService {
                 b.getPosition(),
                 resolveIdentifier(b, template),
                 b.getSide(),
+                b.getLocationKind(),
+                b.getScanCode(),
+                b.getFullCode(),
                 b.getCreatedAt(),
                 b.getUpdatedAt());
     }
@@ -595,6 +772,9 @@ public class LayoutBlockService {
             int position,
             String identifier,
             String side,
+            LocationKind locationKind,
+            String scanCode,
+            String fullCode,
             Instant createdAt,
             Instant updatedAt) {
     }

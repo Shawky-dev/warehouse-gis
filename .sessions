@@ -1,0 +1,958 @@
+Session Map Overview
+Session	Type	Chunk	Size
+C1-A	Backend	Location Kind + Scan Code	Medium
+C1-B	Frontend	Location Kind + Scan Code	Medium
+C2-A	Backend	Lot-Level On-Hand View	Small
+C2-B	Frontend	Lot Display in Stock Tab	Small
+C3-A	Backend	Movement Traceability Fields	Small
+C3-B	Frontend	Reason Code + Movement Display	Small
+C4-A	Backend	Receipt Documents	Large
+C4-B	Frontend	Receipts Page	Large
+C5-A	Backend	Dispatch Documents	Large
+C5-B	Frontend	Dispatches Page	Large
+C6-A	Backend	Count Sessions	Large
+C6-B	Frontend	Count Sessions Page	Large
+C7-A	Backend	Scan Resolver	Small
+C7-B	Frontend	Scan Input + Labels + Form Integration	Medium
+C8-A	Backend	Reporting Gaps	Small
+C8-B	Frontend	Kind Filter + Document Links	Small
+Note: C2-A and C3-A are both tiny. If context budget is tight, merge them into one session. Same for C2-B + C3-B.
+
+Session C1-A — Backend: Location Kind + Scan Code
+Prerequisite sessions: None
+Complexity: Medium
+
+Context
+Tech stack: Spring Boot 3.5 / Java 21 / Hibernate JPA / PostgreSQL / Liquibase. Multi-tenant schema-per-tenant. All entity files are under backend/src/main/java/com/warehouse/warehouse_platform/tenant/. Migrations live in backend/src/main/resources/db/migration/tenant/. Current highest migration is V17__create_f2_inventory_ledger.sql.
+
+The LayoutBlock entity (tenant/warehouse/block/LayoutBlock.java) currently has: id, layoutId, blockTemplateId, parentId, position, side, createdAt, updatedAt. It has no concept of what kind of location it is (storage vs operational area) and no scannable code.
+
+The LayoutBlockService (tenant/warehouse/block/LayoutBlockService.java) handles full tree management: addBlock(), addBlocks(), copySubtree(), moveBlock(), reassignTemplate(), updateMetadata(), removeBlock().
+
+The LayoutBlockController (tenant/warehouse/block/LayoutBlockController.java) exposes PUT /{blockId}/metadata which currently accepts only side via UpdateBlockMetadataRequest.
+
+The InventoryLedgerService.listLocationLookups() builds a LocationLookupItem result that includes a computed pathLabel. This is the only place full path text is assembled — it is not stored.
+
+Deliverables
+New file:
+
+tenant/warehouse/block/LocationKind.java — enum: STORAGE, STAGING, QUARANTINE, DAMAGED, DISPATCH, STRUCTURAL
+Modified files:
+
+tenant/warehouse/block/LayoutBlock.java
+
+Add field: @Enumerated(EnumType.STRING) @Column(name = "location_kind", length = 20) private LocationKind locationKind; — default STORAGE
+Add field: @Column(name = "scan_code", unique = true, length = 60) private String scanCode;
+Add field: @Column(name = "full_code", length = 200) private String fullCode; — stored path label (e.g. A-01-L1-S2), computed and stored on write
+backend/src/main/resources/db/migration/tenant/V18__add_location_identity.sql
+
+
+ALTER TABLE layout_blocks
+  ADD COLUMN location_kind VARCHAR(20) NOT NULL DEFAULT 'STORAGE',
+  ADD COLUMN scan_code     VARCHAR(60),
+  ADD COLUMN full_code     VARCHAR(200);
+
+CREATE UNIQUE INDEX uq_layout_blocks_scan_code
+  ON layout_blocks(scan_code)
+  WHERE scan_code IS NOT NULL;
+tenant/warehouse/block/LayoutBlockService.java
+
+Add private helper generateScanCode(layoutId, block tree context) — produce a short unique code derived from the block's position in the hierarchy (e.g. join parent identifiers with -). Must be unique across the tenant. Fall back to UUID suffix if collision.
+Call generateScanCode() and set fullCode in: addBlock(), addBlocks(), copySubtree(). On copy, generate a new scan_code (do not copy the source's scan_code — it must be unique).
+Add method updateLocationKind(layoutId, blockId, LocationKind kind) — sets locationKind, saves, returns updated block.
+Expose locationKind and scanCode on the BlockNode result object.
+tenant/warehouse/block/LayoutBlockController.java
+
+Update UpdateBlockMetadataRequest to include LocationKind locationKind (optional, nullable).
+Update PUT /{blockId}/metadata handler to call updateLocationKind() when kind is provided.
+Update block response DTO to include locationKind, scanCode, fullCode.
+tenant/inventory/InventoryLedgerService.java
+
+Update listLocationLookups() result to include locationKind and scanCode from the block row.
+Update LocationLookupItem result record/class to add locationKind and scanCode fields.
+Tests
+File: backend/src/test/java/com/warehouse/warehouse_platform/tenant/warehouse/block/LayoutBlockServiceTest.java
+
+Use JUnit 5 + Mockito (@ExtendWith(MockitoExtension.class)). Mock LayoutBlockRepository, WarehouseLayoutRepository, BlockTemplateRepository.
+
+Test cases:
+
+addBlock_setsDefaultStorageKind — newly added block gets locationKind = STORAGE
+addBlock_generatesScanCode — scanCode is non-null and non-empty after add
+copySubtree_generatesNewScanCode — copied blocks do not inherit source scanCode
+updateLocationKind_changesKindAndPersists — after calling updateLocationKind(), the block's kind matches input
+updateLocationKind_rejectsNullKind — throws when kind is null
+API Docs
+If Springdoc/Swagger is on the classpath (check pom.xml for springdoc-openapi), add @Operation and @Parameter annotations to the new/modified controller methods. The new location_kind field should appear in the block response schema.
+
+Session C1-B — Frontend: Location Kind + Scan Code
+Prerequisite sessions: C1-A must be deployed/running
+Complexity: Medium
+
+Context
+Tech stack: React 19, TypeScript, React Router 7, Tailwind, Shadcn/ui, custom i18n (EN/AR via useI18n() hook). All tenant feature code lives under frontend/src/features/tenant/.
+
+Warehouse types are in frontend/src/features/tenant/types/warehouse.ts. The WarehouseBlockResult type currently has: id, layoutId, blockTemplateId, parentId, position, identifier, side, createdAt, updatedAt.
+
+Inventory types are in frontend/src/features/tenant/types/inventory.ts. LocationLookupItem currently has: id, layoutId, layoutName, label, pathLabel, identifier, side.
+
+The warehouse layout builder is in frontend/src/features/tenant/warehouse/WarehouseLayoutsPage.tsx. It renders the block tree and handles metadata updates via the PUT /{blockId}/metadata endpoint.
+
+i18n keys live in frontend/src/i18n/messages/en.ts and ar.ts. Add all new keys to both files.
+
+Deliverables
+Modified files:
+
+frontend/src/features/tenant/types/warehouse.ts
+
+Add to WarehouseBlockResult: locationKind: LocationKind, scanCode: string | null, fullCode: string | null
+Add enum (or union type): type LocationKind = 'STORAGE' | 'STAGING' | 'QUARANTINE' | 'DAMAGED' | 'DISPATCH' | 'STRUCTURAL'
+frontend/src/features/tenant/types/inventory.ts
+
+Add to LocationLookupItem: locationKind: LocationKind, scanCode: string | null
+frontend/src/features/tenant/api/warehouseApi.ts
+
+Update the updateBlockMetadata API call body type to include optional locationKind: LocationKind
+frontend/src/features/tenant/warehouse/WarehouseLayoutsPage.tsx
+
+On the block detail/edit panel (wherever side is currently edited), add a <select> or dropdown for locationKind. Only show this field for leaf nodes (blocks with no children).
+Display a small badge next to each leaf block label showing its kind (e.g. a coloured chip: STORAGE=grey, STAGING=yellow, QUARANTINE=orange, DAMAGED=red, DISPATCH=blue, STRUCTURAL=muted).
+Display scanCode in the block detail panel as a read-only field with a copy-to-clipboard button.
+Clicking "Edit Metadata" on a block should now submit { side, locationKind } together.
+frontend/src/i18n/messages/en.ts + ar.ts
+
+
+warehouse.locationKind.label = "Location Kind"
+warehouse.locationKind.storage = "Storage"
+warehouse.locationKind.staging = "Staging"
+warehouse.locationKind.quarantine = "Quarantine"
+warehouse.locationKind.damaged = "Damaged"
+warehouse.locationKind.dispatch = "Dispatch"
+warehouse.locationKind.structural = "Structural"
+warehouse.scanCode.label = "Scan Code"
+warehouse.scanCode.copy = "Copy"
+Behaviour Rules
+Only leaf blocks (blocks with children.length === 0 in the tree) can have their locationKind changed. Parent nodes are always STRUCTURAL.
+The scanCode field is read-only in the UI — it is generated by the backend. Never send it in a write request.
+In the inventory operations forms (receive, transfer, adjust), the LocationLookupItem dropdown should show the kind badge alongside the location label so users can distinguish STAGING from STORAGE when picking a destination.
+Session C2-A — Backend: Lot-Level On-Hand View
+Prerequisite sessions: None (but deploy before C4-A and C6-A)
+Complexity: Small — but breaking
+
+Context
+The current v_on_hand view groups by (location_id, product_id) only:
+
+
+CREATE VIEW v_on_hand AS
+SELECT location_id, product_id, SUM(qty) AS qty_on_hand
+FROM stock_movements
+GROUP BY location_id, product_id
+HAVING SUM(qty) <> 0;
+OnHandEntry.java is a Spring Data projection interface with three getters: getLocationId(), getProductId(), getQtyOnHand().
+
+StockMovementRepository.java has five native queries that select from v_on_hand. All of them must be updated to include lot_number in SELECT and WHERE.
+
+InventoryLedgerService has a stock sufficiency check for transfers and negative adjusts — it calls findOnHandQtyByLocationAndProduct(). After this change, that query must also filter by lot_number when the product has trackLot = true.
+
+This is a breaking schema change on the view — existing on-hand queries return more rows for lot-tracked products.
+
+Deliverables
+backend/src/main/resources/db/migration/tenant/V19__update_v_on_hand_lot_grouping.sql
+
+
+DROP VIEW IF EXISTS v_on_hand;
+
+CREATE VIEW v_on_hand AS
+SELECT location_id,
+       product_id,
+       lot_number,
+       SUM(qty) AS qty_on_hand
+FROM   stock_movements
+GROUP  BY location_id, product_id, lot_number
+HAVING SUM(qty) <> 0;
+tenant/inventory/OnHandEntry.java
+
+Add getter: String getLotNumber();
+tenant/inventory/StockMovementRepository.java
+
+Update all five v_on_hand queries to: SELECT location_id AS locationId, product_id AS productId, lot_number AS lotNumber, qty_on_hand AS qtyOnHand FROM v_on_hand ...
+Add new query: findOnHandQtyByLocationProductAndLot(@Param("locationId"), @Param("productId"), @Param("lotNumber")) — returns Optional<BigDecimal>, filters by lot_number = :lotNumber (or lot_number IS NULL when lotNumber param is null)
+Keep existing findOnHandQtyByLocationAndProduct() — now returns total across all lots (used only for non-lot-tracked products)
+tenant/inventory/InventoryLedgerService.java
+
+Update OnHandResult record (the DTO returned to the controller) to include lotNumber: String
+In transfer() sufficiency check: if the product has trackLot = true, call findOnHandQtyByLocationProductAndLot() instead of the non-lot version
+In adjust() negative sufficiency check: same lot-aware check
+Update buildOnHandResult() or equivalent mapping method to pass through lotNumber
+Tests
+File: tenant/inventory/InventoryLedgerServiceTest.java (update existing or create)
+
+Test cases:
+
+transfer_withLotTrackedProduct_checksStockAtSpecificLot — mock returns stock only for LOT-A; transfer request for LOT-B should fail with insufficient stock
+getOnHand_returnsSeparateRowsPerLot — mock returns two rows for same product+location with different lots; service returns two OnHandResult entries
+adjust_negativeWithLot_checksLotStock — negative adjust on a lot-tracked product checks the specific lot's balance
+Session C2-B — Frontend: Lot Display in Stock Tab
+Prerequisite sessions: C2-A
+Complexity: Small
+
+Context
+The InventoryPage.tsx Stock tab shows an on-hand table. OnHandEntry type currently has: locationId, productId, qtyOnHand, locationLabel, locationPathLabel, layoutId, layoutName, locationIdentifier, locationSide, productSku, productName, baseUomCode, trackLot, trackExpiry.
+
+After C2-A, the backend returns a new lotNumber field on each on-hand row. For non-lot-tracked products this will be null. For lot-tracked products, each lot appears as a separate row.
+
+Deliverables
+frontend/src/features/tenant/types/inventory.ts
+
+Add lotNumber: string | null to OnHandEntry
+frontend/src/features/tenant/inventory/InventoryPage.tsx (Stock tab section)
+
+Add a "Lot" column to the on-hand table. Show the value when trackLot === true and lotNumber is non-null. Show — when trackLot === false.
+When grouping/sorting the table, group by product then location. Within that group, each lot is a sub-row.
+The filter bar already has product/location filters. No new filters needed for this session.
+frontend/src/i18n/messages/en.ts + ar.ts
+
+
+inventory.columns.lot = "Lot"
+inventory.columns.lotNumber = "Lot Number"
+Session C3-A — Backend: Movement Traceability Fields
+Prerequisite sessions: None (do before C4-A, C5-A, C6-A)
+Complexity: Small
+
+Context
+StockMovement.java currently has referenceId (UUID, links transfer pairs) and notes. It has no link to a source document (receipt, dispatch, count session) and no reason code. These fields need to exist before receipt/dispatch documents are built so a single migration adds them correctly.
+
+InventoryLedgerService has receive(), transfer(), adjust() methods. Their signatures need to accept the new optional fields so document services (C4-A, C5-A, C6-A) can pass them.
+
+Deliverables
+V20__add_movement_traceability.sql
+
+
+ALTER TABLE stock_movements
+  ADD COLUMN source_document_id UUID,
+  ADD COLUMN reason_code        VARCHAR(50);
+
+CREATE INDEX idx_stock_movements_source_document
+  ON stock_movements(source_document_id)
+  WHERE source_document_id IS NOT NULL;
+tenant/inventory/StockMovement.java
+
+Add @Column(name = "source_document_id") private UUID sourceDocumentId;
+Add @Column(name = "reason_code", length = 50) private String reasonCode;
+tenant/inventory/InventoryLedgerService.java
+
+Update receive() signature: add UUID sourceDocumentId, String reasonCode params (both nullable)
+Update adjust() signature: add UUID sourceDocumentId, String reasonCode params (both nullable)
+Update transfer() signature: add String reasonCode param (nullable; sourceDocumentId not needed for transfers — referenceId already links the pair)
+Pass fields through to StockMovement.builder() calls
+Do not change the existing controller call sites — they pass null for new params, preserving backward compatibility
+tenant/inventory/InventoryLedgerController.java
+
+Update AdjustRequest record to include String reasonCode (optional, nullable)
+Pass reasonCode into the service call for adjust()
+Result DTO:
+
+Update MovementResult (or equivalent) to include sourceDocumentId and reasonCode
+Update the mapping from StockMovement to result
+Tests
+Test cases in InventoryLedgerServiceTest.java:
+
+adjust_withReasonCode_persistsReasonCode — mock save, verify StockMovement.reasonCode equals input
+receive_withSourceDocumentId_persistsDocumentId — verify the field passes through
+adjust_withNullReasonCode_persistsNull — existing behaviour unchanged
+Session C3-B — Frontend: Reason Code in Adjust Form + Movements Display
+Prerequisite sessions: C3-A
+Complexity: Small
+
+Context
+The InventoryPage.tsx Operations tab has three forms: Receive, Transfer, Adjust. The Adjust form currently accepts: locationId, productId, qty, lotNumber, notes.
+
+The Movements tab shows a table of MovementResult rows. Currently displayed columns: type badge, product, location, qty, lot, date, created by.
+
+Deliverables
+frontend/src/features/tenant/types/inventory.ts
+
+Add sourceDocumentId: string | null and reasonCode: string | null to MovementResult
+frontend/src/features/tenant/api/inventoryApi.ts
+
+Add reasonCode?: string to the AdjustRequest body type
+frontend/src/features/tenant/inventory/InventoryPage.tsx
+
+In the Adjust form: add an optional text input for "Reason Code" (short free-text, e.g. "DAMAGED", "RECOUNT"). Max 50 chars. Include it in the POST body.
+In the Movements tab table: add a "Reason" column that shows reasonCode when present. Can be a small muted text chip.
+frontend/src/i18n/messages/en.ts + ar.ts
+
+
+inventory.adjust.reasonCode = "Reason Code"
+inventory.adjust.reasonCodePlaceholder = "e.g. DAMAGED, RECOUNT"
+inventory.columns.reason = "Reason"
+Session C4-A — Backend: Receipt Documents
+Prerequisite sessions: C1-A, C2-A, C3-A
+Complexity: Large
+
+Context
+There is no receipt document in the codebase. The existing POST /inventory/receive is a raw atomic operation — it stays untouched. Receipts are a new layer on top.
+
+The InventoryLedgerService.receive() method now accepts UUID sourceDocumentId and String reasonCode (after C3-A). When posting a receipt, the service will call receive() once per line, passing the receipt's ID as sourceDocumentId.
+
+Existing permissions are in a TenantPermission enum or similar. You need to add new receipt-specific permissions.
+
+All new files go under tenant/receipt/.
+
+Deliverables
+New migration: V21__create_receipt_documents.sql
+
+
+CREATE TABLE receipt_documents (
+  id            UUID PRIMARY KEY,
+  supplier_id   UUID REFERENCES suppliers(id),
+  reference     VARCHAR(120),
+  notes         VARCHAR(500),
+  status        VARCHAR(20) NOT NULL DEFAULT 'DRAFT',
+  created_by    VARCHAR(255) NOT NULL,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  posted_at     TIMESTAMPTZ,
+  posted_by     VARCHAR(255),
+  voided_at     TIMESTAMPTZ,
+  voided_by     VARCHAR(255)
+);
+
+CREATE TABLE receipt_lines (
+  id                     UUID PRIMARY KEY,
+  receipt_id             UUID NOT NULL REFERENCES receipt_documents(id) ON DELETE CASCADE,
+  product_id             UUID NOT NULL REFERENCES products(id),
+  destination_location_id UUID NOT NULL REFERENCES layout_blocks(id),
+  qty                    NUMERIC(15,4) NOT NULL CHECK (qty > 0),
+  lot_number             VARCHAR(100),
+  expiry_date            DATE,
+  notes                  VARCHAR(500),
+  position               INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX idx_receipt_lines_receipt ON receipt_lines(receipt_id);
+CREATE INDEX idx_receipt_docs_status ON receipt_documents(status);
+New files:
+
+tenant/receipt/ReceiptStatus.java — enum: DRAFT, POSTED, VOID
+tenant/receipt/ReceiptDocument.java — JPA entity mapping receipt_documents
+tenant/receipt/ReceiptLine.java — JPA entity mapping receipt_lines
+tenant/receipt/ReceiptDocumentRepository.java — JpaRepository<ReceiptDocument, UUID> + findByStatus(ReceiptStatus), paginated list with Specification
+tenant/receipt/ReceiptLineRepository.java — JpaRepository<ReceiptLine, UUID> + findByReceiptIdOrderByPosition(UUID)
+tenant/receipt/ReceiptService.java (see spec below)
+tenant/receipt/ReceiptController.java — base path /{tenantSlug}/receipts
+ReceiptService method spec:
+
+
+createDraft(supplierId?, reference?, notes?, actor)
+  → creates ReceiptDocument with status=DRAFT, returns id
+
+addLine(receiptId, productId, destinationLocationId, qty, lotNumber?, expiryDate?, notes?, actor)
+  → validates receipt is DRAFT
+  → validates product exists + active
+  → validates destinationLocationId is a leaf block (has no children) and locationKind != DISPATCH
+  → if product.trackLot=true, lotNumber must be provided
+  → if product.trackExpiry=true, expiryDate must be provided
+  → creates ReceiptLine, appends to end (max position + 1)
+
+removeLine(receiptId, lineId, actor)
+  → validates receipt is DRAFT
+  → deletes line
+
+updateLine(receiptId, lineId, qty, lotNumber?, expiryDate?, notes?, actor)
+  → validates receipt is DRAFT
+  → updates mutable fields
+
+postReceipt(receiptId, actor)
+  → validates status == DRAFT
+  → validates receipt has at least one line
+  → for each line: call inventoryLedgerService.receive(locationId, productId, qty, lotNumber, expiryDate, notes, sourceDocumentId=receiptId, reasonCode=null, actor)
+  → sets status=POSTED, postedAt, postedBy
+  → wraps in @Transactional — if any receive() fails, entire post rolls back
+
+voidReceipt(receiptId, actor)
+  → validates status == POSTED
+  → for each original line: call inventoryLedgerService.adjust(-line.qty, locationId, productId, lotNumber, sourceDocumentId=receiptId, reasonCode="VOID_RECEIPT", actor)
+  → sets status=VOID, voidedAt, voidedBy
+  → @Transactional
+
+listReceipts(page, size, status?, search?)
+  → paginated, filterable by status and reference/supplier name search
+
+getReceipt(receiptId)
+  → returns header + lines
+ReceiptController endpoints:
+
+
+GET    /{tenantSlug}/receipts                  — list (paginated, filterable)
+GET    /{tenantSlug}/receipts/{id}             — get with lines
+POST   /{tenantSlug}/receipts                  — createDraft
+POST   /{tenantSlug}/receipts/{id}/lines       — addLine
+PUT    /{tenantSlug}/receipts/{id}/lines/{lid} — updateLine
+DELETE /{tenantSlug}/receipts/{id}/lines/{lid} — removeLine
+POST   /{tenantSlug}/receipts/{id}/post        — postReceipt
+POST   /{tenantSlug}/receipts/{id}/void        — voidReceipt
+Permissions to add (in existing TenantPermission enum or equivalent):
+RECEIPTS_VIEW, RECEIPTS_CREATE, RECEIPTS_EDIT, RECEIPTS_POST, RECEIPTS_VOID
+
+Tests
+File: tenant/receipt/ReceiptServiceTest.java
+
+Test cases:
+
+createDraft_returnsReceiptWithDraftStatus
+addLine_withLotTrackedProduct_requiresLotNumber
+addLine_toNonLeafLocation_throws
+addLine_toDispatchLocation_throws
+postReceipt_callsReceiveForEachLine
+postReceipt_withNoLines_throws
+postReceipt_alreadyPosted_throws
+voidReceipt_createsNegativeAdjustPerLine
+voidReceipt_onDraftReceipt_throws
+Session C4-B — Frontend: Receipts Page
+Prerequisite sessions: C4-A
+Complexity: Large
+
+Context
+No receipts UI exists. The tenant navigation is in TenantNavbar.tsx. Routes are in features/tenant/routes.tsx. Path constants are in shared/consts/paths.ts. The pattern for a feature page: one Page.tsx file handling list + detail states via local state, an api/featureApi.ts for HTTP calls, and a types/feature.ts for TypeScript types.
+
+Look at InventoryPage.tsx for the tab/section pattern and TenantProductsPage.tsx for the list + modal pattern to keep style consistent.
+
+Deliverables
+New files:
+
+frontend/src/features/tenant/types/receipts.ts
+
+
+type ReceiptStatus = 'DRAFT' | 'POSTED' | 'VOID'
+
+interface ReceiptListItem { id, reference, supplierName, status, createdAt, postedAt }
+interface ReceiptLine { id, productId, productSku, productName, destinationLocationId, locationPathLabel, qty, lotNumber, expiryDate, notes, position }
+interface ReceiptDetail { id, supplierId, supplierName, reference, notes, status, createdBy, createdAt, postedAt, postedBy, voidedAt, voidedBy, lines: ReceiptLine[] }
+interface CreateReceiptDraftRequest { supplierId?, reference?, notes? }
+interface AddReceiptLineRequest { productId, destinationLocationId, qty, lotNumber?, expiryDate?, notes? }
+interface UpdateReceiptLineRequest { qty, lotNumber?, expiryDate?, notes? }
+frontend/src/features/tenant/api/receiptsApi.ts
+
+listReceipts(tenantSlug, params: { page, size, status?, search? })
+getReceipt(tenantSlug, id)
+createDraft(tenantSlug, body: CreateReceiptDraftRequest)
+addLine(tenantSlug, receiptId, body: AddReceiptLineRequest)
+updateLine(tenantSlug, receiptId, lineId, body: UpdateReceiptLineRequest)
+removeLine(tenantSlug, receiptId, lineId)
+postReceipt(tenantSlug, id)
+voidReceipt(tenantSlug, id)
+frontend/src/features/tenant/receipts/ReceiptsPage.tsx
+
+Two views: list view and detail view (controlled by a selected receipt ID in local state).
+
+List view:
+
+Table of receipts: columns Reference, Supplier, Status badge (colour-coded: DRAFT=grey, POSTED=green, VOID=red), Created At, Actions
+Filter bar: status filter (DRAFT/POSTED/VOID/All), text search
+"New Receipt" button → opens create draft modal (inputs: reference, supplier dropdown, notes)
+Click a row → switch to detail view
+Detail view (for DRAFT receipts):
+
+Header section: shows reference, supplier, notes, status, created by
+"Add Line" button → inline form row: product search dropdown (uses /inventory/lookups/products), destination location dropdown (uses /inventory/lookups/locations), qty input, lot input (shown only if product.trackLot=true), expiry date input (shown only if product.trackExpiry=true), notes
+Lines table: columns Product, Destination, Qty, Lot, Expiry, Notes, Delete action
+"Post Receipt" button → confirm dialog → calls postReceipt → refreshes
+"Back to list" button
+Detail view (for POSTED receipts):
+
+Read-only header + lines table
+"Void Receipt" button → confirm dialog → calls voidReceipt
+Modified files:
+
+frontend/src/features/tenant/routes.tsx
+
+Add route: { path: PATHS.TENANT.RECEIPTS_PATTERN, element: <RequirePermission permission="RECEIPTS_VIEW"><ReceiptsPage /></RequirePermission> }
+frontend/src/features/tenant/navigation/TenantNavbar.tsx
+
+Add "Receipts" nav item with appropriate icon (e.g. PackagePlus from lucide), linking to PATHS.TENANT.receipts(tenantSlug), shown when user has RECEIPTS_VIEW
+frontend/src/shared/consts/paths.ts
+
+Add RECEIPTS_PATTERN: "/:tenantSlug/receipts" and helper receipts(tenantSlug) => /${tenantSlug}/receipts
+frontend/src/features/auth/shared/permissions.ts
+
+Add RECEIPTS_VIEW, RECEIPTS_CREATE, RECEIPTS_EDIT, RECEIPTS_POST, RECEIPTS_VOID to the TENANT_PERMISSIONS object
+frontend/src/i18n/messages/en.ts + ar.ts
+
+Add receipts.* namespace: receipts.title, receipts.newReceipt, receipts.status.*, receipts.columns.*, receipts.form.*, receipts.post.confirm, receipts.void.confirm
+Session C5-A — Backend: Dispatch Documents
+Prerequisite sessions: C1-A, C2-A, C3-A
+Complexity: Large
+
+Context
+Symmetric with C4-A. No dispatch document exists. The existing PICK movement type in MovementType.java is unused by any document — it will now be used by dispatch posting. InventoryLedgerService has no pick() method — dispatches will call the internal adjust() or a new private pick() with negative qty.
+
+The key difference from receipts: dispatch posting must validate stock sufficiency per line before any movement is written. If any line fails, the entire post rolls back.
+
+Stock sufficiency check must be lot-aware: if product.trackLot = true, validate stock at (sourceLocationId, productId, lotNumber) using findOnHandQtyByLocationProductAndLot().
+
+All new files go under tenant/dispatch/.
+
+Deliverables
+New migration: V22__create_dispatch_documents.sql
+
+
+CREATE TABLE dispatch_documents (
+  id           UUID PRIMARY KEY,
+  destination  VARCHAR(200),
+  reference    VARCHAR(120),
+  notes        VARCHAR(500),
+  status       VARCHAR(20) NOT NULL DEFAULT 'DRAFT',
+  created_by   VARCHAR(255) NOT NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  posted_at    TIMESTAMPTZ,
+  posted_by    VARCHAR(255),
+  voided_at    TIMESTAMPTZ,
+  voided_by    VARCHAR(255)
+);
+
+CREATE TABLE dispatch_lines (
+  id                  UUID PRIMARY KEY,
+  dispatch_id         UUID NOT NULL REFERENCES dispatch_documents(id) ON DELETE CASCADE,
+  product_id          UUID NOT NULL REFERENCES products(id),
+  source_location_id  UUID NOT NULL REFERENCES layout_blocks(id),
+  qty                 NUMERIC(15,4) NOT NULL CHECK (qty > 0),
+  lot_number          VARCHAR(100),
+  notes               VARCHAR(500),
+  position            INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX idx_dispatch_lines_dispatch ON dispatch_lines(dispatch_id);
+New files:
+
+tenant/dispatch/DispatchStatus.java — enum: DRAFT, POSTED, VOID
+tenant/dispatch/DispatchDocument.java
+tenant/dispatch/DispatchLine.java
+tenant/dispatch/DispatchDocumentRepository.java
+tenant/dispatch/DispatchLineRepository.java
+tenant/dispatch/DispatchService.java
+tenant/dispatch/DispatchController.java — base path /{tenantSlug}/dispatches
+Add private method to InventoryLedgerService:
+
+
+public StockMovement pick(UUID locationId, UUID productId, BigDecimal qty,
+                          String lotNumber, UUID sourceDocumentId, String actor)
+Creates a PICK movement with qty negated (stored as negative). Includes sourceDocumentId. Does NOT validate sufficiency (caller is responsible).
+
+DispatchService method spec:
+
+
+createDraft(destination?, reference?, notes?, actor)
+
+addLine(dispatchId, productId, sourceLocationId, qty, lotNumber?, notes?, actor)
+  → validate DRAFT status
+  → validate product active, sourceLocationId is leaf and locationKind != STRUCTURAL
+  → if product.trackLot=true, lotNumber required
+
+removeLine / updateLine — symmetric with ReceiptService
+
+postDispatch(dispatchId, actor)
+  → validate DRAFT, at least one line
+  → Pre-flight: for EACH line, check stock sufficiency
+      if product.trackLot=true: check (locationId, productId, lotNumber)
+      else: check (locationId, productId)
+      if ANY line fails → throw with line number and deficit
+  → if all pass: for each line call inventoryLedgerService.pick(...)
+  → set status=POSTED
+  → @Transactional
+
+voidDispatch(dispatchId, actor)
+  → validate POSTED
+  → for each original line: call inventoryLedgerService.receive(locationId, productId, qty, lotNumber, null, sourceDocumentId=dispatchId, reasonCode="VOID_DISPATCH", actor)
+  → set status=VOID
+  → @Transactional
+Endpoints:
+
+
+GET    /{tenantSlug}/dispatches
+GET    /{tenantSlug}/dispatches/{id}
+POST   /{tenantSlug}/dispatches
+POST   /{tenantSlug}/dispatches/{id}/lines
+PUT    /{tenantSlug}/dispatches/{id}/lines/{lid}
+DELETE /{tenantSlug}/dispatches/{id}/lines/{lid}
+POST   /{tenantSlug}/dispatches/{id}/post
+POST   /{tenantSlug}/dispatches/{id}/void
+Permissions: DISPATCHES_VIEW, DISPATCHES_CREATE, DISPATCHES_EDIT, DISPATCHES_POST, DISPATCHES_VOID
+
+Tests
+File: tenant/dispatch/DispatchServiceTest.java
+
+Test cases:
+
+postDispatch_withInsufficientStock_throwsBeforeAnyMovement
+postDispatch_withLotTrackedProduct_checksLotStock
+postDispatch_createsPickMovementPerLine
+postDispatch_stampsSourceDocumentId
+voidDispatch_createsReceiveMovementPerLine
+voidDispatch_onDraftDispatch_throws
+addLine_toLotTrackedProduct_requiresLot
+Session C5-B — Frontend: Dispatches Page
+Prerequisite sessions: C5-A, C4-B (follow the same UI patterns established in C4-B)
+Complexity: Large
+
+Context
+Symmetric with C4-B. The key UI difference: dispatch lines pick from a source location (not destination), and there is no lot input for non-lot-tracked products. The pre-flight stock check happens on the backend at post time — if it fails, show a user-friendly error listing which lines failed and why.
+
+Deliverables
+New files:
+
+frontend/src/features/tenant/types/dispatches.ts — symmetric with receipts.ts but with sourceLocationId, no expiryDate
+frontend/src/features/tenant/api/dispatchesApi.ts — symmetric with receiptsApi.ts
+frontend/src/features/tenant/dispatches/DispatchesPage.tsx — symmetric UX to ReceiptsPage.tsx
+Modified files:
+
+routes.tsx — add dispatch route with DISPATCHES_VIEW guard
+TenantNavbar.tsx — add "Dispatches" nav item (e.g. PackageMinus icon)
+paths.ts — add DISPATCHES_PATTERN and dispatches() helper
+permissions.ts — add DISPATCHES_* permissions
+en.ts + ar.ts — add dispatches.* namespace
+Error handling specifics for DispatchesPage.tsx:
+
+When postDispatch returns a 400/422 error with line-level detail (which lines have insufficient stock), show each failed line's product name and deficit quantity in the error message, not just a generic toast.
+Session C6-A — Backend: Count Sessions
+Prerequisite sessions: C2-A, C3-A
+Complexity: Large
+
+Context
+No count session exists. ADJUST movements exist and will be used for variance posting. The count session workflow: open a session (snapshot expected stock from v_on_hand), workers fill in counted quantities, post (write ADJUST movements only for variances), or void (discard without movements).
+
+The snapshot on open is critical — it captures what the system expected at the moment the session started, even if stock changes afterwards.
+
+All new files under tenant/counting/.
+
+Deliverables
+New migration: V23__create_count_sessions.sql
+
+
+CREATE TABLE count_sessions (
+  id           UUID PRIMARY KEY,
+  name         VARCHAR(120) NOT NULL,
+  status       VARCHAR(20) NOT NULL DEFAULT 'OPEN',
+  created_by   VARCHAR(255) NOT NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  posted_at    TIMESTAMPTZ,
+  posted_by    VARCHAR(255),
+  voided_at    TIMESTAMPTZ,
+  voided_by    VARCHAR(255)
+);
+
+-- Which locations are covered by this session
+CREATE TABLE count_session_locations (
+  session_id  UUID NOT NULL REFERENCES count_sessions(id) ON DELETE CASCADE,
+  location_id UUID NOT NULL REFERENCES layout_blocks(id),
+  PRIMARY KEY (session_id, location_id)
+);
+
+CREATE TABLE count_lines (
+  id             UUID PRIMARY KEY,
+  session_id     UUID NOT NULL REFERENCES count_sessions(id) ON DELETE CASCADE,
+  location_id    UUID NOT NULL REFERENCES layout_blocks(id),
+  product_id     UUID NOT NULL REFERENCES products(id),
+  lot_number     VARCHAR(100),
+  expected_qty   NUMERIC(15,4) NOT NULL DEFAULT 0,
+  counted_qty    NUMERIC(15,4),  -- NULL until entered by staff
+  variance       NUMERIC(15,4) GENERATED ALWAYS AS (counted_qty - expected_qty) STORED
+);
+
+CREATE INDEX idx_count_lines_session ON count_lines(session_id);
+New files:
+
+tenant/counting/CountStatus.java — enum: OPEN, POSTED, VOID
+tenant/counting/CountSession.java
+tenant/counting/CountLine.java
+tenant/counting/CountSessionRepository.java
+tenant/counting/CountLineRepository.java — add findBySessionIdOrderByLocationIdAscProductId(UUID sessionId)
+tenant/counting/CountSessionService.java
+tenant/counting/CountSessionController.java — base path /{tenantSlug}/count-sessions
+CountSessionService method spec:
+
+
+openSession(name, locationIds: List<UUID>, actor)
+  → validate locationIds are all leaf blocks
+  → create CountSession with status=OPEN
+  → insert rows in count_session_locations
+  → snapshot: query v_on_hand WHERE location_id IN (locationIds)
+    → for each row: create CountLine(sessionId, locationId, productId, lotNumber, expectedQty=row.qtyOnHand, countedQty=null)
+  → for any (location, product, lot) combination in scope that has ZERO on-hand (i.e. not in v_on_hand), do NOT create a line — count lines only represent things currently in stock
+  → return session id
+
+updateCountLine(sessionId, lineId, countedQty, actor)
+  → validate session is OPEN
+  → countedQty must be >= 0
+  → update counted_qty on the line
+
+postSession(sessionId, actor)
+  → validate OPEN
+  → validate ALL lines have counted_qty filled (not null)
+  → for each line where variance != 0:
+      call inventoryLedgerService.adjust(variance, locationId, productId, lotNumber, sourceDocumentId=sessionId, reasonCode="COUNT_ADJUSTMENT", actor)
+  → set status=POSTED
+  → @Transactional
+
+voidSession(sessionId, actor)
+  → validate OPEN (cannot void after posting)
+  → set status=VOID
+  → no movements written
+Endpoints:
+
+
+GET    /{tenantSlug}/count-sessions
+GET    /{tenantSlug}/count-sessions/{id}
+POST   /{tenantSlug}/count-sessions              — openSession
+PUT    /{tenantSlug}/count-sessions/{id}/lines/{lid} — updateCountLine
+POST   /{tenantSlug}/count-sessions/{id}/post
+POST   /{tenantSlug}/count-sessions/{id}/void
+Permissions: COUNTING_VIEW, COUNTING_CREATE, COUNTING_POST, COUNTING_VOID
+
+Tests
+File: tenant/counting/CountSessionServiceTest.java
+
+Test cases:
+
+openSession_snapshotsOnHandIntoLines
+openSession_withLotTrackedProduct_createsLotLevelLines
+openSession_withEmptyLocation_createsNoLines
+updateCountLine_withNegativeQty_throws
+postSession_withUnfilledLines_throws
+postSession_writesAdjustOnlyForVariances
+postSession_zeroVarianceLines_writesNoMovement
+voidSession_onPostedSession_throws
+Session C6-B — Frontend: Count Sessions Page
+Prerequisite sessions: C6-A, C4-B (follow UI patterns)
+Complexity: Large
+
+Context
+No count UI exists. The UX flow is distinct from receipts/dispatches: the user first selects locations to count (multi-select from the location tree or a flat list), the session opens and shows all expected items pre-filled, and the user enters counted quantities row by row.
+
+Deliverables
+New files:
+
+frontend/src/features/tenant/types/counting.ts
+
+type CountStatus = 'OPEN' | 'POSTED' | 'VOID'
+interface CountSessionListItem { id, name, status, locationCount, lineCount, createdAt, postedAt }
+interface CountLine { id, locationId, locationPathLabel, productId, productSku, productName, lotNumber, expectedQty, countedQty, variance }
+interface CountSessionDetail { id, name, status, createdBy, createdAt, postedAt, locations: string[], lines: CountLine[] }
+interface OpenSessionRequest { name, locationIds: string[] }
+frontend/src/features/tenant/api/countingApi.ts
+frontend/src/features/tenant/counting/CountSessionsPage.tsx
+CountSessionsPage.tsx UX:
+
+List view:
+
+Table: Name, Status badge, Location Count, Line Count, Created At, Actions
+"New Count Session" button → opens a modal:
+Name input
+Multi-select for locations (use /inventory/lookups/locations endpoint with pagination/search, show checkboxes)
+Submit → opens the new session and immediately navigates to its detail view
+Detail view for OPEN session:
+
+Header: name, status, date, locations covered
+Count lines table: columns Location, Product, Lot (if applicable), Expected Qty (read-only), Counted Qty (editable number input, inline), Variance (computed, shown in colour: red if negative, green if positive, grey if zero)
+"All Counted" indicator — shows how many lines are still unfilled
+"Post Session" button (disabled until all lines filled) → confirm dialog → post
+"Void Session" button → confirm dialog → void
+Detail view for POSTED session:
+
+Read-only table with all variances. Variance column prominently shows non-zero rows.
+Modified files:
+
+routes.tsx — add /:tenantSlug/count-sessions with COUNTING_VIEW guard
+TenantNavbar.tsx — add "Count Sessions" nav item (e.g. ClipboardList icon)
+paths.ts — add COUNT_SESSIONS_PATTERN and countSessions() helper
+permissions.ts — add COUNTING_* permissions
+en.ts + ar.ts — add counting.* namespace
+Session C7-A — Backend: Scan Resolver
+Prerequisite sessions: C1-A
+Complexity: Small
+
+Context
+No scan endpoint exists. Product lookup (/inventory/lookups/products) and location lookup (/inventory/lookups/locations) exist as separate paginated searches. A unified resolver is needed for scanner input: one endpoint that takes a raw scanned string and returns what it identifies.
+
+The scan_code column on LayoutBlock was added in C1-A. Product SKU is already unique in the products table.
+
+Deliverables
+New files:
+
+tenant/scan/ScanType.java — enum: PRODUCT, LOCATION, LOT
+tenant/scan/ScanResolveResult.java — record with type: ScanType, productId?, productSku?, productName?, trackLot?, trackExpiry?, locationId?, locationPathLabel?, locationKind?, scanCode?, lotNumber?
+tenant/scan/ScanResolverService.java
+tenant/scan/ScanController.java — base path /{tenantSlug}/scan
+ScanResolverService.resolve(code: String) logic:
+
+Strip and trim the code
+Check products table: WHERE sku = :code AND active = true → if found, return { type: PRODUCT, ... }
+Check layout_blocks table: WHERE scan_code = :code → if found, return { type: LOCATION, ... }
+Check if code matches pattern {sku}:{lotNumber} (contains exactly one :):
+Split on first :
+Look up product by sku part
+Check stock_movements has any row with (product_id, lot_number) where lot_number = lotNumber part
+If both found, return { type: LOT, productId, productSku, productName, lotNumber }
+If nothing matches, return 404
+Endpoint:
+
+
+GET /{tenantSlug}/scan/resolve?code={rawCode}
+→ 200 ScanResolveResult  |  404 if unresolved
+Permission: reuse INVENTORY_VIEW — scan resolution is a read-only lookup.
+
+Tests
+File: tenant/scan/ScanResolverServiceTest.java
+
+Test cases:
+
+resolve_matchesProductBySku
+resolve_matchesLocationByScanCode
+resolve_matchesLotByPattern
+resolve_unknownCode_returnsEmpty
+resolve_skuWithColonButNoLotInLedger_returnsEmpty
+resolve_caseInsensitiveSku — if SKU lookup should be case-insensitive, test it
+Session C7-B — Frontend: Scan Input + Labels + Form Integration
+Prerequisite sessions: C7-A, C4-B, C5-B, C6-B
+Complexity: Medium
+
+Context
+The scan resolver backend endpoint exists. All operational forms (Receipts, Dispatches, Count Session open) have product and location dropdowns that currently require typing to search. This session adds a scan input component that auto-fills those dropdowns, plus printable label components.
+
+Deliverables
+New shared component: frontend/src/shared/components/ScanInput.tsx
+
+
+interface ScanInputProps {
+  tenantSlug: string
+  onResolved: (result: ScanResolveResult) => void
+  onError?: (code: string) => void
+  placeholder?: string
+  acceptTypes?: ScanType[]  // filter: only accept PRODUCT, LOCATION, or LOT results
+}
+Behaviour:
+
+Renders as a text input with a Scan (barcode) icon
+On Enter key or paste event: calls GET /scan/resolve?code=value
+On success: fires onResolved(result) and clears the input
+On 404 or network error: shows inline error "Code not recognised" and fires onError
+acceptTypes filters: if the resolved type is not in the accepted list, show error "Wrong code type" instead of resolving
+New scan result type: frontend/src/features/tenant/types/scan.ts
+
+
+type ScanType = 'PRODUCT' | 'LOCATION' | 'LOT'
+interface ScanResolveResult { type: ScanType, productId?, productSku?, productName?, trackLot?, trackExpiry?, locationId?, locationPathLabel?, locationKind?, scanCode?, lotNumber? }
+New API function: frontend/src/features/tenant/api/scanApi.ts
+
+resolveCode(tenantSlug, code): Promise<ScanResolveResult>
+Integrate ScanInput into forms:
+
+ReceiptsPage.tsx — in the "Add Line" form row:
+
+Place a ScanInput above the product dropdown, acceptTypes={['PRODUCT']}. On resolve: auto-select that product in the dropdown, auto-toggle lot/expiry fields.
+Place another ScanInput above the destination location dropdown, acceptTypes={['LOCATION']}. On resolve: auto-select that location.
+DispatchesPage.tsx — same pattern for product and source location fields.
+
+CountSessionsPage.tsx (update count line inline form):
+
+In the detail view, add a ScanInput bar at the top, acceptTypes={['PRODUCT', 'LOCATION', 'LOT']}. On resolve: scroll to and highlight the matching line(s) in the count table.
+InventoryPage.tsx (Operations tab):
+
+Add ScanInput to receive, transfer, and adjust forms. On product resolve: auto-fill product. On location resolve: auto-fill location.
+New printable label components:
+
+frontend/src/features/tenant/labels/LocationLabel.tsx
+
+Props: scanCode, fullCode, locationKind, pathLabel
+Renders a print-friendly card (A6-ish): big QR code (encode scanCode as the QR value using a client-side QR library like qrcode.react), location path label, kind badge
+Has a "Print" button that calls window.print() with print CSS that hides everything except the label
+frontend/src/features/tenant/labels/ProductLabel.tsx
+
+Props: sku, name
+Renders: QR code (encode sku), product name, SKU text
+Expose labels in WarehouseLayoutsPage.tsx: on the block detail panel (for leaf nodes), add a "Print Label" button that opens a modal with <LocationLabel ... />.
+
+Expose product label in TenantProductsPage.tsx: add a label icon/button per product row that opens a modal with <ProductLabel ... />.
+
+Install dependency: qrcode.react (or equivalent lightweight QR package). Check if it's already in package.json first.
+
+en.ts + ar.ts:
+
+
+scan.placeholder = "Scan or type a code..."
+scan.notFound = "Code not recognised"
+scan.wrongType = "Wrong code type"
+scan.label = "Scan"
+labels.printLabel = "Print Label"
+labels.location.title = "Location Label"
+labels.product.title = "Product Label"
+Session C8-A — Backend: Reporting Gaps
+Prerequisite sessions: All previous sessions
+Complexity: Small
+
+Context
+Existing endpoints cover most needs. This session adds missing query parameters to existing endpoints and adds one new reporting query.
+
+Deliverables
+Modified files only — no new migrations:
+
+tenant/inventory/InventoryLedgerController.java + InventoryLedgerService.java
+
+Add optional locationKind query param to GET /on-hand. Service joins layout_blocks on location_id and filters by location_kind = :kind. This lets the GIS layer and reporting call GET /inventory/on-hand?locationKind=STAGING to see what's in staging.
+Add optional sourceDocumentId query param to GET /movements. Service filters WHERE source_document_id = :id. Lets receipt/dispatch/count detail pages link directly to their movements.
+Add optional movementType query param to GET /movements (already a MovementType enum). Ensure it's exposed if not already.
+StockMovementRepository.java
+
+Add query: findBySourceDocumentId(UUID sourceDocumentId): List<StockMovement> — used to fetch all movements for a given receipt/dispatch/count session.
+tenant/receipt/ReceiptController.java
+
+Add GET /{tenantSlug}/receipts/{id}/movements — delegates to movementRepository.findBySourceDocumentId(receiptId), returns movement list. Requires RECEIPTS_VIEW.
+tenant/dispatch/DispatchController.java
+
+Same: GET /{tenantSlug}/dispatches/{id}/movements
+tenant/counting/CountSessionController.java
+
+Same: GET /{tenantSlug}/count-sessions/{id}/movements
+Tests
+Test cases in InventoryLedgerServiceTest.java:
+
+getOnHand_filteredByLocationKind_returnsOnlyMatchingLocations — mock returns two locations with different kinds, only one passes filter
+getMovements_filteredBySourceDocumentId_returnsMatchingMovements
+Session C8-B — Frontend: Kind Filter + Document Links
+Prerequisite sessions: C8-A
+Complexity: Small
+
+Context
+This is the polish/wiring session. No new pages — only connecting existing pieces.
+
+Deliverables
+frontend/src/features/tenant/inventory/InventoryPage.tsx (Stock tab)
+
+Add a "Location Kind" filter dropdown to the stock tab filter bar. Values: All, Storage, Staging, Quarantine, Damaged, Dispatch. Passes locationKind param to getOnHand(). Uses the same LocationKind type from warehouse.ts.
+frontend/src/features/tenant/api/inventoryApi.ts
+
+Add locationKind?: LocationKind to getOnHand params type.
+frontend/src/features/tenant/inventory/InventoryPage.tsx (Movements tab)
+
+In the movement rows where sourceDocumentId is non-null, show a small "Source" chip (e.g. "Receipt", "Dispatch", "Count"). Make it a clickable link that navigates to the corresponding document page (e.g. PATHS.TENANT.receipts(tenantSlug) with the ID in state or as a query param).
+The chip text is derived from the movement type: RECEIVE → Receipt, PICK → Dispatch, ADJUST with sourceDocumentId → Count Session.
+frontend/src/features/tenant/receipts/ReceiptsPage.tsx (detail view)
+
+Below the lines table on a POSTED receipt, add a "Stock Movements" section. On mount (when status=POSTED), fetch GET /receipts/{id}/movements and show a compact movement list (type, product, location, qty, lot, date).
+frontend/src/features/tenant/dispatches/DispatchesPage.tsx — same pattern.
+
+frontend/src/features/tenant/counting/CountSessionsPage.tsx — same pattern.
+
+en.ts + ar.ts:
+
+
+inventory.filter.locationKind = "Location Kind"
+inventory.movements.sourceDocument = "Source"
+inventory.movements.sourceReceipt = "Receipt"
+inventory.movements.sourceDispatch = "Dispatch"
+inventory.movements.sourceCount = "Count Session"
+Merge Suggestions
+If you want to reduce total sessions from 16 to 14, combine these without risk of context overload:
+
+C2-A + C3-A → one backend session (both are small, independent schema changes, no shared code)
+C2-B + C3-B → one frontend session (both are small UI additions to InventoryPage.tsx, same file)
+Do not combine any other pairs — C4 through C6 are each large enough to fill a session on their own.

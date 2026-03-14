@@ -138,7 +138,11 @@ public class LayoutBlockController {
                         @Valid @RequestBody UpdateBlockMetadataRequest request,
                         Authentication authentication) {
                 tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
-                return ResponseEntity.ok(layoutBlockService.updateMetadata(layoutId, blockId, request.side()));
+                LayoutBlockService.BlockResult result = layoutBlockService.updateMetadata(layoutId, blockId, request.side());
+                if (request.locationKind() != null) {
+                        result = layoutBlockService.updateLocationKind(layoutId, blockId, request.locationKind());
+                }
+                return ResponseEntity.ok(result);
         }
 
         @DeleteMapping("/{blockId}")
@@ -185,6 +189,7 @@ public class LayoutBlockController {
         }
 
         public record UpdateBlockMetadataRequest(
-                        @Size(max = 50) String side) {
+                        @Size(max = 50) String side,
+                        LocationKind locationKind) {
         }
 }
