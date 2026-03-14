@@ -7,7 +7,8 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 import java.util.UUID;
 
-public interface ReceiptDocumentRepository extends JpaRepository<ReceiptDocument, UUID>, JpaSpecificationExecutor<ReceiptDocument> {
+public interface ReceiptDocumentRepository
+        extends JpaRepository<ReceiptDocument, UUID>, JpaSpecificationExecutor<ReceiptDocument> {
 
     Page<ReceiptDocument> findByStatus(ReceiptStatus status, Pageable pageable);
 }

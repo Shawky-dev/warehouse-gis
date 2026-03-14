@@ -248,16 +248,16 @@ public class ReceiptService {
         List<ReceiptLine> lines = receiptLineRepository.findByReceiptIdOrderByPosition(receiptId);
 
         Map<UUID, Product> productsById = productRepository.findAllById(lines.stream()
-                        .map(ReceiptLine::getProductId)
-                        .distinct()
-                        .toList())
+                .map(ReceiptLine::getProductId)
+                .distinct()
+                .toList())
                 .stream()
                 .collect(Collectors.toMap(Product::getId, Function.identity()));
 
         Map<UUID, LayoutBlock> locationsById = layoutBlockRepository.findAllById(lines.stream()
-                        .map(ReceiptLine::getDestinationLocationId)
-                        .distinct()
-                        .toList())
+                .map(ReceiptLine::getDestinationLocationId)
+                .distinct()
+                .toList())
                 .stream()
                 .collect(Collectors.toMap(LayoutBlock::getId, Function.identity()));
 
@@ -373,7 +373,8 @@ public class ReceiptService {
                 String like = "%" + normalizedSearch.toLowerCase(Locale.ROOT) + "%";
                 Predicate referenceMatch = criteriaBuilder.like(criteriaBuilder.lower(root.get("reference")), like);
                 Predicate supplierMatch = criteriaBuilder.like(
-                        criteriaBuilder.lower(root.join("supplier", jakarta.persistence.criteria.JoinType.LEFT).get("name")),
+                        criteriaBuilder
+                                .lower(root.join("supplier", jakarta.persistence.criteria.JoinType.LEFT).get("name")),
                         like);
                 predicates.add(criteriaBuilder.or(referenceMatch, supplierMatch));
             }

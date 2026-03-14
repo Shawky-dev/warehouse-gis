@@ -53,6 +53,11 @@ export const TENANT_PERMISSIONS = {
   INVENTORY_RECEIVE: "tenant.inventory.receive",
   INVENTORY_TRANSFER: "tenant.inventory.transfer",
   INVENTORY_ADJUST: "tenant.inventory.adjust",
+  RECEIPTS_VIEW: "tenant.receipts.view",
+  RECEIPTS_CREATE: "tenant.receipts.create",
+  RECEIPTS_EDIT: "tenant.receipts.edit",
+  RECEIPTS_POST: "tenant.receipts.post",
+  RECEIPTS_VOID: "tenant.receipts.void",
 } as const;
 
 export type LandlordPermission = (typeof LANDLORD_PERMISSIONS)[keyof typeof LANDLORD_PERMISSIONS];

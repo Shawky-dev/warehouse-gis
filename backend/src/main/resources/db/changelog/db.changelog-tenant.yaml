@@ -167,3 +167,10 @@ databaseChangeLog:
         - sqlFile:
             path: db/migration/tenant/V24__create_receipt_documents.sql
             relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-c4-receipt-admin-grants-25
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V25__grant_receipt_permissions_to_admin.sql
+            relativeToChangelogFile: false

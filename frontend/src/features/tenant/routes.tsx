@@ -9,6 +9,7 @@ import TenantAuditLogsPage from "@/features/tenant/audit/TenantAuditLogsPage";
 import TenantCategoriesPage from "@/features/tenant/category/TenantCategoriesPage";
 import WarehouseLayoutsPage from "@/features/tenant/warehouse/WarehouseLayoutsPage";
 import InventoryPage from "@/features/tenant/inventory/InventoryPage";
+import ReceiptsPage from "@/features/tenant/receipts/ReceiptsPage";
 import { RequirePermission } from "@/features/auth/guards/RequirePermission";
 import { RequireAnyPermission } from "@/features/auth/guards/RequireAnyPermission";
 import { TENANT_PERMISSIONS } from "@/features/auth/shared/permissions";
@@ -127,6 +128,14 @@ export const tenantRoutes = [
       <RequireAnyPermission permissions={INVENTORY_ROUTE_PERMISSIONS}>
         <InventoryPage section="movements" />
       </RequireAnyPermission>
+    ),
+  },
+  {
+    path: PATHS.TENANT.RECEIPTS_PATTERN,
+    element: (
+      <RequirePermission permission={TENANT_PERMISSIONS.RECEIPTS_VIEW}>
+        <ReceiptsPage />
+      </RequirePermission>
     ),
   },
 ];

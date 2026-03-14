@@ -27,6 +27,8 @@ import com.warehouse.warehouse_platform.tenant.audit.AuditLogRepository;
 import com.warehouse.warehouse_platform.tenant.category.ProductCategoryRepository;
 import com.warehouse.warehouse_platform.tenant.product.ProductRepository;
 import com.warehouse.warehouse_platform.tenant.product.ProductSupplierRepository;
+import com.warehouse.warehouse_platform.tenant.receipt.ReceiptDocumentRepository;
+import com.warehouse.warehouse_platform.tenant.receipt.ReceiptLineRepository;
 import com.warehouse.warehouse_platform.tenant.supplier.SupplierRepository;
 import com.warehouse.warehouse_platform.tenant.uom.UnitOfMeasureRepository;
 import com.warehouse.warehouse_platform.tenant.inventory.StockMovementRepository;
@@ -52,7 +54,9 @@ import jakarta.persistence.EntityManagerFactory;
                 LayoutBlockRepository.class,
                 BlockTemplateRepository.class,
                 WarehouseLocationKindRepository.class,
-                StockMovementRepository.class
+                StockMovementRepository.class,
+                ReceiptDocumentRepository.class,
+                ReceiptLineRepository.class
 }, entityManagerFactoryRef = "tenantEntityManagerFactory", transactionManagerRef = "tenantTransactionManager")
 @EnableConfigurationProperties(JpaProperties.class)
 public class TenantPersistenceConfig {
