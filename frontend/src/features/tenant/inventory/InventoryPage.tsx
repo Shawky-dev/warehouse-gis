@@ -759,8 +759,8 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
                   <Input
                     id="op-qty"
                     type="number"
-                    min="0.0001"
-                    step="0.0001"
+                    min="1"
+                    step="1"
                     value={opForm.qty}
                     onChange={(event) => setOpForm((current) => ({ ...current, qty: event.target.value }))}
                     required

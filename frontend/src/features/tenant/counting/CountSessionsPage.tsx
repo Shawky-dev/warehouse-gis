@@ -451,7 +451,7 @@ export default function CountSessionsPage() {
                                                             className="w-full text-end font-mono tabular-nums"
                                                             type="number"
                                                             min="0"
-                                                            step="0.0001"
+                                                            step="1"
                                                             value={lineDrafts[line.id] ?? ""}
                                                             onChange={(event) => {
                                                                 const nextValue = event.target.value;

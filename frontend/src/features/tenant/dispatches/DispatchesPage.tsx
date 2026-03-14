@@ -411,8 +411,8 @@ export default function DispatchesPage() {
                                     <Label>{t("dispatches.form.qty")}</Label>
                                     <Input
                                         type="number"
-                                        min="0.0001"
-                                        step="0.0001"
+                                        min="1"
+                                        step="1"
                                         value={lineForm.qty}
                                         onChange={(event) => setLineForm((current) => ({ ...current, qty: event.target.value }))}
                                     />
