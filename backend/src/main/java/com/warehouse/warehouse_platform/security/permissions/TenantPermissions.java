@@ -44,6 +44,11 @@ public final class TenantPermissions {
     public static final String INVENTORY_RECEIVE = "tenant.inventory.receive";
     public static final String INVENTORY_TRANSFER = "tenant.inventory.transfer";
     public static final String INVENTORY_ADJUST = "tenant.inventory.adjust";
+    public static final String RECEIPTS_VIEW = "tenant.receipts.view";
+    public static final String RECEIPTS_CREATE = "tenant.receipts.create";
+    public static final String RECEIPTS_EDIT = "tenant.receipts.edit";
+    public static final String RECEIPTS_POST = "tenant.receipts.post";
+    public static final String RECEIPTS_VOID = "tenant.receipts.void";
 
     private TenantPermissions() {
     }

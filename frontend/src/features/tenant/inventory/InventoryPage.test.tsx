@@ -91,6 +91,8 @@ describe("InventoryPage", () => {
           pathLabel: "Aisle · 1 / Shelf · 1",
           identifier: "1",
           side: null,
+          locationKind: "STORAGE",
+          scanCode: "LOC-001",
         },
       ],
       page: 0,
@@ -101,6 +103,26 @@ describe("InventoryPage", () => {
   });
 
   it("renders stock section for view-only users and loads stock rows", async () => {
+    mockGetStock.mockResolvedValue([
+      {
+        locationId: "location-1",
+        productId: "product-1",
+        lotNumber: "LOT-A",
+        qtyStock: "12.0000",
+        locationLabel: "Shelf · 1",
+        locationPathLabel: "Aisle · 1 / Shelf · 1",
+        layoutId: "layout-1",
+        layoutName: "Main Layout",
+        locationIdentifier: "1",
+        locationSide: null,
+        productSku: "SKU-1",
+        productName: "Sample Product",
+        baseUomCode: "EA",
+        trackLot: true,
+        trackExpiry: true,
+      },
+    ]);
+
     renderPage([TENANT_PERMISSIONS.INVENTORY_VIEW]);
 
     expect(screen.getByText("Filters")).toBeInTheDocument();
@@ -110,6 +132,54 @@ describe("InventoryPage", () => {
     await waitFor(() => {
       expect(mockGetStock).toHaveBeenCalledWith("acme", { locationId: undefined, productId: undefined });
     });
+
+    expect(screen.getByText("Lot")).toBeInTheDocument();
+    expect(screen.getByText("LOT-A")).toBeInTheDocument();
+  });
+
+  it("renders movement reason when present", async () => {
+    mockGetMovements.mockResolvedValue({
+      content: [
+        {
+          id: "movement-1",
+          locationId: "location-1",
+          productId: "product-1",
+          qty: "-2.0000",
+          type: "ADJUST",
+          referenceId: null,
+          lotNumber: "LOT-A",
+          expiryDate: null,
+          notes: "Damaged packaging",
+          createdBy: "tester",
+          createdAt: "2026-03-14T10:00:00Z",
+          locationLabel: "Shelf · 1",
+          locationPathLabel: "Aisle · 1 / Shelf · 1",
+          layoutId: "layout-1",
+          layoutName: "Main Layout",
+          locationIdentifier: "1",
+          locationSide: null,
+          productSku: "SKU-1",
+          productName: "Sample Product",
+          baseUomCode: "EA",
+          trackLot: true,
+          trackExpiry: false,
+          counterpartLocationId: null,
+          counterpartLocationLabel: null,
+          counterpartLocationPathLabel: null,
+          sourceDocumentId: null,
+          reasonCode: "DAMAGED",
+        },
+      ],
+      page: 0,
+      size: 25,
+      totalElements: 1,
+      totalPages: 1,
+    });
+
+    renderPage([TENANT_PERMISSIONS.INVENTORY_VIEW], "en", "/acme/inventory/movements");
+
+    expect(await screen.findByText("Reason")).toBeInTheDocument();
+    expect(screen.getByText("DAMAGED")).toBeInTheDocument();
   });
 
   it("shows picker-based transfer flow for operation-only users", async () => {

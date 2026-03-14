@@ -41,6 +41,7 @@ export interface LocationLookupPageResult {
 export interface StockEntry {
   locationId: string;
   productId: string;
+  lotNumber: string | null;
   qtyStock: string;
   locationLabel: string | null;
   locationPathLabel: string | null;
@@ -81,6 +82,8 @@ export interface MovementResult {
   counterpartLocationId: string | null;
   counterpartLocationLabel: string | null;
   counterpartLocationPathLabel: string | null;
+  sourceDocumentId: string | null;
+  reasonCode: string | null;
 }
 
 export interface MovementPageResult {
@@ -139,4 +142,5 @@ export interface AdjustRequest {
   productId: string;
   qty: string;
   notes: string;
+  reasonCode?: string | null;
 }

@@ -160,3 +160,10 @@ databaseChangeLog:
         - sqlFile:
             path: db/migration/tenant/V23__refresh_v_stock_view.sql
             relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-c4-receipt-documents-24
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V24__create_receipt_documents.sql
+            relativeToChangelogFile: false

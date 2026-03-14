@@ -72,6 +72,7 @@ interface OperationFormState {
   toLocationId: string;
   productId: string;
   qty: string;
+  reasonCode: string;
   lotNumber: string;
   expiryDate: string;
   notes: string;
@@ -84,6 +85,7 @@ const DEFAULT_OPERATION_FORM: OperationFormState = {
   toLocationId: "",
   productId: "",
   qty: "",
+  reasonCode: "",
   lotNumber: "",
   expiryDate: "",
   notes: "",
@@ -174,6 +176,30 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
   const transferDestinationOptions = useMemo(
     () => locations.filter((location) => location.id !== opForm.fromLocationId),
     [locations, opForm.fromLocationId]
+  );
+
+  const sortedStock = useMemo(
+    () =>
+      [...stock].sort((left, right) => {
+        const leftProduct = (left.productName ?? left.productSku ?? left.productId).toLowerCase();
+        const rightProduct = (right.productName ?? right.productSku ?? right.productId).toLowerCase();
+        const byProduct = leftProduct.localeCompare(rightProduct);
+        if (byProduct !== 0) {
+          return byProduct;
+        }
+
+        const leftLocation = (left.locationPathLabel ?? left.locationLabel ?? left.locationId).toLowerCase();
+        const rightLocation = (right.locationPathLabel ?? right.locationLabel ?? right.locationId).toLowerCase();
+        const byLocation = leftLocation.localeCompare(rightLocation);
+        if (byLocation !== 0) {
+          return byLocation;
+        }
+
+        const leftLot = (left.lotNumber ?? "").toLowerCase();
+        const rightLot = (right.lotNumber ?? "").toLowerCase();
+        return leftLot.localeCompare(rightLot);
+      }),
+    [stock]
   );
 
   useEffect(() => {
@@ -388,6 +414,7 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
           productId: opForm.productId,
           qty: signedQty,
           notes: opForm.notes,
+          reasonCode: opForm.reasonCode.trim() ? opForm.reasonCode.trim() : null,
         });
         setOpSuccess(t("inventory.ops.successAdjust"));
       }
@@ -521,14 +548,15 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
                   <TableHeader>
                     <TableRow>
                       <TableHead>{t("inventory.stock.colProduct")}</TableHead>
+                      <TableHead>{t("inventory.columns.lot")}</TableHead>
                       <TableHead>{t("inventory.stock.colLocation")}</TableHead>
                       <TableHead className="text-end">{t("inventory.stock.colQty")}</TableHead>
                       <TableHead>{t("inventory.stock.colActions")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {stock.map((row) => (
-                      <TableRow key={`${row.locationId}-${row.productId}`}>
+                    {sortedStock.map((row) => (
+                      <TableRow key={`${row.locationId}-${row.productId}-${row.lotNumber ?? "no-lot"}`}>
                         <TableCell>
                           <div className="flex flex-col gap-1">
                             <span className="font-medium">
@@ -538,6 +566,9 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
                               {[row.productSku, row.baseUomCode].filter(Boolean).join(" · ")}
                             </span>
                           </div>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {row.trackLot ? row.lotNumber ?? "—" : "—"}
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col gap-1">
@@ -759,6 +790,19 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
                   </div>
                 ) : null}
 
+                {operation === "adjust" ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="op-reason-code">{t("inventory.adjust.reasonCode")}</Label>
+                    <Input
+                      id="op-reason-code"
+                      maxLength={50}
+                      value={opForm.reasonCode}
+                      onChange={(event) => setOpForm((current) => ({ ...current, reasonCode: event.target.value }))}
+                      placeholder={t("inventory.adjust.reasonCodePlaceholder")}
+                    />
+                  </div>
+                ) : null}
+
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="op-notes">{t("inventory.ops.notes")}</Label>
                   <Textarea
@@ -885,6 +929,7 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
                         <TableHead>{t("inventory.movements.colProduct")}</TableHead>
                         <TableHead>{t("inventory.movements.colLocation")}</TableHead>
                         <TableHead className="text-end">{t("inventory.movements.colQty")}</TableHead>
+                        <TableHead>{t("inventory.columns.reason")}</TableHead>
                         <TableHead>{t("inventory.movements.colNotes")}</TableHead>
                         <TableHead>{t("inventory.movements.colBy")}</TableHead>
                         <TableHead>{t("inventory.movements.colAt")}</TableHead>
@@ -921,6 +966,15 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
                             </div>
                           </TableCell>
                           <TableCell className="text-end font-medium tabular-nums">{row.qty}</TableCell>
+                          <TableCell>
+                            {row.reasonCode ? (
+                              <Badge variant="secondary" className="text-xs">
+                                {row.reasonCode}
+                              </Badge>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
                           <TableCell className="text-xs text-muted-foreground">{row.notes ?? "—"}</TableCell>
                           <TableCell className="text-xs">{row.createdBy}</TableCell>
                           <TableCell className="text-xs text-muted-foreground">
