@@ -11,6 +11,7 @@ import type {
     MoveWarehouseBlockRequest,
     ReassignWarehouseBlockTemplateRequest,
     UpdateWarehouseBlockMetadataRequest,
+    UpsertWarehouseLocationKindRequest,
     UpsertWarehouseLayoutRequest,
     UpsertWarehouseTemplateRequest,
     WarehouseApiErrorResponse,
@@ -19,6 +20,7 @@ import type {
     WarehouseBlockResult,
     WarehouseLayoutPageResult,
     WarehouseLayoutResult,
+    WarehouseLocationKindResult,
     WarehouseTemplatePageResult,
     WarehouseTemplateResult,
 } from "@/features/tenant/types/warehouse";
@@ -119,6 +121,50 @@ export async function listWarehouseTemplates(
         headers: tenantHeaders(tenantSlug),
     });
     return response.data;
+}
+
+export async function listWarehouseLocationKinds(
+    tenantSlug: string
+): Promise<WarehouseLocationKindResult[]> {
+    const response = await api.get<WarehouseLocationKindResult[]>(
+        `${tenantBasePath(tenantSlug)}/warehouse-location-kinds`,
+        { headers: tenantHeaders(tenantSlug) }
+    );
+    return response.data;
+}
+
+export async function createWarehouseLocationKind(
+    tenantSlug: string,
+    payload: UpsertWarehouseLocationKindRequest
+): Promise<WarehouseLocationKindResult> {
+    const response = await api.post<WarehouseLocationKindResult>(
+        `${tenantBasePath(tenantSlug)}/warehouse-location-kinds`,
+        payload,
+        { headers: tenantHeaders(tenantSlug) }
+    );
+    return response.data;
+}
+
+export async function updateWarehouseLocationKind(
+    tenantSlug: string,
+    locationKindId: string,
+    payload: UpsertWarehouseLocationKindRequest
+): Promise<WarehouseLocationKindResult> {
+    const response = await api.put<WarehouseLocationKindResult>(
+        `${tenantBasePath(tenantSlug)}/warehouse-location-kinds/${locationKindId}`,
+        payload,
+        { headers: tenantHeaders(tenantSlug) }
+    );
+    return response.data;
+}
+
+export async function deleteWarehouseLocationKind(
+    tenantSlug: string,
+    locationKindId: string
+): Promise<void> {
+    await api.delete(`${tenantBasePath(tenantSlug)}/warehouse-location-kinds/${locationKindId}`, {
+        headers: tenantHeaders(tenantSlug),
+    });
 }
 
 export async function createWarehouseTemplate(

@@ -3,6 +3,8 @@ package com.warehouse.warehouse_platform.tenant.warehouse.block;
 import com.warehouse.warehouse_platform.tenant.audit.TenantAuditService;
 import com.warehouse.warehouse_platform.tenant.warehouse.common.WarehouseManagementException;
 import com.warehouse.warehouse_platform.tenant.warehouse.layout.WarehouseLayoutRepository;
+import com.warehouse.warehouse_platform.tenant.warehouse.locationkind.WarehouseLocationKind;
+import com.warehouse.warehouse_platform.tenant.warehouse.locationkind.WarehouseLocationKindService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,16 +27,19 @@ public class LayoutBlockService {
     private final BlockTemplateRepository blockTemplateRepository;
     private final WarehouseLayoutRepository layoutRepository;
     private final TenantAuditService tenantAuditService;
+    private final WarehouseLocationKindService warehouseLocationKindService;
 
     public LayoutBlockService(
             LayoutBlockRepository layoutBlockRepository,
             BlockTemplateRepository blockTemplateRepository,
             WarehouseLayoutRepository layoutRepository,
-            TenantAuditService tenantAuditService) {
+            TenantAuditService tenantAuditService,
+            WarehouseLocationKindService warehouseLocationKindService) {
         this.layoutBlockRepository = layoutBlockRepository;
         this.blockTemplateRepository = blockTemplateRepository;
         this.layoutRepository = layoutRepository;
         this.tenantAuditService = tenantAuditService;
+        this.warehouseLocationKindService = warehouseLocationKindService;
     }
 
     /**
@@ -72,6 +77,7 @@ public class LayoutBlockService {
         }
 
         int resolvedPosition = resolvePosition(layoutId, parentId, null, position);
+        WarehouseLocationKind defaultLocationKind = warehouseLocationKindService.getDefaultLocationKind();
 
         // Shift existing siblings up to make room
         shiftPositions(layoutId, parentId, resolvedPosition, +1, null);
@@ -82,7 +88,7 @@ public class LayoutBlockService {
                 .parentId(parentId)
                 .position(resolvedPosition)
                 .side(normalizeSide(side, template))
-                .locationKind(LocationKind.STORAGE)
+                .locationKind(defaultLocationKind)
                 .build();
 
         LayoutBlock saved = saveBlock(block);
@@ -122,6 +128,7 @@ public class LayoutBlockService {
 
         int resolvedPosition = resolvePosition(layoutId, parentId, null, position);
         shiftPositions(layoutId, parentId, resolvedPosition, count, null);
+        WarehouseLocationKind defaultLocationKind = warehouseLocationKindService.getDefaultLocationKind();
 
         List<LayoutBlock> ancestors = loadAncestorChain(parentId);
         Map<UUID, BlockTemplate> templateMap = buildTemplateMap(ancestors, template);
@@ -135,7 +142,7 @@ public class LayoutBlockService {
                     .parentId(parentId)
                     .position(resolvedPosition + index)
                     .side(normalizedSide)
-                    .locationKind(LocationKind.STORAGE)
+                    .locationKind(defaultLocationKind)
                     .build();
             LayoutBlock saved = saveBlock(block);
             String code = generateScanCode(saved, ancestors, templateMap);
@@ -235,17 +242,18 @@ public class LayoutBlockService {
     }
 
     @Transactional
-    public BlockResult updateLocationKind(UUID layoutId, UUID blockId, LocationKind kind) {
-        if (kind == null) {
-            throw WarehouseManagementException.badRequest("locationKind must not be null");
+    public BlockResult updateLocationKind(UUID layoutId, UUID blockId, UUID locationKindId) {
+        if (locationKindId == null) {
+            throw WarehouseManagementException.badRequest("locationKindId must not be null");
         }
         assertLayoutExists(layoutId);
         LayoutBlock block = loadBlock(blockId);
         assertBelongsToLayout(block, layoutId);
 
         BlockTemplate template = loadTemplate(block.getBlockTemplateId());
+        WarehouseLocationKind locationKind = warehouseLocationKindService.getRequired(locationKindId);
         BlockResult before = toResult(block, template);
-        block.setLocationKind(kind);
+        block.setLocationKind(locationKind);
         LayoutBlock saved = saveBlock(block);
         BlockResult after = toResult(saved, template);
         tenantAuditService.record("LAYOUT_BLOCK_UPDATE_KIND", "LAYOUT_BLOCK", blockId.toString(), before, after);
@@ -565,7 +573,7 @@ public class LayoutBlockService {
                 .parentId(parentId)
                 .position(position)
                 .side(source.getSide())
-                .locationKind(source.getLocationKind() != null ? source.getLocationKind() : LocationKind.STORAGE)
+                .locationKind(source.getLocationKind() != null ? source.getLocationKind() : warehouseLocationKindService.getDefaultLocationKind())
                 // scanCode and fullCode are generated separately via assignScanCodes()
                 .build();
     }
@@ -757,7 +765,8 @@ public class LayoutBlockService {
                 b.getPosition(),
                 resolveIdentifier(b, template),
                 b.getSide(),
-                b.getLocationKind(),
+                b.getLocationKind() == null ? null : b.getLocationKind().getId(),
+                b.getLocationKind() == null ? null : b.getLocationKind().getName(),
                 b.getScanCode(),
                 b.getFullCode(),
                 b.getCreatedAt(),
@@ -772,7 +781,8 @@ public class LayoutBlockService {
             int position,
             String identifier,
             String side,
-            LocationKind locationKind,
+            UUID locationKindId,
+            String locationKindName,
             String scanCode,
             String fullCode,
             Instant createdAt,

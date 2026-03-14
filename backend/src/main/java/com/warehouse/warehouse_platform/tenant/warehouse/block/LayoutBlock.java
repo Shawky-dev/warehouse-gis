@@ -1,10 +1,12 @@
 package com.warehouse.warehouse_platform.tenant.warehouse.block;
 
+import com.warehouse.warehouse_platform.tenant.warehouse.locationkind.WarehouseLocationKind;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -53,10 +55,9 @@ public class LayoutBlock {
     @Column(length = 50)
     private String side;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "location_kind", length = 20, nullable = false)
-    @lombok.Builder.Default
-    private LocationKind locationKind = LocationKind.STORAGE;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "location_kind_id", nullable = false)
+    private WarehouseLocationKind locationKind;
 
     @Column(name = "scan_code", unique = true, length = 60)
     private String scanCode;

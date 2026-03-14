@@ -6,6 +6,7 @@ import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplateRepo
 import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlock;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlockRepository;
 import com.warehouse.warehouse_platform.tenant.warehouse.common.WarehouseManagementException;
+import com.warehouse.warehouse_platform.tenant.warehouse.locationkind.WarehouseLocationKindService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -29,16 +30,19 @@ public class WarehouseLayoutService {
     private final LayoutBlockRepository layoutBlockRepository;
     private final BlockTemplateRepository blockTemplateRepository;
     private final TenantAuditService tenantAuditService;
+    private final WarehouseLocationKindService warehouseLocationKindService;
 
     public WarehouseLayoutService(
             WarehouseLayoutRepository layoutRepository,
             LayoutBlockRepository layoutBlockRepository,
             BlockTemplateRepository blockTemplateRepository,
-            TenantAuditService tenantAuditService) {
+            TenantAuditService tenantAuditService,
+            WarehouseLocationKindService warehouseLocationKindService) {
         this.layoutRepository = layoutRepository;
         this.layoutBlockRepository = layoutBlockRepository;
         this.blockTemplateRepository = blockTemplateRepository;
         this.tenantAuditService = tenantAuditService;
+        this.warehouseLocationKindService = warehouseLocationKindService;
     }
 
     @Transactional(readOnly = true)
@@ -258,6 +262,7 @@ public class WarehouseLayoutService {
                 .parentId(parentId)
                 .position(position)
                 .blockTemplateId(templateId)
+                .locationKind(warehouseLocationKindService.getDefaultLocationKind())
                 .build());
     }
 

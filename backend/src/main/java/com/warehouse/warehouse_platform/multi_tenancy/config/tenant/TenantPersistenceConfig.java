@@ -33,6 +33,7 @@ import com.warehouse.warehouse_platform.tenant.inventory.StockMovementRepository
 import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplateRepository;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlockRepository;
 import com.warehouse.warehouse_platform.tenant.warehouse.layout.WarehouseLayoutRepository;
+import com.warehouse.warehouse_platform.tenant.warehouse.locationkind.WarehouseLocationKindRepository;
 import com.warehouse.warehouse_platform.user.UserRepository;
 
 import jakarta.persistence.EntityManagerFactory;
@@ -50,6 +51,7 @@ import jakarta.persistence.EntityManagerFactory;
                 WarehouseLayoutRepository.class,
                 LayoutBlockRepository.class,
                 BlockTemplateRepository.class,
+                WarehouseLocationKindRepository.class,
                 StockMovementRepository.class
 }, entityManagerFactoryRef = "tenantEntityManagerFactory", transactionManagerRef = "tenantTransactionManager")
 @EnableConfigurationProperties(JpaProperties.class)

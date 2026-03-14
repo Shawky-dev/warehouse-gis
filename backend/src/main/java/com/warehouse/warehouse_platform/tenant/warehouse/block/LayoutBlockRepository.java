@@ -20,6 +20,8 @@ public interface LayoutBlockRepository extends JpaRepository<LayoutBlock, UUID> 
 
     long countByBlockTemplateId(UUID blockTemplateId);
 
+    long countByLocationKind_Id(UUID locationKindId);
+
     boolean existsByLayoutIdAndParentIdAndPosition(UUID layoutId, UUID parentId, int position);
 
     boolean existsByLayoutIdAndParentIdIsNullAndPosition(UUID layoutId, int position);

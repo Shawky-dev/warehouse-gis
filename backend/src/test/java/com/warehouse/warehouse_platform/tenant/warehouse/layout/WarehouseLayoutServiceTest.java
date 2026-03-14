@@ -6,12 +6,16 @@ import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplateRepo
 import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlock;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlockRepository;
 import com.warehouse.warehouse_platform.tenant.warehouse.common.WarehouseManagementException;
+import com.warehouse.warehouse_platform.tenant.warehouse.locationkind.WarehouseLocationKind;
+import com.warehouse.warehouse_platform.tenant.warehouse.locationkind.WarehouseLocationKindService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -29,6 +33,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 @SuppressWarnings("null")
 class WarehouseLayoutServiceTest {
 
@@ -40,13 +45,20 @@ class WarehouseLayoutServiceTest {
     private BlockTemplateRepository blockTemplateRepository;
     @Mock
     private TenantAuditService tenantAuditService;
+    @Mock
+    private WarehouseLocationKindService warehouseLocationKindService;
 
     private WarehouseLayoutService service;
 
     @BeforeEach
     void setUp() {
         service = new WarehouseLayoutService(layoutRepository, layoutBlockRepository, blockTemplateRepository,
-                tenantAuditService);
+            tenantAuditService, warehouseLocationKindService);
+        when(warehouseLocationKindService.getDefaultLocationKind()).thenReturn(WarehouseLocationKind.builder()
+            .id(UUID.fromString("41000000-0000-0000-0000-000000000001"))
+            .name("Storage")
+            .sortOrder(0)
+            .build());
     }
 
     // -------------------------------------------------------------------------

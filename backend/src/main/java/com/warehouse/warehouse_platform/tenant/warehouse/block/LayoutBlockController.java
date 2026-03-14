@@ -139,8 +139,8 @@ public class LayoutBlockController {
                         Authentication authentication) {
                 tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
                 LayoutBlockService.BlockResult result = layoutBlockService.updateMetadata(layoutId, blockId, request.side());
-                if (request.locationKind() != null) {
-                        result = layoutBlockService.updateLocationKind(layoutId, blockId, request.locationKind());
+                if (request.locationKindId() != null) {
+                        result = layoutBlockService.updateLocationKind(layoutId, blockId, request.locationKindId());
                 }
                 return ResponseEntity.ok(result);
         }
@@ -190,6 +190,6 @@ public class LayoutBlockController {
 
         public record UpdateBlockMetadataRequest(
                         @Size(max = 50) String side,
-                        LocationKind locationKind) {
+                        UUID locationKindId) {
         }
 }

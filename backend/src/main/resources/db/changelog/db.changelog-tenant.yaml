@@ -132,3 +132,10 @@ databaseChangeLog:
         - sqlFile:
             path: db/migration/tenant/V19__add_location_identity.sql
             relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-c1-location-kind-master-data-20
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V20__replace_location_kind_enum_with_master_data.sql
+            relativeToChangelogFile: false

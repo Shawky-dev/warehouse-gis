@@ -27,9 +27,11 @@ import {
     addWarehouseLayoutBlock,
     addWarehouseLayoutBlocks,
     copyWarehouseLayoutBlockSubtree,
+    createWarehouseLocationKind,
     createClassicWarehousePreset,
     createWarehouseLayout,
     createWarehouseTemplate,
+    deleteWarehouseLocationKind,
     deleteWarehouseLayout,
     deleteWarehouseLayoutBlock,
     deleteWarehouseTemplate,
@@ -37,16 +39,18 @@ import {
     extractWarehouseErrorMessage,
     listWarehouseLayoutBlocks,
     listWarehouseLayouts,
+    listWarehouseLocationKinds,
     listWarehouseTemplates,
     moveWarehouseLayoutBlock,
     reassignWarehouseLayoutBlockTemplate,
     updateWarehouseLayoutBlockMetadata,
+    updateWarehouseLocationKind,
     updateWarehouseLayout,
     updateWarehouseTemplate,
 } from "@/features/tenant/api/warehouseApi";
 import type {
     AddWarehouseBlockRequest,
-    LocationKind,
+    UpsertWarehouseLocationKindRequest,
     UpsertWarehouseLayoutRequest,
     UpsertWarehouseTemplateRequest,
     WarehouseBlockResult,
@@ -54,6 +58,7 @@ import type {
     WarehouseFlattenedNode,
     WarehouseIdentifierFormat,
     WarehouseLayoutResult,
+    WarehouseLocationKindResult,
     WarehouseSideConfig,
     WarehouseTemplateResult,
 } from "@/features/tenant/types/warehouse";
@@ -108,6 +113,7 @@ import {
 type LayoutFilter = "all" | "active" | "inactive";
 type LayoutDialogMode = "create" | "edit" | "classic" | null;
 type TemplateDialogMode = "create" | "edit" | null;
+type LocationKindDialogMode = "create" | "edit" | null;
 type PageTab = "builder" | "templates";
 
 interface LayoutFormState {
@@ -140,6 +146,10 @@ interface PasteBlockFormState {
     copies: string;
 }
 
+interface LocationKindFormState {
+    name: string;
+}
+
 interface BlockClipboardState {
     sourceBlockId: string;
     label: string;
@@ -149,6 +159,7 @@ interface BlockClipboardState {
 type DeleteTarget =
     | { type: "layout"; id: string; label: string }
     | { type: "template"; id: string; label: string }
+    | { type: "locationKind"; id: string; label: string }
     | { type: "block"; id: string; label: string };
 
 const DEFAULT_LAYOUT_FORM: LayoutFormState = {
@@ -179,6 +190,10 @@ const DEFAULT_PASTE_FORM: PasteBlockFormState = {
     parentId: "__root__",
     position: "",
     copies: "1",
+};
+
+const DEFAULT_LOCATION_KIND_FORM: LocationKindFormState = {
+    name: "",
 };
 
 function parsePath(value: string | null): string[] {
@@ -335,9 +350,11 @@ export default function WarehouseLayoutsPage() {
 
     const [layouts, setLayouts] = useState<WarehouseLayoutResult[]>([]);
     const [templates, setTemplates] = useState<WarehouseTemplateResult[]>([]);
+    const [locationKinds, setLocationKinds] = useState<WarehouseLocationKindResult[]>([]);
     const [layoutTree, setLayoutTree] = useState<WarehouseBlockNode[]>([]);
     const [isLoadingLayouts, setIsLoadingLayouts] = useState(false);
     const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
+    const [isLoadingLocationKinds, setIsLoadingLocationKinds] = useState(false);
     const [isLoadingTree, setIsLoadingTree] = useState(false);
     const [pageError, setPageError] = useState<string | null>(null);
     const [actionError, setActionError] = useState<string | null>(null);
@@ -348,6 +365,9 @@ export default function WarehouseLayoutsPage() {
     const [templateDialogMode, setTemplateDialogMode] = useState<TemplateDialogMode>(null);
     const [templateForm, setTemplateForm] = useState<TemplateFormState>(DEFAULT_TEMPLATE_FORM);
     const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+    const [locationKindDialogMode, setLocationKindDialogMode] = useState<LocationKindDialogMode>(null);
+    const [locationKindForm, setLocationKindForm] = useState<LocationKindFormState>(DEFAULT_LOCATION_KIND_FORM);
+    const [editingLocationKindId, setEditingLocationKindId] = useState<string | null>(null);
     const [isAddBlockOpen, setIsAddBlockOpen] = useState(false);
     const [blockForm, setBlockForm] = useState<BlockFormState>(DEFAULT_BLOCK_FORM);
     const [isPasteBlockOpen, setIsPasteBlockOpen] = useState(false);
@@ -357,7 +377,7 @@ export default function WarehouseLayoutsPage() {
     const [selectedBlockTemplateId, setSelectedBlockTemplateId] = useState("");
     const [selectedBlockParentId, setSelectedBlockParentId] = useState("__root__");
     const [selectedBlockSide, setSelectedBlockSide] = useState("__none__");
-    const [selectedBlockLocationKind, setSelectedBlockLocationKind] = useState<LocationKind>("STORAGE");
+    const [selectedBlockLocationKindId, setSelectedBlockLocationKindId] = useState("");
     const [isScanCodeCopied, setIsScanCodeCopied] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
     const [layoutSearch, setLayoutSearch] = useState("");
@@ -492,6 +512,18 @@ export default function WarehouseLayoutsPage() {
         }
     }, [slug, t]);
 
+    const loadLocationKinds = useCallback(async () => {
+        setIsLoadingLocationKinds(true);
+        try {
+            const result = await listWarehouseLocationKinds(slug);
+            setLocationKinds(result);
+        } catch (error) {
+            setPageError(extractWarehouseErrorMessage(error) ?? t("warehouse.common.loadFailed"));
+        } finally {
+            setIsLoadingLocationKinds(false);
+        }
+    }, [slug, t]);
+
     const loadTree = useCallback(async (layoutId: string) => {
         setIsLoadingTree(true);
         try {
@@ -506,8 +538,8 @@ export default function WarehouseLayoutsPage() {
     }, [slug, t]);
 
     useEffect(() => {
-        void Promise.all([loadLayouts(), loadTemplates()]);
-    }, [loadLayouts, loadTemplates]);
+        void Promise.all([loadLayouts(), loadTemplates(), loadLocationKinds()]);
+    }, [loadLayouts, loadTemplates, loadLocationKinds]);
 
     useEffect(() => {
         if (!selectedLayoutId) {
@@ -548,7 +580,7 @@ export default function WarehouseLayoutsPage() {
             setSelectedBlockTemplateId("");
             setSelectedBlockParentId("__root__");
             setSelectedBlockSide("__none__");
-            setSelectedBlockLocationKind("STORAGE");
+            setSelectedBlockLocationKindId(locationKinds[0]?.id ?? "");
             setIsScanCodeCopied(false);
             return;
         }
@@ -556,9 +588,27 @@ export default function WarehouseLayoutsPage() {
         setSelectedBlockTemplateId(selectedFlattenedNode.node.block.blockTemplateId);
         setSelectedBlockParentId(selectedFlattenedNode.node.block.parentId ?? "__root__");
         setSelectedBlockSide(selectedFlattenedNode.node.block.side ?? "__none__");
-        setSelectedBlockLocationKind(selectedFlattenedNode.node.block.locationKind ?? "STORAGE");
+        setSelectedBlockLocationKindId(selectedFlattenedNode.node.block.locationKindId ?? locationKinds[0]?.id ?? "");
         setIsScanCodeCopied(false);
-    }, [selectedFlattenedNode]);
+    }, [locationKinds, selectedFlattenedNode]);
+
+    useEffect(() => {
+        if (selectedFlattenedNode) {
+            return;
+        }
+        if (!selectedBlockLocationKindId && locationKinds[0]?.id) {
+            setSelectedBlockLocationKindId(locationKinds[0].id);
+        }
+    }, [locationKinds, selectedBlockLocationKindId, selectedFlattenedNode]);
+
+    useEffect(() => {
+        if (!selectedBlockLocationKindId) {
+            return;
+        }
+        if (!locationKinds.some((item) => item.id === selectedBlockLocationKindId)) {
+            setSelectedBlockLocationKindId(locationKinds[0]?.id ?? "");
+        }
+    }, [locationKinds, selectedBlockLocationKindId]);
 
     useEffect(() => {
         if (selectedEditorSideOptions.length === 0) {
@@ -622,6 +672,15 @@ export default function WarehouseLayoutsPage() {
         setTemplateForm(DEFAULT_TEMPLATE_FORM);
     };
 
+    const handleLocationKindDialogOpen = (mode: Exclude<LocationKindDialogMode, null>, locationKind?: WarehouseLocationKindResult) => {
+        setActionError(null);
+        setLocationKindDialogMode(mode);
+        setEditingLocationKindId(locationKind?.id ?? null);
+        setLocationKindForm({
+            name: locationKind?.name ?? "",
+        });
+    };
+
     const handleCreateOrUpdateLayout = async (event: FormEvent) => {
         event.preventDefault();
         setActionError(null);
@@ -677,6 +736,31 @@ export default function WarehouseLayoutsPage() {
             }
             await loadTemplates();
             setTemplateDialogMode(null);
+        } catch (error) {
+            setActionError(extractWarehouseErrorMessage(error) ?? t("warehouse.common.actionFailed"));
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleCreateOrUpdateLocationKind = async (event: FormEvent) => {
+        event.preventDefault();
+        setActionError(null);
+        setIsSubmitting(true);
+
+        try {
+            const payload: UpsertWarehouseLocationKindRequest = {
+                name: locationKindForm.name.trim(),
+            };
+            if (locationKindDialogMode === "edit" && editingLocationKindId) {
+                await updateWarehouseLocationKind(slug, editingLocationKindId, payload);
+            } else {
+                await createWarehouseLocationKind(slug, payload);
+            }
+            await loadLocationKinds();
+            setLocationKindDialogMode(null);
+            setLocationKindForm(DEFAULT_LOCATION_KIND_FORM);
+            setEditingLocationKindId(null);
         } catch (error) {
             setActionError(extractWarehouseErrorMessage(error) ?? t("warehouse.common.actionFailed"));
         } finally {
@@ -859,11 +943,11 @@ export default function WarehouseLayoutsPage() {
             if (
                 selectedBlockTemplateId !== selectedFlattenedNode.node.block.blockTemplateId
                 || nextSide !== (selectedFlattenedNode.node.block.side ?? null)
-                || selectedBlockLocationKind !== selectedFlattenedNode.node.block.locationKind
+                || selectedBlockLocationKindId !== (selectedFlattenedNode.node.block.locationKindId ?? "")
             ) {
                 await updateWarehouseLayoutBlockMetadata(slug, selectedLayout.id, blockId, {
                     side: nextSide,
-                    locationKind: selectedBlockLocationKind,
+                    locationKindId: selectedBlockLocationKindId || null,
                 });
             }
 
@@ -950,6 +1034,11 @@ export default function WarehouseLayoutsPage() {
             if (deleteTarget.type === "template") {
                 await deleteWarehouseTemplate(slug, deleteTarget.id);
                 await loadTemplates();
+            }
+
+            if (deleteTarget.type === "locationKind") {
+                await deleteWarehouseLocationKind(slug, deleteTarget.id);
+                await loadLocationKinds();
             }
 
             if (deleteTarget.type === "block" && selectedLayout) {
@@ -1099,87 +1188,150 @@ export default function WarehouseLayoutsPage() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        {pageTab === "templates" ? (
-                            <div className="space-y-4">
-                                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                                    <Input
-                                        value={templateSearch}
-                                        onChange={(event) => setTemplateSearch(event.target.value)}
-                                        placeholder={t("warehouse.templates.searchPlaceholder")}
-                                    />
-                                    {canManageTemplates ? (
-                                        <Button onClick={() => handleTemplateDialogOpen("create")}>
-                                            <Plus className="h-4 w-4" />
-                                            {t("warehouse.templates.createAction")}
-                                        </Button>
-                                    ) : null}
+                                        {pageTab === "templates" ? (
+                            <div className="space-y-6">
+                                <div className="space-y-4">
+                                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                        <Input
+                                            value={templateSearch}
+                                            onChange={(event) => setTemplateSearch(event.target.value)}
+                                            placeholder={t("warehouse.templates.searchPlaceholder")}
+                                        />
+                                        {canManageTemplates ? (
+                                            <Button onClick={() => handleTemplateDialogOpen("create")}>
+                                                <Plus className="h-4 w-4" />
+                                                {t("warehouse.templates.createAction")}
+                                            </Button>
+                                        ) : null}
+                                    </div>
+
+                                    {isLoadingTemplates ? (
+                                        <p className="text-sm text-muted-foreground">{t("warehouse.common.loading")}</p>
+                                    ) : filteredTemplates.length === 0 ? (
+                                        <p className="text-sm text-muted-foreground">{t("warehouse.templates.empty")}</p>
+                                    ) : (
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>{t("warehouse.templates.tableType")}</TableHead>
+                                                    <TableHead>{t("warehouse.templates.tableIdentifier")}</TableHead>
+                                                    <TableHead>{t("warehouse.templates.tableSideConfig")}</TableHead>
+                                                    <TableHead>{t("warehouse.templates.tableIcon")}</TableHead>
+                                                    <TableHead>{t("warehouse.common.actions")}</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {filteredTemplates.map((template) => {
+                                                    const Icon = getLucideIcon(template.iconName);
+                                                    const iconLabel = getLucideIconLabel(template.iconName);
+                                                    return (
+                                                        <TableRow key={template.id}>
+                                                            <TableCell>
+                                                                <div className="flex items-center gap-2 font-medium">
+                                                                    <Icon className="h-4 w-4 text-primary" />
+                                                                    <span>{template.name}</span>
+                                                                </div>
+                                                            </TableCell>
+                                                            <TableCell>{template.identifierFormat}</TableCell>
+                                                            <TableCell>{template.sideConfig}</TableCell>
+                                                            <TableCell>
+                                                                {iconLabel ? (
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="flex size-7 items-center justify-center border bg-muted/30">
+                                                                            <Icon className="h-4 w-4 text-primary" />
+                                                                        </span>
+                                                                        <span>{iconLabel}</span>
+                                                                    </div>
+                                                                ) : t("warehouse.common.none")}
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <div className="flex flex-wrap gap-2">
+                                                                    {canManageTemplates ? (
+                                                                        <Button size="sm" variant="outline" onClick={() => handleTemplateDialogOpen("edit", template)}>
+                                                                            <Pencil className="h-4 w-4" />
+                                                                            {t("warehouse.common.edit")}
+                                                                        </Button>
+                                                                    ) : null}
+                                                                    {canHardDelete ? (
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="outline"
+                                                                            onClick={() => setDeleteTarget({ type: "template", id: template.id, label: template.name })}
+                                                                        >
+                                                                            <Trash2 className="h-4 w-4" />
+                                                                            {t("warehouse.common.delete")}
+                                                                        </Button>
+                                                                    ) : null}
+                                                                </div>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    );
+                                                })}
+                                            </TableBody>
+                                        </Table>
+                                    )}
                                 </div>
 
-                                {isLoadingTemplates ? (
-                                    <p className="text-sm text-muted-foreground">{t("warehouse.common.loading")}</p>
-                                ) : filteredTemplates.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground">{t("warehouse.templates.empty")}</p>
-                                ) : (
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>{t("warehouse.templates.tableType")}</TableHead>
-                                                <TableHead>{t("warehouse.templates.tableIdentifier")}</TableHead>
-                                                <TableHead>{t("warehouse.templates.tableSideConfig")}</TableHead>
-                                                <TableHead>{t("warehouse.templates.tableIcon")}</TableHead>
-                                                <TableHead>{t("warehouse.common.actions")}</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {filteredTemplates.map((template) => {
-                                                const Icon = getLucideIcon(template.iconName);
-                                                const iconLabel = getLucideIconLabel(template.iconName);
-                                                return (
-                                                    <TableRow key={template.id}>
-                                                        <TableCell>
-                                                            <div className="flex items-center gap-2 font-medium">
-                                                                <Icon className="h-4 w-4 text-primary" />
-                                                                <span>{template.name}</span>
-                                                            </div>
-                                                        </TableCell>
-                                                        <TableCell>{template.identifierFormat}</TableCell>
-                                                        <TableCell>{template.sideConfig}</TableCell>
-                                                        <TableCell>
-                                                            {iconLabel ? (
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className="flex size-7 items-center justify-center border bg-muted/30">
-                                                                        <Icon className="h-4 w-4 text-primary" />
-                                                                    </span>
-                                                                    <span>{iconLabel}</span>
+                                <div className="space-y-4 border-t pt-4">
+                                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                        <div>
+                                            <p className="font-medium">{t("warehouse.locationKinds.sectionTitle")}</p>
+                                            <p className="text-sm text-muted-foreground">{t("warehouse.locationKinds.sectionDescription")}</p>
+                                        </div>
+                                        {canManageTemplates ? (
+                                            <Button onClick={() => handleLocationKindDialogOpen("create")}>
+                                                <Plus className="h-4 w-4" />
+                                                {t("warehouse.locationKinds.createAction")}
+                                            </Button>
+                                        ) : null}
+                                    </div>
+
+                                    {isLoadingLocationKinds ? (
+                                        <p className="text-sm text-muted-foreground">{t("warehouse.common.loading")}</p>
+                                    ) : locationKinds.length === 0 ? (
+                                        <p className="text-sm text-muted-foreground">{t("warehouse.locationKinds.empty")}</p>
+                                    ) : (
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>{t("warehouse.locationKinds.tableName")}</TableHead>
+                                                    <TableHead>{t("warehouse.locationKinds.tableOrder")}</TableHead>
+                                                    <TableHead>{t("warehouse.common.actions")}</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {locationKinds.map((locationKind) => {
+                                                    return (
+                                                        <TableRow key={locationKind.id}>
+                                                            <TableCell className="font-medium">{locationKind.name}</TableCell>
+                                                            <TableCell>{locationKind.sortOrder + 1}</TableCell>
+                                                            <TableCell>
+                                                                <div className="flex flex-wrap gap-2">
+                                                                    {canManageTemplates ? (
+                                                                        <Button size="sm" variant="outline" onClick={() => handleLocationKindDialogOpen("edit", locationKind)}>
+                                                                            <Pencil className="h-4 w-4" />
+                                                                            {t("warehouse.common.edit")}
+                                                                        </Button>
+                                                                    ) : null}
+                                                                    {canHardDelete ? (
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="outline"
+                                                                            onClick={() => setDeleteTarget({ type: "locationKind", id: locationKind.id, label: locationKind.name })}
+                                                                        >
+                                                                            <Trash2 className="h-4 w-4" />
+                                                                            {t("warehouse.common.delete")}
+                                                                        </Button>
+                                                                    ) : null}
                                                                 </div>
-                                                            ) : t("warehouse.common.none")}
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <div className="flex flex-wrap gap-2">
-                                                                {canManageTemplates ? (
-                                                                    <Button size="sm" variant="outline" onClick={() => handleTemplateDialogOpen("edit", template)}>
-                                                                        <Pencil className="h-4 w-4" />
-                                                                        {t("warehouse.common.edit")}
-                                                                    </Button>
-                                                                ) : null}
-                                                                {canHardDelete ? (
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant="outline"
-                                                                        onClick={() => setDeleteTarget({ type: "template", id: template.id, label: template.name })}
-                                                                    >
-                                                                        <Trash2 className="h-4 w-4" />
-                                                                        {t("warehouse.common.delete")}
-                                                                    </Button>
-                                                                ) : null}
-                                                            </div>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                );
-                                            })}
-                                        </TableBody>
-                                    </Table>
-                                )}
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    );
+                                                })}
+                                            </TableBody>
+                                        </Table>
+                                    )}
+                                </div>
                             </div>
                         ) : !selectedLayout ? (
                             <div className="space-y-3">
@@ -1324,7 +1476,7 @@ export default function WarehouseLayoutsPage() {
                                                                     <span className="flex-1 truncate">{getBlockDisplayLabel(item.node.block, template ?? null, t("warehouse.builder.unknownBlock"))}</span>
                                                                     {!hasChildren ? (
                                                                         <Badge variant="outline" className="shrink-0 rounded-none px-1 py-0 text-[10px]">
-                                                                            {t(`warehouse.locationKind.${item.node.block.locationKind}`)}
+                                                                            {item.node.block.locationKindName ?? t("warehouse.common.none")}
                                                                         </Badge>
                                                                     ) : null}
                                                                 </button>
@@ -1424,13 +1576,13 @@ export default function WarehouseLayoutsPage() {
                                                     {selectedFlattenedNode.node.children.length === 0 ? (
                                                         <div className="space-y-2">
                                                             <Label htmlFor="selected-kind">{t("warehouse.locationKind.label")}</Label>
-                                                            <Select value={selectedBlockLocationKind} onValueChange={(v) => setSelectedBlockLocationKind(v as LocationKind)}>
+                                                            <Select value={selectedBlockLocationKindId} onValueChange={setSelectedBlockLocationKindId}>
                                                                 <SelectTrigger id="selected-kind" className="w-full">
                                                                     <SelectValue placeholder={t("warehouse.locationKind.placeholder")} />
                                                                 </SelectTrigger>
                                                                 <SelectContent>
-                                                                    {(["STORAGE", "STAGING", "QUARANTINE", "DAMAGED", "DISPATCH", "STRUCTURAL"] as const).map((kind) => (
-                                                                        <SelectItem key={kind} value={kind}>{t(`warehouse.locationKind.${kind}`)}</SelectItem>
+                                                                    {locationKinds.map((kind) => (
+                                                                        <SelectItem key={kind.id} value={kind.id}>{kind.name}</SelectItem>
                                                                     ))}
                                                                 </SelectContent>
                                                             </Select>
@@ -1679,6 +1831,44 @@ export default function WarehouseLayoutsPage() {
                             </Button>
                             <Button type="submit" disabled={isSubmitting}>
                                 {templateDialogMode === "edit" ? t("warehouse.common.save") : t("warehouse.common.create")}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog
+                open={locationKindDialogMode !== null}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setLocationKindDialogMode(null);
+                    }
+                }}
+            >
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>
+                            {locationKindDialogMode === "edit"
+                                ? t("warehouse.locationKinds.editDialogTitle")
+                                : t("warehouse.locationKinds.createDialogTitle")}
+                        </DialogTitle>
+                        <DialogDescription>{t("warehouse.locationKinds.dialogDescription")}</DialogDescription>
+                    </DialogHeader>
+                    <form className="space-y-4" onSubmit={handleCreateOrUpdateLocationKind}>
+                        <div className="space-y-2">
+                            <Label htmlFor="location-kind-name">{t("warehouse.locationKinds.nameLabel")}</Label>
+                            <Input
+                                id="location-kind-name"
+                                value={locationKindForm.name}
+                                onChange={(event) => setLocationKindForm({ name: event.target.value })}
+                            />
+                        </div>
+                        <DialogFooter>
+                            <Button type="button" variant="outline" onClick={() => setLocationKindDialogMode(null)}>
+                                {t("warehouse.common.cancel")}
+                            </Button>
+                            <Button type="submit" disabled={isSubmitting}>
+                                {locationKindDialogMode === "edit" ? t("warehouse.common.save") : t("warehouse.common.create")}
                             </Button>
                         </DialogFooter>
                     </form>

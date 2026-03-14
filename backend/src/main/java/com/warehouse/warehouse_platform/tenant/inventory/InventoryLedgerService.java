@@ -6,7 +6,6 @@ import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplate;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplateRepository;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlock;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlockRepository;
-import com.warehouse.warehouse_platform.tenant.warehouse.block.LocationKind;
 import com.warehouse.warehouse_platform.tenant.warehouse.layout.WarehouseLayout;
 import com.warehouse.warehouse_platform.tenant.warehouse.layout.WarehouseLayoutRepository;
 import jakarta.persistence.criteria.Predicate;
@@ -604,7 +603,7 @@ public class InventoryLedgerService {
                 pathLabel,
                 resolveIdentifier(block, templateById.get(block.getBlockTemplateId())),
                 block.getSide(),
-                block.getLocationKind(),
+                block.getLocationKind() == null ? null : block.getLocationKind().getName(),
                 block.getScanCode());
     }
 
@@ -738,7 +737,7 @@ public class InventoryLedgerService {
             String pathLabel,
             String identifier,
             String side,
-            LocationKind locationKind,
+            String locationKind,
             String scanCode) {
     }
 
@@ -768,7 +767,7 @@ public class InventoryLedgerService {
             String pathLabel,
             String identifier,
             String side,
-            LocationKind locationKind,
+            String locationKind,
             String scanCode) {
     }
 
