@@ -82,6 +82,13 @@ export default function CountSessionsPage() {
     const [isPostConfirmOpen, setIsPostConfirmOpen] = useState(false);
     const [isVoidConfirmOpen, setIsVoidConfirmOpen] = useState(false);
 
+    function normalizeQtyValue(value: unknown): string {
+        if (value === null || value === undefined) {
+            return "";
+        }
+        return String(value);
+    }
+
     const locationMap = useMemo(
         () =>
             new Map<string, string>(
@@ -95,7 +102,7 @@ export default function CountSessionsPage() {
             return 0;
         }
         return detail.lines.reduce((missing, line) => {
-            const value = lineDrafts[line.id] ?? line.countedQty ?? "";
+            const value = normalizeQtyValue(lineDrafts[line.id] ?? line.countedQty);
             return value.trim() === "" ? missing + 1 : missing;
         }, 0);
     }, [detail, lineDrafts]);
@@ -124,7 +131,7 @@ export default function CountSessionsPage() {
         }
 
         const nextDrafts = detail.lines.reduce<Record<string, string>>((acc, line) => {
-            acc[line.id] = line.countedQty ?? "";
+            acc[line.id] = normalizeQtyValue(line.countedQty);
             return acc;
         }, {});
         setLineDrafts(nextDrafts);
@@ -222,7 +229,7 @@ export default function CountSessionsPage() {
     }
 
     function resolveEffectiveCountedQty(line: CountLine): string {
-        return (lineDrafts[line.id] ?? line.countedQty ?? "").trim();
+        return normalizeQtyValue(lineDrafts[line.id] ?? line.countedQty).trim();
     }
 
     function computeVariance(line: CountLine): number | null {
@@ -239,7 +246,7 @@ export default function CountSessionsPage() {
     }
 
     function getLineInputFeedback(line: CountLine): { message: string; tone: "muted" | "danger" | "success" } | null {
-        const draft = lineDrafts[line.id] ?? "";
+        const draft = normalizeQtyValue(lineDrafts[line.id]);
         const trimmed = draft.trim();
         const touched = Boolean(lineTouched[line.id]);
 
@@ -260,7 +267,7 @@ export default function CountSessionsPage() {
             return { message: t("counting.feedback.invalid"), tone: "danger" };
         }
 
-        const persisted = (line.countedQty ?? "").trim();
+        const persisted = normalizeQtyValue(line.countedQty).trim();
         if (trimmed !== persisted) {
             return { message: t("counting.feedback.unsaved"), tone: "muted" };
         }
@@ -274,7 +281,7 @@ export default function CountSessionsPage() {
         }
 
         const nextValue = resolveEffectiveCountedQty(line);
-        const currentValue = (line.countedQty ?? "").trim();
+        const currentValue = normalizeQtyValue(line.countedQty).trim();
         if (nextValue === currentValue) {
             return;
         }
@@ -302,7 +309,7 @@ export default function CountSessionsPage() {
                     lines: current.lines.map((item) => (item.id === updatedLine.id ? updatedLine : item)),
                 };
             });
-            setLineDrafts((current) => ({ ...current, [line.id]: updatedLine.countedQty ?? "" }));
+            setLineDrafts((current) => ({ ...current, [line.id]: normalizeQtyValue(updatedLine.countedQty) }));
         } catch (error) {
             setLineError(extractCountingErrorMessage(error, t("counting.actionFailed")));
         } finally {
