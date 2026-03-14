@@ -51,7 +51,7 @@ class WarehouseLayoutServiceTest {
     @BeforeEach
     void setUp() {
         service = new WarehouseLayoutService(layoutRepository, layoutBlockRepository, blockTemplateRepository,
-            layoutBlockService, tenantAuditService);
+                layoutBlockService, tenantAuditService);
     }
 
     // -------------------------------------------------------------------------
@@ -122,65 +122,65 @@ class WarehouseLayoutServiceTest {
             return t;
         });
         when(layoutBlockService.addBlock(any(), any(), eq(null), eq(0), eq(null))).thenReturn(
-            new LayoutBlockService.BlockResult(
-                aisleId,
-                UUID.fromString("11111111-1111-1111-1111-111111111111"),
-                UUID.fromString("31000000-0000-0000-0000-000000000001"),
-                null,
-                0,
-                "A",
-                null,
-                UUID.fromString("41000000-0000-0000-0000-000000000001"),
-                "Storage",
-                "A",
-                "A",
-                Instant.parse("2026-03-01T00:00:00Z"),
-                Instant.parse("2026-03-01T00:00:00Z")));
+                new LayoutBlockService.BlockResult(
+                        aisleId,
+                        UUID.fromString("11111111-1111-1111-1111-111111111111"),
+                        UUID.fromString("31000000-0000-0000-0000-000000000001"),
+                        null,
+                        0,
+                        "A",
+                        null,
+                        UUID.fromString("41000000-0000-0000-0000-000000000001"),
+                        "Storage",
+                        "A",
+                        "A",
+                        Instant.parse("2026-03-01T00:00:00Z"),
+                        Instant.parse("2026-03-01T00:00:00Z")));
         when(layoutBlockService.addBlock(any(), any(), eq(aisleId), eq(0), eq(null))).thenReturn(
-            new LayoutBlockService.BlockResult(
-                bayId,
-                UUID.fromString("11111111-1111-1111-1111-111111111111"),
-                UUID.fromString("31000000-0000-0000-0000-000000000002"),
-                aisleId,
-                0,
-                "1",
-                null,
-                UUID.fromString("41000000-0000-0000-0000-000000000001"),
-                "Storage",
-                "A-01",
-                "A-01",
-                Instant.parse("2026-03-01T00:00:00Z"),
-                Instant.parse("2026-03-01T00:00:00Z")));
+                new LayoutBlockService.BlockResult(
+                        bayId,
+                        UUID.fromString("11111111-1111-1111-1111-111111111111"),
+                        UUID.fromString("31000000-0000-0000-0000-000000000002"),
+                        aisleId,
+                        0,
+                        "1",
+                        null,
+                        UUID.fromString("41000000-0000-0000-0000-000000000001"),
+                        "Storage",
+                        "A-01",
+                        "A-01",
+                        Instant.parse("2026-03-01T00:00:00Z"),
+                        Instant.parse("2026-03-01T00:00:00Z")));
         when(layoutBlockService.addBlock(any(), any(), eq(bayId), eq(0), eq(null))).thenReturn(
-            new LayoutBlockService.BlockResult(
-                levelId,
-                UUID.fromString("11111111-1111-1111-1111-111111111111"),
-                UUID.fromString("31000000-0000-0000-0000-000000000003"),
-                bayId,
-                0,
-                "1",
-                null,
-                UUID.fromString("41000000-0000-0000-0000-000000000001"),
-                "Storage",
-                "A-01-01",
-                "A-01-01",
-                Instant.parse("2026-03-01T00:00:00Z"),
-                Instant.parse("2026-03-01T00:00:00Z")));
+                new LayoutBlockService.BlockResult(
+                        levelId,
+                        UUID.fromString("11111111-1111-1111-1111-111111111111"),
+                        UUID.fromString("31000000-0000-0000-0000-000000000003"),
+                        bayId,
+                        0,
+                        "1",
+                        null,
+                        UUID.fromString("41000000-0000-0000-0000-000000000001"),
+                        "Storage",
+                        "A-01-01",
+                        "A-01-01",
+                        Instant.parse("2026-03-01T00:00:00Z"),
+                        Instant.parse("2026-03-01T00:00:00Z")));
         when(layoutBlockService.addBlock(any(), any(), eq(levelId), eq(0), eq(null))).thenReturn(
-            new LayoutBlockService.BlockResult(
-                shelfId,
-                UUID.fromString("11111111-1111-1111-1111-111111111111"),
-                UUID.fromString("31000000-0000-0000-0000-000000000004"),
-                levelId,
-                0,
-                "1",
-                null,
-                UUID.fromString("41000000-0000-0000-0000-000000000001"),
-                "Storage",
-                "A-01-01-01",
-                "A-01-01-01",
-                Instant.parse("2026-03-01T00:00:00Z"),
-                Instant.parse("2026-03-01T00:00:00Z")));
+                new LayoutBlockService.BlockResult(
+                        shelfId,
+                        UUID.fromString("11111111-1111-1111-1111-111111111111"),
+                        UUID.fromString("31000000-0000-0000-0000-000000000004"),
+                        levelId,
+                        0,
+                        "1",
+                        null,
+                        UUID.fromString("41000000-0000-0000-0000-000000000001"),
+                        "Storage",
+                        "A-01-01-01",
+                        "A-01-01-01",
+                        Instant.parse("2026-03-01T00:00:00Z"),
+                        Instant.parse("2026-03-01T00:00:00Z")));
 
         WarehouseLayoutService.LayoutResult result = service.createClassicPreset("Classic Layout", "Default tree",
                 true);

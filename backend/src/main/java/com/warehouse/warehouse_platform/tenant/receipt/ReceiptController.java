@@ -1,6 +1,7 @@
 package com.warehouse.warehouse_platform.tenant.receipt;
 
 import com.warehouse.warehouse_platform.tenant.access.TenantAccessPolicy;
+import com.warehouse.warehouse_platform.tenant.inventory.InventoryLedgerService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -32,10 +34,15 @@ public class ReceiptController {
 
     private final TenantAccessPolicy tenantAccessPolicy;
     private final ReceiptService receiptService;
+    private final InventoryLedgerService inventoryLedgerService;
 
-    public ReceiptController(TenantAccessPolicy tenantAccessPolicy, ReceiptService receiptService) {
+    public ReceiptController(
+            TenantAccessPolicy tenantAccessPolicy,
+            ReceiptService receiptService,
+            InventoryLedgerService inventoryLedgerService) {
         this.tenantAccessPolicy = tenantAccessPolicy;
         this.receiptService = receiptService;
+        this.inventoryLedgerService = inventoryLedgerService;
     }
 
     @GetMapping
@@ -133,6 +140,16 @@ public class ReceiptController {
             Authentication authentication) {
         tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
         return ResponseEntity.ok(receiptService.postReceipt(receiptId, authentication.getName()));
+    }
+
+    @GetMapping("/{receiptId}/movements")
+    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).RECEIPTS_VIEW)")
+    public ResponseEntity<List<InventoryLedgerService.MovementResult>> getReceiptMovements(
+            @PathVariable String tenantSlug,
+            @PathVariable UUID receiptId,
+            Authentication authentication) {
+        tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
+        return ResponseEntity.ok(inventoryLedgerService.getMovementsBySourceDocument(receiptId));
     }
 
     @PostMapping("/{receiptId}/void")

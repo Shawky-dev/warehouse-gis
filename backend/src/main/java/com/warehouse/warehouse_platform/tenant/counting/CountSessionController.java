@@ -1,6 +1,7 @@
 package com.warehouse.warehouse_platform.tenant.counting;
 
 import com.warehouse.warehouse_platform.tenant.access.TenantAccessPolicy;
+import com.warehouse.warehouse_platform.tenant.inventory.InventoryLedgerService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
@@ -33,10 +34,15 @@ public class CountSessionController {
 
     private final TenantAccessPolicy tenantAccessPolicy;
     private final CountSessionService countSessionService;
+    private final InventoryLedgerService inventoryLedgerService;
 
-    public CountSessionController(TenantAccessPolicy tenantAccessPolicy, CountSessionService countSessionService) {
+    public CountSessionController(
+            TenantAccessPolicy tenantAccessPolicy,
+            CountSessionService countSessionService,
+            InventoryLedgerService inventoryLedgerService) {
         this.tenantAccessPolicy = tenantAccessPolicy;
         this.countSessionService = countSessionService;
+        this.inventoryLedgerService = inventoryLedgerService;
     }
 
     @GetMapping
@@ -99,6 +105,16 @@ public class CountSessionController {
             Authentication authentication) {
         tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
         return ResponseEntity.ok(countSessionService.postSession(sessionId, authentication.getName()));
+    }
+
+    @GetMapping("/{sessionId}/movements")
+    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).COUNTING_VIEW)")
+    public ResponseEntity<List<InventoryLedgerService.MovementResult>> getSessionMovements(
+            @PathVariable String tenantSlug,
+            @PathVariable UUID sessionId,
+            Authentication authentication) {
+        tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
+        return ResponseEntity.ok(inventoryLedgerService.getMovementsBySourceDocument(sessionId));
     }
 
     @PostMapping("/{sessionId}/void")

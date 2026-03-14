@@ -103,6 +103,9 @@ export interface TransferResult {
 export interface InventoryListParams {
   productId?: string;
   locationId?: string;
+  locationKind?: string;
+  sourceDocumentId?: string;
+  movementType?: MovementType;
   page?: number;
   size?: number;
 }

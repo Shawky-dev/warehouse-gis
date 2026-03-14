@@ -216,6 +216,11 @@ public class InventoryLedgerService {
 
     @Transactional(readOnly = true)
     public List<StockResult> getStock(UUID productId, UUID locationId) {
+        return getStock(productId, locationId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<StockResult> getStock(UUID productId, UUID locationId, String locationKind) {
         if (locationId != null) {
             assertLocationExists(locationId);
         }
@@ -230,11 +235,22 @@ public class InventoryLedgerService {
             case NONE -> movementRepository.findAllStock();
         };
 
-        return enrichStock(rows);
+        return enrichStock(rows, locationKind);
     }
 
     @Transactional(readOnly = true)
     public MovementPageResult getMovements(UUID productId, UUID locationId, int page, int size) {
+        return getMovements(productId, locationId, null, null, page, size);
+    }
+
+    @Transactional(readOnly = true)
+    public MovementPageResult getMovements(
+            UUID productId,
+            UUID locationId,
+            UUID sourceDocumentId,
+            MovementType movementType,
+            int page,
+            int size) {
         if (locationId != null) {
             assertLocationExists(locationId);
         }
@@ -243,14 +259,24 @@ public class InventoryLedgerService {
         }
 
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        Page<StockMovement> result = switch (buildFilterKey(productId, locationId)) {
-            case BOTH ->
-                movementRepository.findByLocationIdAndProductIdOrderByCreatedAtDesc(locationId, productId, pageable);
-            case PRODUCT -> movementRepository.findByProductIdOrderByCreatedAtDesc(productId, pageable);
-            case LOCATION -> movementRepository.findByLocationIdOrderByCreatedAtDesc(locationId, pageable);
-            case NONE -> movementRepository.findAllByOrderByCreatedAtDesc(pageable);
-        };
+        Specification<StockMovement> spec = buildMovementSpec(productId, locationId, sourceDocumentId, movementType);
+        Page<StockMovement> result = movementRepository.findAll(spec, pageable);
         return toPageResult(result);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MovementResult> getMovementsBySourceDocument(UUID sourceDocumentId) {
+        List<StockMovement> movements = movementRepository.findBySourceDocumentIdOrderByCreatedAtDesc(sourceDocumentId);
+        if (movements.isEmpty()) {
+            return List.of();
+        }
+        Set<UUID> productIds = movements.stream().map(StockMovement::getProductId).collect(Collectors.toSet());
+        Set<UUID> locationIds = movements.stream().map(StockMovement::getLocationId).collect(Collectors.toSet());
+        Map<UUID, ProductSummary> products = loadProductSummaryMap(productIds);
+        Map<UUID, LocationSummary> locations = buildLocationSummaryMap(locationIds);
+        return movements.stream()
+                .map(m -> enrichMovement(m, locations, products))
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -405,13 +431,18 @@ public class InventoryLedgerService {
         return normalized.isEmpty() ? null : normalized;
     }
 
-    private List<StockResult> enrichStock(List<StockEntry> rows) {
+    private List<StockResult> enrichStock(List<StockEntry> rows, String locationKind) {
         Set<UUID> productIds = rows.stream().map(StockEntry::getProductId).collect(Collectors.toSet());
         Set<UUID> locationIds = rows.stream().map(StockEntry::getLocationId).collect(Collectors.toSet());
         Map<UUID, ProductSummary> products = loadProductSummaryMap(productIds);
         Map<UUID, LocationSummary> locations = buildLocationSummaryMap(locationIds);
 
         return rows.stream()
+                .filter(row -> {
+                    if (locationKind == null) return true;
+                    LocationSummary loc = locations.get(row.getLocationId());
+                    return loc != null && locationKind.equalsIgnoreCase(loc.locationKind());
+                })
                 .map(row -> {
                     ProductSummary product = products.get(row.getProductId());
                     LocationSummary location = locations.get(row.getLocationId());
@@ -433,6 +464,29 @@ public class InventoryLedgerService {
                             product == null ? null : product.trackExpiry());
                 })
                 .toList();
+    }
+
+    private Specification<StockMovement> buildMovementSpec(
+            UUID productId,
+            UUID locationId,
+            UUID sourceDocumentId,
+            MovementType movementType) {
+        return (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (productId != null) {
+                predicates.add(cb.equal(root.get("productId"), productId));
+            }
+            if (locationId != null) {
+                predicates.add(cb.equal(root.get("locationId"), locationId));
+            }
+            if (sourceDocumentId != null) {
+                predicates.add(cb.equal(root.get("sourceDocumentId"), sourceDocumentId));
+            }
+            if (movementType != null) {
+                predicates.add(cb.equal(root.get("type"), movementType));
+            }
+            return cb.and(predicates.toArray(Predicate[]::new));
+        };
     }
 
     private MovementPageResult toPageResult(Page<StockMovement> page) {

@@ -9,6 +9,7 @@ import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlock;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlockRepository;
 import com.warehouse.warehouse_platform.tenant.warehouse.layout.WarehouseLayout;
 import com.warehouse.warehouse_platform.tenant.warehouse.layout.WarehouseLayoutRepository;
+import com.warehouse.warehouse_platform.tenant.warehouse.locationkind.WarehouseLocationKind;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -356,7 +357,9 @@ class InventoryLedgerServiceTest {
                 .createdBy("actor")
                 .build();
 
-        when(movementRepository.findAllByOrderByCreatedAtDesc(any()))
+        when(movementRepository.findAll(
+                org.mockito.ArgumentMatchers.<org.springframework.data.jpa.domain.Specification<StockMovement>>any(),
+                org.mockito.ArgumentMatchers.<org.springframework.data.domain.Pageable>any()))
                 .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(out)));
         when(movementRepository.findByReferenceIdIn(List.of(ref))).thenReturn(List.of(out, in));
         when(layoutBlockRepository.findAllById(any()))
@@ -373,6 +376,71 @@ class InventoryLedgerServiceTest {
         InventoryLedgerService.MovementResult row = page.content().get(0);
         assertEquals(OTHER_LEAF_LOCATION_ID, row.counterpartLocationId());
         assertEquals("Shelf · 3", row.counterpartLocationLabel());
+    }
+
+    @Test
+    void getStock_filteredByLocationKind_returnsOnlyMatchingLocations() {
+        WarehouseLocationKind stagingKind = WarehouseLocationKind.builder()
+                .id(UUID.randomUUID())
+                .name("STAGING")
+                .sortOrder(1)
+                .build();
+
+        LayoutBlock stagingLeaf = LayoutBlock.builder()
+                .id(OTHER_LEAF_LOCATION_ID)
+                .layoutId(ACTIVE_LAYOUT_ID)
+                .blockTemplateId(TEMPLATE_ID)
+                .parentId(ROOT_LOCATION_ID)
+                .position(2)
+                .locationKind(stagingKind)
+                .build();
+
+        when(movementRepository.findAllStock()).thenReturn(List.of(
+                stockEntry(LEAF_LOCATION_ID, PRODUCT_ID, null, "5.0000"),
+                stockEntry(OTHER_LEAF_LOCATION_ID, PRODUCT_ID, null, "3.0000")));
+        when(layoutBlockRepository.findAllById(any()))
+                .thenReturn(List.of(leafBlock(), stagingLeaf));
+        when(layoutBlockRepository.findByLayoutIdOrderByParentIdAscPositionAsc(ACTIVE_LAYOUT_ID))
+                .thenReturn(List.of(rootBlock(), leafBlock(), stagingLeaf));
+        when(blockTemplateRepository.findAllById(any())).thenReturn(List.of(template()));
+        when(warehouseLayoutRepository.findAllById(any())).thenReturn(List.of(activeLayout()));
+        when(productRepository.findAllById(any())).thenReturn(List.of(product()));
+
+        List<InventoryLedgerService.StockResult> result = service.getStock(null, null, "STAGING");
+
+        assertEquals(1, result.size());
+        assertEquals(OTHER_LEAF_LOCATION_ID, result.get(0).locationId());
+    }
+
+    @Test
+    void getMovements_filteredBySourceDocumentId_returnsMatchingMovements() {
+        UUID sourceDocId = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        StockMovement movement = StockMovement.builder()
+                .id(UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"))
+                .locationId(LEAF_LOCATION_ID)
+                .productId(PRODUCT_ID)
+                .qty(BigDecimal.ONE)
+                .type(MovementType.RECEIVE)
+                .sourceDocumentId(sourceDocId)
+                .createdBy("actor")
+                .build();
+
+        when(movementRepository.findAll(
+                org.mockito.ArgumentMatchers.<org.springframework.data.jpa.domain.Specification<StockMovement>>any(),
+                org.mockito.ArgumentMatchers.<org.springframework.data.domain.Pageable>any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(movement)));
+        when(layoutBlockRepository.findAllById(any())).thenReturn(List.of(leafBlock()));
+        when(layoutBlockRepository.findByLayoutIdOrderByParentIdAscPositionAsc(ACTIVE_LAYOUT_ID))
+                .thenReturn(List.of(rootBlock(), leafBlock()));
+        when(blockTemplateRepository.findAllById(any())).thenReturn(List.of(template()));
+        when(warehouseLayoutRepository.findAllById(any())).thenReturn(List.of(activeLayout()));
+        when(productRepository.findAllById(any())).thenReturn(List.of(product()));
+
+        InventoryLedgerService.MovementPageResult page =
+                service.getMovements(null, null, sourceDocId, null, 0, 50);
+
+        assertEquals(1, page.content().size());
+        assertEquals(sourceDocId, page.content().get(0).sourceDocumentId());
     }
 
     private void givenActiveLayout() {

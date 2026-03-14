@@ -130,7 +130,7 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
 
-  const [stockFilters, setStockFilters] = useState({ productId: "", locationId: "" });
+  const [stockFilters, setStockFilters] = useState({ productId: "", locationId: "", locationKind: "" });
   const [stock, setStock] = useState<StockEntry[]>([]);
   const [stockLoading, setStockLoading] = useState(false);
   const [stockError, setStockError] = useState<string | null>(null);
@@ -358,13 +358,14 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
     }
   }
 
-  async function loadStock(filters: { productId: string; locationId: string }) {
+  async function loadStock(filters: { productId: string; locationId: string; locationKind: string }) {
     setStockLoading(true);
     setStockError(null);
     try {
       const result = await getStock(slug, {
         productId: filters.productId || undefined,
         locationId: filters.locationId || undefined,
+        locationKind: filters.locationKind || undefined,
       });
       setStock(result);
     } catch (error) {
@@ -538,7 +539,7 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
               <CardDescription>{t("inventory.stock.filtersDescription")}</CardDescription>
             </CardHeader>
             <CardContent>
-              <form className="grid gap-4 lg:grid-cols-[1fr_1fr_auto_auto]" onSubmit={handleStockApplyFilters}>
+              <form className="grid gap-4 lg:grid-cols-[1fr_1fr_1fr_auto_auto]" onSubmit={handleStockApplyFilters}>
                 <PickerField
                   id="stock-product"
                   label={t("inventory.filters.product")}
@@ -565,6 +566,17 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
                   renderOption={renderLocationOption}
                   getOptionLabel={getLocationLabel}
                 />
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="stock-location-kind">{t("inventory.filter.locationKind")}</Label>
+                  <Input
+                    id="stock-location-kind"
+                    value={stockFilters.locationKind}
+                    onChange={(e) =>
+                      setStockFilters((current) => ({ ...current, locationKind: e.target.value }))
+                    }
+                    placeholder="e.g. STORAGE"
+                  />
+                </div>
                 <Button type="submit" variant="outline" className="self-end">
                   {t("inventory.filters.apply")}
                 </Button>
@@ -573,7 +585,7 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
                   variant="ghost"
                   className="self-end"
                   onClick={() => {
-                    const nextFilters = { productId: "", locationId: "" };
+                    const nextFilters = { productId: "", locationId: "", locationKind: "" };
                     setStockFilters(nextFilters);
                     void loadStock(nextFilters);
                   }}
@@ -1013,6 +1025,7 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
                     <TableHeader>
                       <TableRow>
                         <TableHead>{t("inventory.movements.colType")}</TableHead>
+                        <TableHead>{t("inventory.movements.sourceDocument")}</TableHead>
                         <TableHead>{t("inventory.movements.colProduct")}</TableHead>
                         <TableHead>{t("inventory.movements.colLocation")}</TableHead>
                         <TableHead className="text-end">{t("inventory.movements.colQty")}</TableHead>
@@ -1029,6 +1042,31 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
                             <span className={`inline-flex px-2 py-1 text-xs font-medium ${movTypeColor(row.type)}`}>
                               {t(movementTypeKey[row.type])}
                             </span>
+                          </TableCell>
+                          <TableCell>
+                            {row.sourceDocumentId ? (
+                              <button
+                                type="button"
+                                className="text-xs text-primary underline-offset-2 hover:underline"
+                                onClick={() => {
+                                  const path =
+                                    row.type === "RECEIVE"
+                                      ? PATHS.TENANT.receipts(slug)
+                                      : row.type === "PICK"
+                                        ? PATHS.TENANT.dispatches(slug)
+                                        : PATHS.TENANT.countSessions(slug);
+                                  navigate(path);
+                                }}
+                              >
+                                {row.type === "RECEIVE"
+                                  ? t("inventory.movements.sourceReceipt")
+                                  : row.type === "PICK"
+                                    ? t("inventory.movements.sourceDispatch")
+                                    : t("inventory.movements.sourceCount")}
+                              </button>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-col gap-1">

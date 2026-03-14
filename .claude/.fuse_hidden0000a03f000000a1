@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs cat:*)",
+      "Bash(find /mnt/data/arch/Documents/coding/freelance/warehouse-gis-webapp/backend/src/main/java/com/warehouse/warehouse_platform/tenant/warehouse -type f -name *.java)",
+      "Bash(mvn -B -DskipTests clean compile)",
+      "Bash(grep -v \"^--$\")",
+      "Bash(ls /mnt/data/arch/Documents/coding/freelance/warehouse-gis-webapp/frontend/src/features/tenant/warehouse/Warehouse*Global*.tsx)",
+      "Bash(find /mnt/data/arch/Documents/coding/freelance/warehouse-gis-webapp -path */bruno* -o -name *.bru)",
+      "Bash(npx tsc:*)",
+      "Bash(grep -r \"flyway\" /mnt/data/arch/Documents/coding/freelance/warehouse-gis-webapp/backend/src/main/resources/application*.yml --include=\"*.yml\" -i)",
+      "Bash(npm install:*)",
+      "Bash(find /mnt/data/arch/Documents/coding/freelance/warehouse-gis-webapp/frontend/src/lib -name *.ts)"
+    ]
+  }
+}

@@ -90,18 +90,21 @@ public class WarehouseLayoutService {
         UUID savedLayoutId = savedLayout.getId();
 
         UUID aisleTemplateId = resolveClassicTemplate("Aisle", BlockTemplate.IdentifierFormat.ALPHA,
-            BlockTemplate.SideConfig.NONE, true, "Primary warehouse aisle segment", "AlignJustify").getId();
+                BlockTemplate.SideConfig.NONE, true, "Primary warehouse aisle segment", "AlignJustify").getId();
         UUID bayTemplateId = resolveClassicTemplate("Bay", BlockTemplate.IdentifierFormat.NUMERIC,
-            BlockTemplate.SideConfig.LR, true, "Numbered bay segment on a left or right aisle side",
-            "Layers").getId();
+                BlockTemplate.SideConfig.LR, true, "Numbered bay segment on a left or right aisle side",
+                "Layers").getId();
         UUID levelTemplateId = resolveClassicTemplate("Level", BlockTemplate.IdentifierFormat.NUMERIC,
-            BlockTemplate.SideConfig.NONE, true, "Vertical bay level", "List").getId();
+                BlockTemplate.SideConfig.NONE, true, "Vertical bay level", "List").getId();
         UUID shelfTemplateId = resolveClassicTemplate("Shelf", BlockTemplate.IdentifierFormat.NUMERIC,
-            BlockTemplate.SideConfig.NONE, true, "Shelf within a level", "MapPin").getId();
+                BlockTemplate.SideConfig.NONE, true, "Shelf within a level", "MapPin").getId();
 
-        LayoutBlockService.BlockResult aisleBlock = layoutBlockService.addBlock(savedLayoutId, aisleTemplateId, null, 0, null);
-        LayoutBlockService.BlockResult bayBlock = layoutBlockService.addBlock(savedLayoutId, bayTemplateId, aisleBlock.id(), 0, null);
-        LayoutBlockService.BlockResult levelBlock = layoutBlockService.addBlock(savedLayoutId, levelTemplateId, bayBlock.id(), 0, null);
+        LayoutBlockService.BlockResult aisleBlock = layoutBlockService.addBlock(savedLayoutId, aisleTemplateId, null, 0,
+                null);
+        LayoutBlockService.BlockResult bayBlock = layoutBlockService.addBlock(savedLayoutId, bayTemplateId,
+                aisleBlock.id(), 0, null);
+        LayoutBlockService.BlockResult levelBlock = layoutBlockService.addBlock(savedLayoutId, levelTemplateId,
+                bayBlock.id(), 0, null);
         layoutBlockService.addBlock(savedLayoutId, shelfTemplateId, levelBlock.id(), 0, null);
 
         if (activate) {

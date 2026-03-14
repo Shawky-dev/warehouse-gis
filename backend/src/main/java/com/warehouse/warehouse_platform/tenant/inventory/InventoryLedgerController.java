@@ -49,9 +49,10 @@ public class InventoryLedgerController {
                         @PathVariable String tenantSlug,
                         @RequestParam(required = false) UUID productId,
                         @RequestParam(required = false) UUID locationId,
+                        @RequestParam(required = false) String locationKind,
                         Authentication authentication) {
                 tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
-                return ResponseEntity.ok(inventoryLedgerService.getStock(productId, locationId));
+                return ResponseEntity.ok(inventoryLedgerService.getStock(productId, locationId, locationKind));
         }
 
         @GetMapping("/stock/by-location/{locationId}")
@@ -118,11 +119,13 @@ public class InventoryLedgerController {
                         @PathVariable String tenantSlug,
                         @RequestParam(required = false) UUID productId,
                         @RequestParam(required = false) UUID locationId,
+                        @RequestParam(required = false) UUID sourceDocumentId,
+                        @RequestParam(required = false) MovementType movementType,
                         @RequestParam(defaultValue = "0") @Min(0) int page,
                         @RequestParam(defaultValue = "50") @Min(1) @Max(200) int size,
                         Authentication authentication) {
                 tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
-                return ResponseEntity.ok(inventoryLedgerService.getMovements(productId, locationId, page, size));
+                return ResponseEntity.ok(inventoryLedgerService.getMovements(productId, locationId, sourceDocumentId, movementType, page, size));
         }
 
         @GetMapping("/movements/by-location/{locationId}")

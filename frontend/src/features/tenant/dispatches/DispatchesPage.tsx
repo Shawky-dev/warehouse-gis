@@ -14,8 +14,8 @@ import {
     removeLine,
     voidDispatch,
 } from "@/features/tenant/api/dispatchesApi";
-import { getLocationLookups, getProductLookups } from "@/features/tenant/api/inventoryApi";
-import type { ProductLookupItem, LocationLookupItem } from "@/features/tenant/types/inventory";
+import { getDocumentMovements, getLocationLookups, getProductLookups } from "@/features/tenant/api/inventoryApi";
+import type { MovementResult, ProductLookupItem, LocationLookupItem } from "@/features/tenant/types/inventory";
 import type { DispatchDetail, DispatchListItem, DispatchStatus } from "@/features/tenant/types/dispatches";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
@@ -106,6 +106,9 @@ export default function DispatchesPage() {
     const [isPostConfirmOpen, setIsPostConfirmOpen] = useState(false);
     const [isVoidConfirmOpen, setIsVoidConfirmOpen] = useState(false);
 
+    const [docMovements, setDocMovements] = useState<MovementResult[]>([]);
+    const [docMovementsLoading, setDocMovementsLoading] = useState(false);
+
     const selectedProduct = useMemo(
         () => products.find((product) => product.id === lineForm.productId) ?? null,
         [products, lineForm.productId]
@@ -167,6 +170,19 @@ export default function DispatchesPage() {
         void loadDispatchDetail(selectedDispatchId);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedDispatchId]);
+
+    useEffect(() => {
+        if (!detail || detail.status !== "POSTED") {
+            setDocMovements([]);
+            return;
+        }
+        setDocMovementsLoading(true);
+        getDocumentMovements(slug, "dispatches", detail.id)
+            .then(setDocMovements)
+            .catch(() => setDocMovements([]))
+            .finally(() => setDocMovementsLoading(false));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [detail?.id, detail?.status]);
 
     async function loadDispatches(page: number) {
         setListLoading(true);
@@ -569,6 +585,54 @@ export default function DispatchesPage() {
                         </Button>
                     ) : null}
                 </div>
+
+                {isPosted ? (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">{t("inventory.movements.documentMovements")}</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            {docMovementsLoading ? (
+                                <p className="p-4 text-sm text-muted-foreground">{t("dispatches.loading")}</p>
+                            ) : docMovements.length === 0 ? (
+                                <p className="p-4 text-sm text-muted-foreground">{t("inventory.movements.documentMovementsEmpty")}</p>
+                            ) : (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>{t("inventory.movements.colProduct")}</TableHead>
+                                            <TableHead>{t("inventory.movements.colLocation")}</TableHead>
+                                            <TableHead className="text-end">{t("inventory.movements.colQty")}</TableHead>
+                                            <TableHead>{t("inventory.columns.lot")}</TableHead>
+                                            <TableHead>{t("inventory.movements.colAt")}</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {docMovements.map((mov) => (
+                                            <TableRow key={mov.id}>
+                                                <TableCell>
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="font-medium">{mov.productName ?? mov.productSku ?? mov.productId}</span>
+                                                        <span className="text-xs text-muted-foreground">{[mov.productSku, mov.baseUomCode].filter(Boolean).join(" · ")}</span>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="font-medium">{mov.locationLabel ?? mov.locationId}</span>
+                                                        <span className="text-xs text-muted-foreground">{mov.locationPathLabel ?? ""}</span>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="text-end font-medium tabular-nums">{mov.qty}</TableCell>
+                                                <TableCell className="text-xs text-muted-foreground">{mov.lotNumber ?? "—"}</TableCell>
+                                                <TableCell className="text-xs text-muted-foreground">{new Date(mov.createdAt).toLocaleString()}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            )}
+                        </CardContent>
+                    </Card>
+                ) : null}
 
                 <AlertDialog open={isPostConfirmOpen} onOpenChange={setIsPostConfirmOpen}>
                     <AlertDialogContent>

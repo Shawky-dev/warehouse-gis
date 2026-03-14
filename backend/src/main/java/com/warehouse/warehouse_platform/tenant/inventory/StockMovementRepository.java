@@ -3,6 +3,7 @@ package com.warehouse.warehouse_platform.tenant.inventory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -11,7 +12,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface StockMovementRepository extends JpaRepository<StockMovement, UUID> {
+public interface StockMovementRepository extends JpaRepository<StockMovement, UUID>, JpaSpecificationExecutor<StockMovement> {
 
         /** Stock per (location, product), excluding zeroed-out pairs. */
         @Query(value = """
@@ -112,4 +113,7 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, UU
         List<StockMovement> findByReferenceIdIn(List<UUID> referenceIds);
 
         boolean existsByProductIdAndLotNumber(UUID productId, String lotNumber);
+
+        /** All movements for a given source document (receipt/dispatch/count session), newest first. */
+        List<StockMovement> findBySourceDocumentIdOrderByCreatedAtDesc(UUID sourceDocumentId);
 }

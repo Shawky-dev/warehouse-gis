@@ -1,6 +1,7 @@
 package com.warehouse.warehouse_platform.tenant.dispatch;
 
 import com.warehouse.warehouse_platform.tenant.access.TenantAccessPolicy;
+import com.warehouse.warehouse_platform.tenant.inventory.InventoryLedgerService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -31,10 +33,15 @@ public class DispatchController {
 
     private final TenantAccessPolicy tenantAccessPolicy;
     private final DispatchService dispatchService;
+    private final InventoryLedgerService inventoryLedgerService;
 
-    public DispatchController(TenantAccessPolicy tenantAccessPolicy, DispatchService dispatchService) {
+    public DispatchController(
+            TenantAccessPolicy tenantAccessPolicy,
+            DispatchService dispatchService,
+            InventoryLedgerService inventoryLedgerService) {
         this.tenantAccessPolicy = tenantAccessPolicy;
         this.dispatchService = dispatchService;
+        this.inventoryLedgerService = inventoryLedgerService;
     }
 
     @GetMapping
@@ -130,6 +137,16 @@ public class DispatchController {
             Authentication authentication) {
         tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
         return ResponseEntity.ok(dispatchService.postDispatch(dispatchId, authentication.getName()));
+    }
+
+    @GetMapping("/{dispatchId}/movements")
+    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).DISPATCHES_VIEW)")
+    public ResponseEntity<List<InventoryLedgerService.MovementResult>> getDispatchMovements(
+            @PathVariable String tenantSlug,
+            @PathVariable UUID dispatchId,
+            Authentication authentication) {
+        tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
+        return ResponseEntity.ok(inventoryLedgerService.getMovementsBySourceDocument(dispatchId));
     }
 
     @PostMapping("/{dispatchId}/void")

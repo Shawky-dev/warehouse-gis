@@ -135,6 +135,18 @@ export async function adjustStock(
   return res.data;
 }
 
+export async function getDocumentMovements(
+  tenantSlug: string,
+  docPath: string,
+  docId: string
+): Promise<MovementResult[]> {
+  const slug = normalizeTenantSlug(tenantSlug);
+  const res = await api.get<MovementResult[]>(`/${slug}/${docPath}/${docId}/movements`, {
+    headers: headers(tenantSlug),
+  });
+  return res.data;
+}
+
 export function extractInventoryErrorMessage(error: unknown, fallback: string): string {
   if (
     error &&

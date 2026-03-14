@@ -955,4 +955,193 @@ If you want to reduce total sessions from 16 to 14, combine these without risk o
 
 C2-A + C3-A → one backend session (both are small, independent schema changes, no shared code)
 C2-B + C3-B → one frontend session (both are small UI additions to InventoryPage.tsx, same file)
+Do not combine any other pairs — C4 through C6 are each large enough to fill a session on their own.Session C7-A — Backend: Scan Resolver
+Prerequisite sessions: C1-A
+Complexity: Small
+
+Context
+No scan endpoint exists. Product lookup (/inventory/lookups/products) and location lookup (/inventory/lookups/locations) exist as separate paginated searches. A unified resolver is needed for scanner input: one endpoint that takes a raw scanned string and returns what it identifies.
+
+The scan_code column on LayoutBlock was added in C1-A. Product SKU is already unique in the products table.
+
+Deliverables
+New files:
+
+tenant/scan/ScanType.java — enum: PRODUCT, LOCATION, LOT
+tenant/scan/ScanResolveResult.java — record with type: ScanType, productId?, productSku?, productName?, trackLot?, trackExpiry?, locationId?, locationPathLabel?, locationKind?, scanCode?, lotNumber?
+tenant/scan/ScanResolverService.java
+tenant/scan/ScanController.java — base path /{tenantSlug}/scan
+ScanResolverService.resolve(code: String) logic:
+
+Strip and trim the code
+Check products table: WHERE sku = :code AND active = true → if found, return { type: PRODUCT, ... }
+Check layout_blocks table: WHERE scan_code = :code → if found, return { type: LOCATION, ... }
+Check if code matches pattern {sku}:{lotNumber} (contains exactly one :):
+Split on first :
+Look up product by sku part
+Check stock_movements has any row with (product_id, lot_number) where lot_number = lotNumber part
+If both found, return { type: LOT, productId, productSku, productName, lotNumber }
+If nothing matches, return 404
+Endpoint:
+
+
+GET /{tenantSlug}/scan/resolve?code={rawCode}
+→ 200 ScanResolveResult  |  404 if unresolved
+Permission: reuse INVENTORY_VIEW — scan resolution is a read-only lookup.
+
+Tests
+File: tenant/scan/ScanResolverServiceTest.java
+
+Test cases:
+
+resolve_matchesProductBySku
+resolve_matchesLocationByScanCode
+resolve_matchesLotByPattern
+resolve_unknownCode_returnsEmpty
+resolve_skuWithColonButNoLotInLedger_returnsEmpty
+resolve_caseInsensitiveSku — if SKU lookup should be case-insensitive, test it
+Session C7-B — Frontend: Scan Input + Labels + Form Integration
+Prerequisite sessions: C7-A, C4-B, C5-B, C6-B
+Complexity: Medium
+
+Context
+The scan resolver backend endpoint exists. All operational forms (Receipts, Dispatches, Count Session open) have product and location dropdowns that currently require typing to search. This session adds a scan input component that auto-fills those dropdowns, plus printable label components.
+
+Deliverables
+New shared component: frontend/src/shared/components/ScanInput.tsx
+
+
+interface ScanInputProps {
+  tenantSlug: string
+  onResolved: (result: ScanResolveResult) => void
+  onError?: (code: string) => void
+  placeholder?: string
+  acceptTypes?: ScanType[]  // filter: only accept PRODUCT, LOCATION, or LOT results
+}
+Behaviour:
+
+Renders as a text input with a Scan (barcode) icon
+On Enter key or paste event: calls GET /scan/resolve?code=value
+On success: fires onResolved(result) and clears the input
+On 404 or network error: shows inline error "Code not recognised" and fires onError
+acceptTypes filters: if the resolved type is not in the accepted list, show error "Wrong code type" instead of resolving
+New scan result type: frontend/src/features/tenant/types/scan.ts
+
+
+type ScanType = 'PRODUCT' | 'LOCATION' | 'LOT'
+interface ScanResolveResult { type: ScanType, productId?, productSku?, productName?, trackLot?, trackExpiry?, locationId?, locationPathLabel?, locationKind?, scanCode?, lotNumber? }
+New API function: frontend/src/features/tenant/api/scanApi.ts
+
+resolveCode(tenantSlug, code): Promise<ScanResolveResult>
+Integrate ScanInput into forms:
+
+ReceiptsPage.tsx — in the "Add Line" form row:
+
+Place a ScanInput above the product dropdown, acceptTypes={['PRODUCT']}. On resolve: auto-select that product in the dropdown, auto-toggle lot/expiry fields.
+Place another ScanInput above the destination location dropdown, acceptTypes={['LOCATION']}. On resolve: auto-select that location.
+DispatchesPage.tsx — same pattern for product and source location fields.
+
+CountSessionsPage.tsx (update count line inline form):
+
+In the detail view, add a ScanInput bar at the top, acceptTypes={['PRODUCT', 'LOCATION', 'LOT']}. On resolve: scroll to and highlight the matching line(s) in the count table.
+InventoryPage.tsx (Operations tab):
+
+Add ScanInput to receive, transfer, and adjust forms. On product resolve: auto-fill product. On location resolve: auto-fill location.
+New printable label components:
+
+frontend/src/features/tenant/labels/LocationLabel.tsx
+
+Props: scanCode, fullCode, locationKind, pathLabel
+Renders a print-friendly card (A6-ish): big QR code (encode scanCode as the QR value using a client-side QR library like qrcode.react), location path label, kind badge
+Has a "Print" button that calls window.print() with print CSS that hides everything except the label
+frontend/src/features/tenant/labels/ProductLabel.tsx
+
+Props: sku, name
+Renders: QR code (encode sku), product name, SKU text
+Expose labels in WarehouseLayoutsPage.tsx: on the block detail panel (for leaf nodes), add a "Print Label" button that opens a modal with <LocationLabel ... />.
+
+Expose product label in TenantProductsPage.tsx: add a label icon/button per product row that opens a modal with <ProductLabel ... />.
+
+Install dependency: qrcode.react (or equivalent lightweight QR package). Check if it's already in package.json first.
+
+en.ts + ar.ts:
+
+
+scan.placeholder = "Scan or type a code..."
+scan.notFound = "Code not recognised"
+scan.wrongType = "Wrong code type"
+scan.label = "Scan"
+labels.printLabel = "Print Label"
+labels.location.title = "Location Label"
+labels.product.title = "Product Label"
+Session C8-A — Backend: Reporting Gaps
+Prerequisite sessions: All previous sessions
+Complexity: Small
+
+Context
+Existing endpoints cover most needs. This session adds missing query parameters to existing endpoints and adds one new reporting query.
+
+Deliverables
+Modified files only — no new migrations:
+
+tenant/inventory/InventoryLedgerController.java + InventoryLedgerService.java
+
+Add optional locationKind query param to GET /on-hand. Service joins layout_blocks on location_id and filters by location_kind = :kind. This lets the GIS layer and reporting call GET /inventory/on-hand?locationKind=STAGING to see what's in staging.
+Add optional sourceDocumentId query param to GET /movements. Service filters WHERE source_document_id = :id. Lets receipt/dispatch/count detail pages link directly to their movements.
+Add optional movementType query param to GET /movements (already a MovementType enum). Ensure it's exposed if not already.
+StockMovementRepository.java
+
+Add query: findBySourceDocumentId(UUID sourceDocumentId): List<StockMovement> — used to fetch all movements for a given receipt/dispatch/count session.
+tenant/receipt/ReceiptController.java
+
+Add GET /{tenantSlug}/receipts/{id}/movements — delegates to movementRepository.findBySourceDocumentId(receiptId), returns movement list. Requires RECEIPTS_VIEW.
+tenant/dispatch/DispatchController.java
+
+Same: GET /{tenantSlug}/dispatches/{id}/movements
+tenant/counting/CountSessionController.java
+
+Same: GET /{tenantSlug}/count-sessions/{id}/movements
+Tests
+Test cases in InventoryLedgerServiceTest.java:
+
+getOnHand_filteredByLocationKind_returnsOnlyMatchingLocations — mock returns two locations with different kinds, only one passes filter
+getMovements_filteredBySourceDocumentId_returnsMatchingMovements
+Session C8-B — Frontend: Kind Filter + Document Links
+Prerequisite sessions: C8-A
+Complexity: Small
+
+Context
+This is the polish/wiring session. No new pages — only connecting existing pieces.
+
+Deliverables
+frontend/src/features/tenant/inventory/InventoryPage.tsx (Stock tab)
+
+Add a "Location Kind" filter dropdown to the stock tab filter bar. Values: All, Storage, Staging, Quarantine, Damaged, Dispatch. Passes locationKind param to getOnHand(). Uses the same LocationKind type from warehouse.ts.
+frontend/src/features/tenant/api/inventoryApi.ts
+
+Add locationKind?: LocationKind to getOnHand params type.
+frontend/src/features/tenant/inventory/InventoryPage.tsx (Movements tab)
+
+In the movement rows where sourceDocumentId is non-null, show a small "Source" chip (e.g. "Receipt", "Dispatch", "Count"). Make it a clickable link that navigates to the corresponding document page (e.g. PATHS.TENANT.receipts(tenantSlug) with the ID in state or as a query param).
+The chip text is derived from the movement type: RECEIVE → Receipt, PICK → Dispatch, ADJUST with sourceDocumentId → Count Session.
+frontend/src/features/tenant/receipts/ReceiptsPage.tsx (detail view)
+
+Below the lines table on a POSTED receipt, add a "Stock Movements" section. On mount (when status=POSTED), fetch GET /receipts/{id}/movements and show a compact movement list (type, product, location, qty, lot, date).
+frontend/src/features/tenant/dispatches/DispatchesPage.tsx — same pattern.
+
+frontend/src/features/tenant/counting/CountSessionsPage.tsx — same pattern.
+
+en.ts + ar.ts:
+
+
+inventory.filter.locationKind = "Location Kind"
+inventory.movements.sourceDocument = "Source"
+inventory.movements.sourceReceipt = "Receipt"
+inventory.movements.sourceDispatch = "Dispatch"
+inventory.movements.sourceCount = "Count Session"
+Merge Suggestions
+If you want to reduce total sessions from 16 to 14, combine these without risk of context overload:
+
+C2-A + C3-A → one backend session (both are small, independent schema changes, no shared code)
+C2-B + C3-B → one frontend session (both are small UI additions to InventoryPage.tsx, same file)
 Do not combine any other pairs — C4 through C6 are each large enough to fill a session on their own.
