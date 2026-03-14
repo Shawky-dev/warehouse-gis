@@ -3,10 +3,9 @@ package com.warehouse.warehouse_platform.tenant.warehouse.layout;
 import com.warehouse.warehouse_platform.tenant.audit.TenantAuditService;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplate;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplateRepository;
-import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlock;
+import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlockService;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlockRepository;
 import com.warehouse.warehouse_platform.tenant.warehouse.common.WarehouseManagementException;
-import com.warehouse.warehouse_platform.tenant.warehouse.locationkind.WarehouseLocationKindService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -29,20 +28,20 @@ public class WarehouseLayoutService {
     private final WarehouseLayoutRepository layoutRepository;
     private final LayoutBlockRepository layoutBlockRepository;
     private final BlockTemplateRepository blockTemplateRepository;
+    private final LayoutBlockService layoutBlockService;
     private final TenantAuditService tenantAuditService;
-    private final WarehouseLocationKindService warehouseLocationKindService;
 
     public WarehouseLayoutService(
             WarehouseLayoutRepository layoutRepository,
             LayoutBlockRepository layoutBlockRepository,
             BlockTemplateRepository blockTemplateRepository,
-            TenantAuditService tenantAuditService,
-            WarehouseLocationKindService warehouseLocationKindService) {
+            LayoutBlockService layoutBlockService,
+            TenantAuditService tenantAuditService) {
         this.layoutRepository = layoutRepository;
         this.layoutBlockRepository = layoutBlockRepository;
         this.blockTemplateRepository = blockTemplateRepository;
+        this.layoutBlockService = layoutBlockService;
         this.tenantAuditService = tenantAuditService;
-        this.warehouseLocationKindService = warehouseLocationKindService;
     }
 
     @Transactional(readOnly = true)
@@ -90,20 +89,20 @@ public class WarehouseLayoutService {
         WarehouseLayout savedLayout = saveLayout(layout);
         UUID savedLayoutId = savedLayout.getId();
 
-        LayoutBlock aisleBlock = createPresetBlock(savedLayoutId, null, 0,
-                resolveClassicTemplate("Aisle", BlockTemplate.IdentifierFormat.ALPHA,
-                        BlockTemplate.SideConfig.NONE, true, "Primary warehouse aisle segment", "AlignJustify")
-                        .getId());
-        LayoutBlock bayBlock = createPresetBlock(savedLayoutId, aisleBlock.getId(), 0,
-                resolveClassicTemplate("Bay", BlockTemplate.IdentifierFormat.NUMERIC,
-                        BlockTemplate.SideConfig.LR, true, "Numbered bay segment on a left or right aisle side",
-                        "Layers").getId());
-        LayoutBlock levelBlock = createPresetBlock(savedLayoutId, bayBlock.getId(), 0,
-                resolveClassicTemplate("Level", BlockTemplate.IdentifierFormat.NUMERIC,
-                        BlockTemplate.SideConfig.NONE, true, "Vertical bay level", "List").getId());
-        createPresetBlock(savedLayoutId, levelBlock.getId(), 0,
-                resolveClassicTemplate("Shelf", BlockTemplate.IdentifierFormat.NUMERIC,
-                        BlockTemplate.SideConfig.NONE, true, "Shelf within a level", "MapPin").getId());
+        UUID aisleTemplateId = resolveClassicTemplate("Aisle", BlockTemplate.IdentifierFormat.ALPHA,
+            BlockTemplate.SideConfig.NONE, true, "Primary warehouse aisle segment", "AlignJustify").getId();
+        UUID bayTemplateId = resolveClassicTemplate("Bay", BlockTemplate.IdentifierFormat.NUMERIC,
+            BlockTemplate.SideConfig.LR, true, "Numbered bay segment on a left or right aisle side",
+            "Layers").getId();
+        UUID levelTemplateId = resolveClassicTemplate("Level", BlockTemplate.IdentifierFormat.NUMERIC,
+            BlockTemplate.SideConfig.NONE, true, "Vertical bay level", "List").getId();
+        UUID shelfTemplateId = resolveClassicTemplate("Shelf", BlockTemplate.IdentifierFormat.NUMERIC,
+            BlockTemplate.SideConfig.NONE, true, "Shelf within a level", "MapPin").getId();
+
+        LayoutBlockService.BlockResult aisleBlock = layoutBlockService.addBlock(savedLayoutId, aisleTemplateId, null, 0, null);
+        LayoutBlockService.BlockResult bayBlock = layoutBlockService.addBlock(savedLayoutId, bayTemplateId, aisleBlock.id(), 0, null);
+        LayoutBlockService.BlockResult levelBlock = layoutBlockService.addBlock(savedLayoutId, levelTemplateId, bayBlock.id(), 0, null);
+        layoutBlockService.addBlock(savedLayoutId, shelfTemplateId, levelBlock.id(), 0, null);
 
         if (activate) {
             layoutRepository.findByIsActiveTrue()
@@ -256,26 +255,10 @@ public class WarehouseLayoutService {
         return saveTemplate(template);
     }
 
-    private LayoutBlock createPresetBlock(UUID layoutId, UUID parentId, int position, UUID templateId) {
-        return saveLayoutBlock(LayoutBlock.builder()
-                .layoutId(layoutId)
-                .parentId(parentId)
-                .position(position)
-                .blockTemplateId(templateId)
-                .locationKind(warehouseLocationKindService.getDefaultLocationKind())
-                .build());
-    }
-
     @SuppressWarnings("null")
     private BlockTemplate saveTemplate(BlockTemplate template) {
         return Objects.requireNonNull(blockTemplateRepository.save(template),
                 "blockTemplateRepository.save returned null");
-    }
-
-    @SuppressWarnings("null")
-    private LayoutBlock saveLayoutBlock(LayoutBlock layoutBlock) {
-        return Objects.requireNonNull(layoutBlockRepository.save(layoutBlock),
-                "layoutBlockRepository.save returned null");
     }
 
     private Specification<WarehouseLayout> buildSpecification(String search, Boolean active) {

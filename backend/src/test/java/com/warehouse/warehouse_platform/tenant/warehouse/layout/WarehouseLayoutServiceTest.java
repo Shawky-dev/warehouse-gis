@@ -3,11 +3,9 @@ package com.warehouse.warehouse_platform.tenant.warehouse.layout;
 import com.warehouse.warehouse_platform.tenant.audit.TenantAuditService;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplate;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplateRepository;
-import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlock;
+import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlockService;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlockRepository;
 import com.warehouse.warehouse_platform.tenant.warehouse.common.WarehouseManagementException;
-import com.warehouse.warehouse_platform.tenant.warehouse.locationkind.WarehouseLocationKind;
-import com.warehouse.warehouse_platform.tenant.warehouse.locationkind.WarehouseLocationKindService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,21 +42,16 @@ class WarehouseLayoutServiceTest {
     @Mock
     private BlockTemplateRepository blockTemplateRepository;
     @Mock
-    private TenantAuditService tenantAuditService;
+    private LayoutBlockService layoutBlockService;
     @Mock
-    private WarehouseLocationKindService warehouseLocationKindService;
+    private TenantAuditService tenantAuditService;
 
     private WarehouseLayoutService service;
 
     @BeforeEach
     void setUp() {
         service = new WarehouseLayoutService(layoutRepository, layoutBlockRepository, blockTemplateRepository,
-                tenantAuditService, warehouseLocationKindService);
-        when(warehouseLocationKindService.getDefaultLocationKind()).thenReturn(WarehouseLocationKind.builder()
-                .id(UUID.fromString("41000000-0000-0000-0000-000000000001"))
-                .name("Storage")
-                .sortOrder(0)
-                .build());
+            layoutBlockService, tenantAuditService);
     }
 
     // -------------------------------------------------------------------------
@@ -104,6 +97,10 @@ class WarehouseLayoutServiceTest {
 
     @Test
     void createClassicPreset_shouldCreateNestedDefaultBlocks() {
+        UUID aisleId = UUID.fromString("21000000-0000-0000-0000-000000000001");
+        UUID bayId = UUID.fromString("21000000-0000-0000-0000-000000000002");
+        UUID levelId = UUID.fromString("21000000-0000-0000-0000-000000000003");
+        UUID shelfId = UUID.fromString("21000000-0000-0000-0000-000000000004");
         when(layoutRepository.findByNameIgnoreCase("Classic Layout")).thenReturn(Optional.empty());
         when(blockTemplateRepository.findByNameIgnoreCase(any())).thenReturn(Optional.empty());
         when(layoutRepository.save(any(WarehouseLayout.class))).thenAnswer(inv -> {
@@ -124,15 +121,66 @@ class WarehouseLayoutServiceTest {
             t.setUpdatedAt(Instant.parse("2026-03-01T00:00:00Z"));
             return t;
         });
-        when(layoutBlockRepository.save(any(LayoutBlock.class))).thenAnswer(inv -> {
-            LayoutBlock block = inv.getArgument(0);
-            if (block.getId() == null) {
-                block.setId(UUID.randomUUID());
-            }
-            block.setCreatedAt(Instant.parse("2026-03-01T00:00:00Z"));
-            block.setUpdatedAt(Instant.parse("2026-03-01T00:00:00Z"));
-            return block;
-        });
+        when(layoutBlockService.addBlock(any(), any(), eq(null), eq(0), eq(null))).thenReturn(
+            new LayoutBlockService.BlockResult(
+                aisleId,
+                UUID.fromString("11111111-1111-1111-1111-111111111111"),
+                UUID.fromString("31000000-0000-0000-0000-000000000001"),
+                null,
+                0,
+                "A",
+                null,
+                UUID.fromString("41000000-0000-0000-0000-000000000001"),
+                "Storage",
+                "A",
+                "A",
+                Instant.parse("2026-03-01T00:00:00Z"),
+                Instant.parse("2026-03-01T00:00:00Z")));
+        when(layoutBlockService.addBlock(any(), any(), eq(aisleId), eq(0), eq(null))).thenReturn(
+            new LayoutBlockService.BlockResult(
+                bayId,
+                UUID.fromString("11111111-1111-1111-1111-111111111111"),
+                UUID.fromString("31000000-0000-0000-0000-000000000002"),
+                aisleId,
+                0,
+                "1",
+                null,
+                UUID.fromString("41000000-0000-0000-0000-000000000001"),
+                "Storage",
+                "A-01",
+                "A-01",
+                Instant.parse("2026-03-01T00:00:00Z"),
+                Instant.parse("2026-03-01T00:00:00Z")));
+        when(layoutBlockService.addBlock(any(), any(), eq(bayId), eq(0), eq(null))).thenReturn(
+            new LayoutBlockService.BlockResult(
+                levelId,
+                UUID.fromString("11111111-1111-1111-1111-111111111111"),
+                UUID.fromString("31000000-0000-0000-0000-000000000003"),
+                bayId,
+                0,
+                "1",
+                null,
+                UUID.fromString("41000000-0000-0000-0000-000000000001"),
+                "Storage",
+                "A-01-01",
+                "A-01-01",
+                Instant.parse("2026-03-01T00:00:00Z"),
+                Instant.parse("2026-03-01T00:00:00Z")));
+        when(layoutBlockService.addBlock(any(), any(), eq(levelId), eq(0), eq(null))).thenReturn(
+            new LayoutBlockService.BlockResult(
+                shelfId,
+                UUID.fromString("11111111-1111-1111-1111-111111111111"),
+                UUID.fromString("31000000-0000-0000-0000-000000000004"),
+                levelId,
+                0,
+                "1",
+                null,
+                UUID.fromString("41000000-0000-0000-0000-000000000001"),
+                "Storage",
+                "A-01-01-01",
+                "A-01-01-01",
+                Instant.parse("2026-03-01T00:00:00Z"),
+                Instant.parse("2026-03-01T00:00:00Z")));
 
         WarehouseLayoutService.LayoutResult result = service.createClassicPreset("Classic Layout", "Default tree",
                 true);
@@ -145,7 +193,10 @@ class WarehouseLayoutServiceTest {
                         && template.getSideConfig() == BlockTemplate.SideConfig.LR));
         verify(blockTemplateRepository).save(
                 argThat(template -> "Shelf".equals(template.getName()) && "MapPin".equals(template.getIconName())));
-        verify(layoutBlockRepository, org.mockito.Mockito.times(4)).save(any(LayoutBlock.class));
+        verify(layoutBlockService).addBlock(any(), any(), eq(null), eq(0), eq(null));
+        verify(layoutBlockService).addBlock(any(), any(), eq(aisleId), eq(0), eq(null));
+        verify(layoutBlockService).addBlock(any(), any(), eq(bayId), eq(0), eq(null));
+        verify(layoutBlockService).addBlock(any(), any(), eq(levelId), eq(0), eq(null));
         verify(tenantAuditService).record(eq("WAREHOUSE_LAYOUT_CREATE_CLASSIC_PRESET"), eq("WAREHOUSE_LAYOUT"),
                 eq(result.id().toString()), eq(null), any());
     }
