@@ -173,7 +173,7 @@ export function TenantNavbar() {
                   ? [
                     {
                       to: PATHS.TENANT.inventoryStock(normalizedSlug),
-                      label: t("inventory.tabOnHand"),
+                      label: t("inventory.tabStock"),
                       icon: PackageOpen,
                     },
                   ]

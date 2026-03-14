@@ -40,38 +40,38 @@ public class InventoryLedgerController {
     }
 
     // -------------------------------------------------------------------------
-    // On-hand queries
+    // Stock queries
     // -------------------------------------------------------------------------
 
-    @GetMapping("/on-hand")
+    @GetMapping("/stock")
     @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_VIEW)")
-    public ResponseEntity<List<InventoryLedgerService.OnHandResult>> getOnHand(
+    public ResponseEntity<List<InventoryLedgerService.StockResult>> getStock(
             @PathVariable String tenantSlug,
             @RequestParam(required = false) UUID productId,
             @RequestParam(required = false) UUID locationId,
             Authentication authentication) {
         tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
-        return ResponseEntity.ok(inventoryLedgerService.getOnHand(productId, locationId));
+        return ResponseEntity.ok(inventoryLedgerService.getStock(productId, locationId));
     }
 
-    @GetMapping("/on-hand/by-location/{locationId}")
+    @GetMapping("/stock/by-location/{locationId}")
     @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_VIEW)")
-    public ResponseEntity<List<InventoryLedgerService.OnHandResult>> getOnHandByLocation(
+    public ResponseEntity<List<InventoryLedgerService.StockResult>> getStockByLocation(
             @PathVariable String tenantSlug,
             @PathVariable UUID locationId,
             Authentication authentication) {
         tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
-        return ResponseEntity.ok(inventoryLedgerService.getOnHand(null, locationId));
+        return ResponseEntity.ok(inventoryLedgerService.getStock(null, locationId));
     }
 
-    @GetMapping("/on-hand/by-product/{productId}")
+    @GetMapping("/stock/by-product/{productId}")
     @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).INVENTORY_VIEW)")
-    public ResponseEntity<List<InventoryLedgerService.OnHandResult>> getOnHandByProduct(
+    public ResponseEntity<List<InventoryLedgerService.StockResult>> getStockByProduct(
             @PathVariable String tenantSlug,
             @PathVariable UUID productId,
             Authentication authentication) {
         tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
-        return ResponseEntity.ok(inventoryLedgerService.getOnHand(productId, null));
+        return ResponseEntity.ok(inventoryLedgerService.getStock(productId, null));
     }
 
     @GetMapping("/lookups/products")
@@ -168,6 +168,8 @@ public class InventoryLedgerController {
                 request.lotNumber(),
                 request.expiryDate(),
                 request.notes(),
+                null,
+                null,
                 actor));
     }
 
@@ -186,6 +188,7 @@ public class InventoryLedgerController {
                 request.qty(),
                 request.lotNumber(),
                 request.notes(),
+                null,
                 actor));
     }
 
@@ -201,7 +204,10 @@ public class InventoryLedgerController {
                 request.locationId(),
                 request.productId(),
                 request.qty(),
+                request.lotNumber(),
                 request.notes(),
+                null,
+                request.reasonCode(),
                 actor));
     }
 
@@ -231,6 +237,8 @@ public class InventoryLedgerController {
             @NotNull UUID locationId,
             @NotNull UUID productId,
             @NotNull BigDecimal qty,
-            @NotNull @Size(min = 1, max = 500) String notes) {
+            @Size(max = 100) String lotNumber,
+            @NotNull @Size(min = 1, max = 500) String notes,
+            @Size(max = 50) String reasonCode) {
     }
 }

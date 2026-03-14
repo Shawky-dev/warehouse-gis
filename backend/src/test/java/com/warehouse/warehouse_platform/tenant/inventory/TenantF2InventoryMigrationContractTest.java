@@ -23,7 +23,7 @@ class TenantF2InventoryMigrationContractTest {
                 Path.of("src/main/resources/db/migration/tenant/V17__create_f2_inventory_ledger.sql"));
 
         assertTrue(migration.contains("CREATE TABLE stock_movements"));
-        assertTrue(migration.contains("CREATE OR REPLACE VIEW v_on_hand AS"));
+        assertTrue(migration.contains("CREATE OR REPLACE VIEW v_stock AS"));
         assertTrue(migration.contains("tenant.inventory.view"));
         assertTrue(migration.contains("tenant.inventory.receive"));
         assertTrue(migration.contains("tenant.inventory.transfer"));

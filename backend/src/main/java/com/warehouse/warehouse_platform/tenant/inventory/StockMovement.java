@@ -19,7 +19,7 @@ import java.util.UUID;
 
 /**
  * Immutable ledger row. Every stock change — receive, transfer, adjust, pick —
- * is recorded here. On-hand quantities are always derived from these rows.
+ * is recorded here. Stock quantities are always derived from these rows.
  * <p>
  * qty is the signed delta relative to the location:
  * positive = stock entering the location, negative = stock leaving.
@@ -55,6 +55,12 @@ public class StockMovement {
     /** Links the TRANSFER_OUT and TRANSFER_IN rows of a transfer pair. */
     @Column(name = "reference_id")
     private UUID referenceId;
+
+    @Column(name = "source_document_id")
+    private UUID sourceDocumentId;
+
+    @Column(name = "reason_code", length = 50)
+    private String reasonCode;
 
     @Column(name = "lot_number", length = 100)
     private String lotNumber;

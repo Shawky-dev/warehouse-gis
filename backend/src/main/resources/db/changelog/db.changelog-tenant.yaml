@@ -139,3 +139,24 @@ databaseChangeLog:
         - sqlFile:
             path: db/migration/tenant/V20__replace_location_kind_enum_with_master_data.sql
             relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-c2-stock-lot-grouping-21
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V21__update_v_stock_lot_grouping.sql
+            relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-c3-movement-traceability-22
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V22__add_movement_traceability.sql
+            relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-stock-view-rename-23
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V23__refresh_v_stock_view.sql
+            relativeToChangelogFile: false

@@ -6,7 +6,7 @@ import InventoryPage from "@/features/tenant/inventory/InventoryPage";
 import { TENANT_PERMISSIONS } from "@/features/auth/shared/permissions";
 
 const mockUseAuth = vi.fn();
-const mockGetOnHand = vi.fn();
+const mockGetStock = vi.fn();
 const mockGetMovements = vi.fn();
 const mockGetProductLookups = vi.fn();
 const mockGetLocationLookups = vi.fn();
@@ -16,7 +16,7 @@ vi.mock("@/features/auth/context/AuthContext", () => ({
 }));
 
 vi.mock("@/features/tenant/api/inventoryApi", () => ({
-  getOnHand: (...args: unknown[]) => mockGetOnHand(...args),
+  getStock: (...args: unknown[]) => mockGetStock(...args),
   getMovements: (...args: unknown[]) => mockGetMovements(...args),
   getProductLookups: (...args: unknown[]) => mockGetProductLookups(...args),
   getLocationLookups: (...args: unknown[]) => mockGetLocationLookups(...args),
@@ -39,7 +39,7 @@ function renderPage(
     <I18nProvider initialLocale={locale} storageKey={`test-locale-inventory-page-${locale}`}>
       <MemoryRouter initialEntries={[path]}>
         <Routes>
-          <Route path="/:tenantSlug/inventory/stock" element={<InventoryPage section="onhand" />} />
+          <Route path="/:tenantSlug/inventory/stock" element={<InventoryPage section="stock" />} />
           <Route path="/:tenantSlug/inventory/operations" element={<InventoryPage section="operations" />} />
           <Route path="/:tenantSlug/inventory/movements" element={<InventoryPage section="movements" />} />
         </Routes>
@@ -51,12 +51,12 @@ function renderPage(
 describe("InventoryPage", () => {
   beforeEach(() => {
     mockUseAuth.mockReset();
-    mockGetOnHand.mockReset();
+    mockGetStock.mockReset();
     mockGetMovements.mockReset();
     mockGetProductLookups.mockReset();
     mockGetLocationLookups.mockReset();
 
-    mockGetOnHand.mockResolvedValue([]);
+    mockGetStock.mockResolvedValue([]);
     mockGetMovements.mockResolvedValue({
       content: [],
       page: 0,
@@ -100,7 +100,7 @@ describe("InventoryPage", () => {
     });
   });
 
-  it("renders stock section for view-only users and loads on-hand rows", async () => {
+  it("renders stock section for view-only users and loads stock rows", async () => {
     renderPage([TENANT_PERMISSIONS.INVENTORY_VIEW]);
 
     expect(screen.getByText("Filters")).toBeInTheDocument();
@@ -108,7 +108,7 @@ describe("InventoryPage", () => {
     expect(screen.queryByText("Movements")).not.toBeInTheDocument();
 
     await waitFor(() => {
-      expect(mockGetOnHand).toHaveBeenCalledWith("acme", { locationId: undefined, productId: undefined });
+      expect(mockGetStock).toHaveBeenCalledWith("acme", { locationId: undefined, productId: undefined });
     });
   });
 

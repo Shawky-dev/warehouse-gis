@@ -1,6 +1,6 @@
 -- ============================================================
 -- V17: F2 – Inventory Ledger Engine
--- Creates: stock_movements table, v_on_hand view, inventory permissions
+-- Creates: stock_movements table, v_stock view, inventory permissions
 -- ============================================================
 
 -- ============================================================
@@ -42,20 +42,20 @@ CREATE INDEX idx_stock_movements_product    ON stock_movements (product_id);
 CREATE INDEX idx_stock_movements_type       ON stock_movements (type);
 CREATE INDEX idx_stock_movements_created_at ON stock_movements (created_at DESC);
 CREATE INDEX idx_stock_movements_reference  ON stock_movements (reference_id) WHERE reference_id IS NOT NULL;
--- Composite index for the on-hand aggregation query
+-- Composite index for stock aggregation queries
 CREATE INDEX idx_stock_movements_loc_prod   ON stock_movements (location_id, product_id);
 
 -- ============================================================
--- v_on_hand
+-- v_stock
 -- Derived current stock level per (location, product).
--- Rows with qty_on_hand = 0 are excluded (location is empty).
+-- Rows with qty_stock = 0 are excluded (location is empty).
 -- This view is the single source of truth for current inventory.
 -- ============================================================
-CREATE OR REPLACE VIEW v_on_hand AS
+CREATE OR REPLACE VIEW v_stock AS
 SELECT
     location_id,
     product_id,
-    SUM(qty) AS qty_on_hand
+    SUM(qty) AS qty_stock
 FROM stock_movements
 GROUP BY location_id, product_id
 HAVING SUM(qty) <> 0;

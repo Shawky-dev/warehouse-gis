@@ -13,56 +13,73 @@ import java.util.UUID;
 
 public interface StockMovementRepository extends JpaRepository<StockMovement, UUID> {
 
-    /** On-hand stock per (location, product), excluding zeroed-out pairs. */
+    /** Stock per (location, product), excluding zeroed-out pairs. */
     @Query(value = """
             SELECT location_id   AS locationId,
                    product_id    AS productId,
-                   qty_on_hand   AS qtyOnHand
-            FROM   v_on_hand
+                     lot_number    AS lotNumber,
+                     qty_stock     AS qtyStock
+            FROM   v_stock
             """, nativeQuery = true)
-    List<OnHandEntry> findAllOnHand();
+    List<StockEntry> findAllStock();
 
-    /** On-hand stock for a single location. */
+    /** Stock for a single location. */
     @Query(value = """
             SELECT location_id   AS locationId,
                    product_id    AS productId,
-                   qty_on_hand   AS qtyOnHand
-            FROM   v_on_hand
+                                                                         lot_number    AS lotNumber,
+                                                                         qty_stock     AS qtyStock
+            FROM   v_stock
             WHERE  location_id = :locationId
             """, nativeQuery = true)
-    List<OnHandEntry> findOnHandByLocation(@Param("locationId") UUID locationId);
+    List<StockEntry> findStockByLocation(@Param("locationId") UUID locationId);
 
-    /** On-hand stock for a single product across all locations. */
+    /** Stock for a single product across all locations. */
     @Query(value = """
             SELECT location_id   AS locationId,
                    product_id    AS productId,
-                   qty_on_hand   AS qtyOnHand
-            FROM   v_on_hand
+                                                                         lot_number    AS lotNumber,
+                                                                         qty_stock     AS qtyStock
+            FROM   v_stock
             WHERE  product_id = :productId
             """, nativeQuery = true)
-    List<OnHandEntry> findOnHandByProduct(@Param("productId") UUID productId);
+    List<StockEntry> findStockByProduct(@Param("productId") UUID productId);
 
     @Query(value = """
             SELECT location_id   AS locationId,
                    product_id    AS productId,
-                   qty_on_hand   AS qtyOnHand
-            FROM   v_on_hand
+                                                                         lot_number    AS lotNumber,
+                                                                         qty_stock     AS qtyStock
+            FROM   v_stock
             WHERE  location_id = :locationId
               AND  product_id = :productId
             """, nativeQuery = true)
-    List<OnHandEntry> findOnHandByLocationAndProduct(
+    List<StockEntry> findStockByLocationAndProduct(
             @Param("locationId") UUID locationId,
             @Param("productId") UUID productId);
 
     @Query(value = """
-            SELECT qty_on_hand
-            FROM   v_on_hand
+            SELECT COALESCE(SUM(qty_stock), 0)
+            FROM   v_stock
             WHERE  location_id = :locationId
               AND  product_id = :productId
             """, nativeQuery = true)
-    Optional<BigDecimal> findOnHandQtyByLocationAndProduct(
+    Optional<BigDecimal> findStockQtyByLocationAndProduct(
             @Param("locationId") UUID locationId,
             @Param("productId") UUID productId);
+
+    @Query(value = """
+            SELECT qty_stock
+            FROM   v_stock
+            WHERE  location_id = :locationId
+              AND  product_id = :productId
+              AND  ((:lotNumber IS NULL AND lot_number IS NULL)
+                    OR lot_number = :lotNumber)
+            """, nativeQuery = true)
+    Optional<BigDecimal> findStockQtyByLocationProductAndLot(
+            @Param("locationId") UUID locationId,
+            @Param("productId") UUID productId,
+            @Param("lotNumber") String lotNumber);
 
     /** Movement history for a location, newest first. */
     Page<StockMovement> findByLocationIdOrderByCreatedAtDesc(UUID locationId, Pageable pageable);

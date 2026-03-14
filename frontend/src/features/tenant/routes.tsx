@@ -101,7 +101,7 @@ export const tenantRoutes = [
     path: PATHS.TENANT.INVENTORY_PATTERN,
     element: (
       <RequireAnyPermission permissions={INVENTORY_ROUTE_PERMISSIONS}>
-        <InventoryPage section="onhand" />
+        <InventoryPage section="stock" />
       </RequireAnyPermission>
     ),
   },
@@ -109,7 +109,7 @@ export const tenantRoutes = [
     path: PATHS.TENANT.INVENTORY_STOCK_PATTERN,
     element: (
       <RequireAnyPermission permissions={INVENTORY_ROUTE_PERMISSIONS}>
-        <InventoryPage section="onhand" />
+        <InventoryPage section="stock" />
       </RequireAnyPermission>
     ),
   },

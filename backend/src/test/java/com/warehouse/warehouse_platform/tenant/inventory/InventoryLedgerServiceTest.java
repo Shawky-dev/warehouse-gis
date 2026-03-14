@@ -22,7 +22,9 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -61,7 +63,7 @@ class InventoryLedgerServiceTest {
 
         InventoryLedgerException ex = assertThrows(
                 InventoryLedgerException.class,
-                () -> service.receive(ROOT_LOCATION_ID, PRODUCT_ID, BigDecimal.ONE, null, null, null, "actor"));
+                () -> service.receive(ROOT_LOCATION_ID, PRODUCT_ID, BigDecimal.ONE, null, null, null, null, null, "actor"));
 
         assertEquals("BAD_REQUEST", ex.getCode());
         assertEquals("Location is not selectable for inventory operations in the active layout", ex.getMessage());
@@ -95,6 +97,8 @@ class InventoryLedgerServiceTest {
                 null,
                 null,
                 null,
+            null,
+            null,
                 "actor");
 
         assertEquals("Shelf · 2", result.locationLabel());
@@ -108,15 +112,15 @@ class InventoryLedgerServiceTest {
 
         InventoryLedgerException ex = assertThrows(
                 InventoryLedgerException.class,
-                () -> service.transfer(LEAF_LOCATION_ID, OTHER_LEAF_LOCATION_ID, PRODUCT_ID, BigDecimal.ONE, null, null, "actor"));
+                () -> service.transfer(LEAF_LOCATION_ID, OTHER_LEAF_LOCATION_ID, PRODUCT_ID, BigDecimal.ONE, null, null, null, "actor"));
 
         assertEquals("BAD_REQUEST", ex.getCode());
         assertEquals("Inventory operations require an active warehouse layout", ex.getMessage());
     }
 
     @Test
-    void getOnHand_shouldEnrichLocationAndProductLabels() {
-        when(movementRepository.findAllOnHand()).thenReturn(List.of(onHandEntry(LEAF_LOCATION_ID, PRODUCT_ID, "12.5000")));
+    void getStock_shouldEnrichLocationAndProductLabels() {
+        when(movementRepository.findAllStock()).thenReturn(List.of(stockEntry(LEAF_LOCATION_ID, PRODUCT_ID, "LOT-A", "12.5000")));
         when(layoutBlockRepository.findAllById(any())).thenReturn(List.of(leafBlock()));
         when(layoutBlockRepository.findByLayoutIdOrderByParentIdAscPositionAsc(ACTIVE_LAYOUT_ID))
                 .thenReturn(List.of(rootBlock(), leafBlock()));
@@ -124,16 +128,203 @@ class InventoryLedgerServiceTest {
         when(warehouseLayoutRepository.findAllById(any())).thenReturn(List.of(activeLayout()));
         when(productRepository.findAllById(any())).thenReturn(List.of(product()));
 
-        List<InventoryLedgerService.OnHandResult> result = service.getOnHand(null, null);
+        List<InventoryLedgerService.StockResult> result = service.getStock(null, null);
 
         assertEquals(1, result.size());
-        InventoryLedgerService.OnHandResult row = result.get(0);
+        InventoryLedgerService.StockResult row = result.get(0);
         assertEquals("Shelf · 2", row.locationLabel());
         assertEquals("Shelf · 1 / Shelf · 2", row.locationPathLabel());
         assertEquals("SKU-1", row.productSku());
         assertEquals("Sample Product", row.productName());
         assertEquals("EA", row.baseUomCode());
+        assertEquals("LOT-A", row.lotNumber());
     }
+
+        @Test
+        void transfer_withLotTrackedProduct_checksStockAtSpecificLot() {
+        givenActiveLayout();
+        givenActiveLayoutBlocks();
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product()));
+        when(movementRepository.findStockQtyByLocationProductAndLot(LEAF_LOCATION_ID, PRODUCT_ID, "LOT-B"))
+            .thenReturn(Optional.of(new BigDecimal("1.0000")));
+
+        InventoryLedgerException ex = assertThrows(
+            InventoryLedgerException.class,
+            () -> service.transfer(
+                LEAF_LOCATION_ID,
+                OTHER_LEAF_LOCATION_ID,
+                PRODUCT_ID,
+                new BigDecimal("2.0000"),
+                "LOT-B",
+                null,
+                null,
+                "actor"));
+
+        assertEquals("BAD_REQUEST", ex.getCode());
+        assertTrue(ex.getMessage().contains("Insufficient stock"));
+        verify(movementRepository).findStockQtyByLocationProductAndLot(LEAF_LOCATION_ID, PRODUCT_ID, "LOT-B");
+        }
+
+        @Test
+        void getStock_returnsSeparateRowsPerLot() {
+            when(movementRepository.findAllStock()).thenReturn(List.of(
+                    stockEntry(LEAF_LOCATION_ID, PRODUCT_ID, "LOT-A", "5.0000"),
+                    stockEntry(LEAF_LOCATION_ID, PRODUCT_ID, "LOT-B", "7.0000")));
+        when(layoutBlockRepository.findAllById(any())).thenReturn(List.of(leafBlock()));
+        when(layoutBlockRepository.findByLayoutIdOrderByParentIdAscPositionAsc(ACTIVE_LAYOUT_ID))
+            .thenReturn(List.of(rootBlock(), leafBlock()));
+        when(blockTemplateRepository.findAllById(any())).thenReturn(List.of(template()));
+        when(warehouseLayoutRepository.findAllById(any())).thenReturn(List.of(activeLayout()));
+        when(productRepository.findAllById(any())).thenReturn(List.of(product()));
+
+        List<InventoryLedgerService.StockResult> result = service.getStock(null, null);
+
+        assertEquals(2, result.size());
+        assertEquals("LOT-A", result.get(0).lotNumber());
+        assertEquals("LOT-B", result.get(1).lotNumber());
+        }
+
+        @Test
+        void adjust_negativeWithLot_checksLotStock() {
+        givenActiveLayout();
+        givenActiveLayoutBlocks();
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product()));
+        when(movementRepository.findStockQtyByLocationProductAndLot(LEAF_LOCATION_ID, PRODUCT_ID, "LOT-A"))
+            .thenReturn(Optional.of(new BigDecimal("1.0000")));
+
+        InventoryLedgerException ex = assertThrows(
+            InventoryLedgerException.class,
+            () -> service.adjust(
+                LEAF_LOCATION_ID,
+                PRODUCT_ID,
+                new BigDecimal("-2.0000"),
+                "LOT-A",
+                "manual correction",
+                null,
+                null,
+                "actor"));
+
+        assertEquals("BAD_REQUEST", ex.getCode());
+        assertTrue(ex.getMessage().contains("Insufficient stock"));
+        verify(movementRepository).findStockQtyByLocationProductAndLot(LEAF_LOCATION_ID, PRODUCT_ID, "LOT-A");
+        }
+
+        @Test
+        void adjust_withReasonCode_persistsReasonCode() {
+        givenActiveLayout();
+        givenActiveLayoutBlocks();
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product()));
+        when(layoutBlockRepository.findAllById(any())).thenReturn(List.of(leafBlock()));
+        when(layoutBlockRepository.findByLayoutIdOrderByParentIdAscPositionAsc(ACTIVE_LAYOUT_ID))
+            .thenReturn(List.of(rootBlock(), leafBlock()));
+        when(blockTemplateRepository.findAllById(any())).thenReturn(List.of(template()));
+        when(warehouseLayoutRepository.findAllById(any())).thenReturn(List.of(activeLayout()));
+        when(movementRepository.save(any())).thenAnswer(invocation -> {
+            StockMovement movement = invocation.getArgument(0);
+            return StockMovement.builder()
+                .id(UUID.fromString("99999999-9999-9999-9999-999999999991"))
+                .locationId(movement.getLocationId())
+                .productId(movement.getProductId())
+                .qty(movement.getQty())
+                .type(movement.getType())
+                .reasonCode(movement.getReasonCode())
+                .lotNumber(movement.getLotNumber())
+                .notes(movement.getNotes())
+                .createdBy(movement.getCreatedBy())
+                .build();
+        });
+
+        InventoryLedgerService.MovementResult result = service.adjust(
+            LEAF_LOCATION_ID,
+            PRODUCT_ID,
+            new BigDecimal("3.0000"),
+            "LOT-A",
+            "manual correction",
+            null,
+            "DAMAGED",
+            "actor");
+
+        assertEquals("DAMAGED", result.reasonCode());
+        }
+
+        @Test
+        void receive_withSourceDocumentId_persistsDocumentId() {
+        UUID sourceDocumentId = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        givenActiveLayout();
+        givenActiveLayoutBlocks();
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product()));
+        when(layoutBlockRepository.findAllById(any())).thenReturn(List.of(leafBlock()));
+        when(layoutBlockRepository.findByLayoutIdOrderByParentIdAscPositionAsc(ACTIVE_LAYOUT_ID))
+            .thenReturn(List.of(rootBlock(), leafBlock()));
+        when(blockTemplateRepository.findAllById(any())).thenReturn(List.of(template()));
+        when(warehouseLayoutRepository.findAllById(any())).thenReturn(List.of(activeLayout()));
+        when(movementRepository.save(any())).thenAnswer(invocation -> {
+            StockMovement movement = invocation.getArgument(0);
+            return StockMovement.builder()
+                .id(UUID.fromString("99999999-9999-9999-9999-999999999992"))
+                .locationId(movement.getLocationId())
+                .productId(movement.getProductId())
+                .qty(movement.getQty())
+                .type(movement.getType())
+                .sourceDocumentId(movement.getSourceDocumentId())
+                .reasonCode(movement.getReasonCode())
+                .lotNumber(movement.getLotNumber())
+                .notes(movement.getNotes())
+                .createdBy(movement.getCreatedBy())
+                .build();
+        });
+
+        InventoryLedgerService.MovementResult result = service.receive(
+            LEAF_LOCATION_ID,
+            PRODUCT_ID,
+            BigDecimal.ONE,
+            "LOT-A",
+            null,
+            null,
+            sourceDocumentId,
+            null,
+            "actor");
+
+        assertEquals(sourceDocumentId, result.sourceDocumentId());
+        }
+
+        @Test
+        void adjust_withNullReasonCode_persistsNull() {
+        givenActiveLayout();
+        givenActiveLayoutBlocks();
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product()));
+        when(layoutBlockRepository.findAllById(any())).thenReturn(List.of(leafBlock()));
+        when(layoutBlockRepository.findByLayoutIdOrderByParentIdAscPositionAsc(ACTIVE_LAYOUT_ID))
+            .thenReturn(List.of(rootBlock(), leafBlock()));
+        when(blockTemplateRepository.findAllById(any())).thenReturn(List.of(template()));
+        when(warehouseLayoutRepository.findAllById(any())).thenReturn(List.of(activeLayout()));
+        when(movementRepository.save(any())).thenAnswer(invocation -> {
+            StockMovement movement = invocation.getArgument(0);
+            return StockMovement.builder()
+                .id(UUID.fromString("99999999-9999-9999-9999-999999999993"))
+                .locationId(movement.getLocationId())
+                .productId(movement.getProductId())
+                .qty(movement.getQty())
+                .type(movement.getType())
+                .reasonCode(movement.getReasonCode())
+                .lotNumber(movement.getLotNumber())
+                .notes(movement.getNotes())
+                .createdBy(movement.getCreatedBy())
+                .build();
+        });
+
+        InventoryLedgerService.MovementResult result = service.adjust(
+            LEAF_LOCATION_ID,
+            PRODUCT_ID,
+            new BigDecimal("1.0000"),
+            null,
+            "manual correction",
+            null,
+            null,
+            "actor");
+
+        assertEquals(null, result.reasonCode());
+        }
 
     @Test
     void getMovements_shouldIncludeCounterpartLocationForTransfers() {
@@ -250,8 +441,8 @@ class InventoryLedgerServiceTest {
                 .build();
     }
 
-    private OnHandEntry onHandEntry(UUID locationId, UUID productId, String qty) {
-        return new OnHandEntry() {
+    private StockEntry stockEntry(UUID locationId, UUID productId, String lotNumber, String qty) {
+        return new StockEntry() {
             @Override
             public UUID getLocationId() {
                 return locationId;
@@ -263,7 +454,12 @@ class InventoryLedgerServiceTest {
             }
 
             @Override
-            public BigDecimal getQtyOnHand() {
+            public String getLotNumber() {
+                return lotNumber;
+            }
+
+            @Override
+            public BigDecimal getQtyStock() {
                 return new BigDecimal(qty);
             }
         };

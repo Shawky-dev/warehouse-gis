@@ -15,7 +15,7 @@ import {
   extractInventoryErrorMessage,
   getLocationLookups,
   getMovements,
-  getOnHand,
+  getStock,
   getProductLookups,
   receiveStock,
   transferStock,
@@ -24,7 +24,7 @@ import type {
   LocationLookupItem,
   MovementPageResult,
   MovementResult,
-  OnHandEntry,
+  StockEntry,
   ProductLookupItem,
 } from "@/features/tenant/types/inventory";
 import { Badge } from "@/shared/components/ui/badge";
@@ -58,7 +58,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-type Tab = "onhand" | "operations" | "movements";
+type Tab = "stock" | "operations" | "movements";
 type Operation = "receive" | "transfer" | "adjust";
 type AdjustmentDirection = "increase" | "decrease";
 
@@ -90,7 +90,7 @@ const DEFAULT_OPERATION_FORM: OperationFormState = {
   adjustmentDirection: "increase",
 };
 
-export default function InventoryPage({ section = "onhand" }: InventoryPageProps) {
+export default function InventoryPage({ section = "stock" }: InventoryPageProps) {
   const { t, locale } = useI18n();
   const { hasPermission } = useAuth();
   const navigate = useNavigate();
@@ -119,10 +119,10 @@ export default function InventoryPage({ section = "onhand" }: InventoryPageProps
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
 
-  const [onHandFilters, setOnHandFilters] = useState({ productId: "", locationId: "" });
-  const [onHand, setOnHand] = useState<OnHandEntry[]>([]);
-  const [onHandLoading, setOnHandLoading] = useState(false);
-  const [onHandError, setOnHandError] = useState<string | null>(null);
+  const [stockFilters, setStockFilters] = useState({ productId: "", locationId: "" });
+  const [stock, setStock] = useState<StockEntry[]>([]);
+  const [stockLoading, setStockLoading] = useState(false);
+  const [stockError, setStockError] = useState<string | null>(null);
 
   const [opForm, setOpForm] = useState<OperationFormState>(DEFAULT_OPERATION_FORM);
   const [opSubmitting, setOpSubmitting] = useState(false);
@@ -142,13 +142,13 @@ export default function InventoryPage({ section = "onhand" }: InventoryPageProps
     () => products.find((product) => product.id === opForm.productId) ?? null,
     [products, opForm.productId]
   );
-  const selectedOnHandProduct = useMemo(
-    () => products.find((product) => product.id === onHandFilters.productId) ?? null,
-    [products, onHandFilters.productId]
+  const selectedStockProduct = useMemo(
+    () => products.find((product) => product.id === stockFilters.productId) ?? null,
+    [products, stockFilters.productId]
   );
-  const selectedOnHandLocation = useMemo(
-    () => locations.find((location) => location.id === onHandFilters.locationId) ?? null,
-    [locations, onHandFilters.locationId]
+  const selectedStockLocation = useMemo(
+    () => locations.find((location) => location.id === stockFilters.locationId) ?? null,
+    [locations, stockFilters.locationId]
   );
   const selectedMovementProduct = useMemo(
     () => products.find((product) => product.id === movementFilters.productId) ?? null,
@@ -234,8 +234,8 @@ export default function InventoryPage({ section = "onhand" }: InventoryPageProps
   }, [slug]);
 
   useEffect(() => {
-    if (activeTab === "onhand" && canView) {
-      void loadOnHand(onHandFilters);
+    if (activeTab === "stock" && canView) {
+      void loadStock(stockFilters);
     }
   }, [activeTab, canView]);
 
@@ -282,19 +282,19 @@ export default function InventoryPage({ section = "onhand" }: InventoryPageProps
     }
   }
 
-  async function loadOnHand(filters: { productId: string; locationId: string }) {
-    setOnHandLoading(true);
-    setOnHandError(null);
+  async function loadStock(filters: { productId: string; locationId: string }) {
+    setStockLoading(true);
+    setStockError(null);
     try {
-      const result = await getOnHand(slug, {
+      const result = await getStock(slug, {
         productId: filters.productId || undefined,
         locationId: filters.locationId || undefined,
       });
-      setOnHand(result);
+      setStock(result);
     } catch (error) {
-      setOnHandError(extractInventoryErrorMessage(error, t("inventory.onHand.loadFailed")));
+      setStockError(extractInventoryErrorMessage(error, t("inventory.stock.loadFailed")));
     } finally {
-      setOnHandLoading(false);
+      setStockLoading(false);
     }
   }
 
@@ -394,7 +394,7 @@ export default function InventoryPage({ section = "onhand" }: InventoryPageProps
 
       setOpForm(DEFAULT_OPERATION_FORM);
       if (canView) {
-        void loadOnHand(onHandFilters);
+        void loadStock(stockFilters);
         if (activeTab === "movements") {
           void loadMovements(movementFilters, movPage);
         }
@@ -406,9 +406,9 @@ export default function InventoryPage({ section = "onhand" }: InventoryPageProps
     }
   }
 
-  function handleOnHandApplyFilters(event: FormEvent) {
+  function handleStockApplyFilters(event: FormEvent) {
     event.preventDefault();
-    void loadOnHand(onHandFilters);
+    void loadStock(stockFilters);
   }
 
   function handleMovementApplyFilters(event: FormEvent) {
@@ -417,7 +417,7 @@ export default function InventoryPage({ section = "onhand" }: InventoryPageProps
     void loadMovements(movementFilters, 0);
   }
 
-  function handleQuickAction(action: "receive" | "transfer" | "adjust" | "movements", row: OnHandEntry) {
+  function handleQuickAction(action: "receive" | "transfer" | "adjust" | "movements", row: StockEntry) {
     const params = new URLSearchParams({
       productId: row.productId,
       locationId: row.locationId,
@@ -453,22 +453,22 @@ export default function InventoryPage({ section = "onhand" }: InventoryPageProps
 
       {lookupError ? <p className="text-sm text-destructive">{lookupError}</p> : null}
 
-      {activeTab === "onhand" ? (
+      {activeTab === "stock" ? (
         <div className="flex flex-col gap-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">{t("inventory.onHand.filtersTitle")}</CardTitle>
-              <CardDescription>{t("inventory.onHand.filtersDescription")}</CardDescription>
+              <CardTitle className="text-base">{t("inventory.stock.filtersTitle")}</CardTitle>
+              <CardDescription>{t("inventory.stock.filtersDescription")}</CardDescription>
             </CardHeader>
             <CardContent>
-              <form className="grid gap-4 lg:grid-cols-[1fr_1fr_auto_auto]" onSubmit={handleOnHandApplyFilters}>
+              <form className="grid gap-4 lg:grid-cols-[1fr_1fr_auto_auto]" onSubmit={handleStockApplyFilters}>
                 <PickerField
-                  id="onhand-product"
+                  id="stock-product"
                   label={t("inventory.filters.product")}
-                  value={selectedOnHandProduct}
+                  value={selectedStockProduct}
                   options={products}
                   onSearch={searchProducts}
-                  onChange={(next) => setOnHandFilters((current) => ({ ...current, productId: next?.id ?? "" }))}
+                  onChange={(next) => setStockFilters((current) => ({ ...current, productId: next?.id ?? "" }))}
                   placeholder={t("inventory.lookups.productPlaceholder")}
                   emptyMessage={t("inventory.lookups.noProducts")}
                   loading={lookupLoading}
@@ -476,12 +476,12 @@ export default function InventoryPage({ section = "onhand" }: InventoryPageProps
                   getOptionLabel={getProductLabel}
                 />
                 <PickerField
-                  id="onhand-location"
+                  id="stock-location"
                   label={t("inventory.filters.location")}
-                  value={selectedOnHandLocation}
+                  value={selectedStockLocation}
                   options={locations}
                   onSearch={searchLocations}
-                  onChange={(next) => setOnHandFilters((current) => ({ ...current, locationId: next?.id ?? "" }))}
+                  onChange={(next) => setStockFilters((current) => ({ ...current, locationId: next?.id ?? "" }))}
                   placeholder={t("inventory.lookups.locationPlaceholder")}
                   emptyMessage={t("inventory.lookups.noLocations")}
                   loading={lookupLoading}
@@ -497,8 +497,8 @@ export default function InventoryPage({ section = "onhand" }: InventoryPageProps
                   className="self-end"
                   onClick={() => {
                     const nextFilters = { productId: "", locationId: "" };
-                    setOnHandFilters(nextFilters);
-                    void loadOnHand(nextFilters);
+                    setStockFilters(nextFilters);
+                    void loadStock(nextFilters);
                   }}
                 >
                   {t("inventory.filters.reset")}
@@ -509,25 +509,25 @@ export default function InventoryPage({ section = "onhand" }: InventoryPageProps
 
           <Card>
             <CardContent className="p-0">
-              {onHandLoading ? (
-                <p className="p-4 text-sm text-muted-foreground">{t("inventory.onHand.loading")}</p>
+              {stockLoading ? (
+                <p className="p-4 text-sm text-muted-foreground">{t("inventory.stock.loading")}</p>
               ) : null}
-              {onHandError ? <p className="p-4 text-sm text-destructive">{onHandError}</p> : null}
-              {!onHandLoading && !onHandError && onHand.length === 0 ? (
-                <p className="p-4 text-sm text-muted-foreground">{t("inventory.onHand.empty")}</p>
+              {stockError ? <p className="p-4 text-sm text-destructive">{stockError}</p> : null}
+              {!stockLoading && !stockError && stock.length === 0 ? (
+                <p className="p-4 text-sm text-muted-foreground">{t("inventory.stock.empty")}</p>
               ) : null}
-              {!onHandLoading && onHand.length > 0 ? (
+              {!stockLoading && stock.length > 0 ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>{t("inventory.onHand.colProduct")}</TableHead>
-                      <TableHead>{t("inventory.onHand.colLocation")}</TableHead>
-                      <TableHead className="text-end">{t("inventory.onHand.colQty")}</TableHead>
-                      <TableHead>{t("inventory.onHand.colActions")}</TableHead>
+                      <TableHead>{t("inventory.stock.colProduct")}</TableHead>
+                      <TableHead>{t("inventory.stock.colLocation")}</TableHead>
+                      <TableHead className="text-end">{t("inventory.stock.colQty")}</TableHead>
+                      <TableHead>{t("inventory.stock.colActions")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {onHand.map((row) => (
+                    {stock.map((row) => (
                       <TableRow key={`${row.locationId}-${row.productId}`}>
                         <TableCell>
                           <div className="flex flex-col gap-1">
@@ -550,7 +550,7 @@ export default function InventoryPage({ section = "onhand" }: InventoryPageProps
                           </div>
                         </TableCell>
                         <TableCell className="text-end font-medium tabular-nums">
-                          {row.qtyOnHand} {row.baseUomCode ?? ""}
+                          {row.qtyStock} {row.baseUomCode ?? ""}
                         </TableCell>
                         <TableCell>
                           <div className={`flex flex-wrap gap-2 ${isRtl ? "justify-end" : ""}`}>

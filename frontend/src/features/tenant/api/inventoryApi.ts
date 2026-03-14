@@ -7,7 +7,7 @@ import type {
   LocationLookupParams,
   MovementPageResult,
   MovementResult,
-  OnHandEntry,
+  StockEntry,
   ProductLookupPageResult,
   ProductLookupParams,
   ReceiveRequest,
@@ -23,11 +23,11 @@ function headers(tenantSlug: string): Record<string, string> {
   return { "X-TENANT-ID": normalizeTenantSlug(tenantSlug) };
 }
 
-export async function getOnHand(
+export async function getStock(
   tenantSlug: string,
   params: InventoryListParams = {}
-): Promise<OnHandEntry[]> {
-  const res = await api.get<OnHandEntry[]>(`${basePath(tenantSlug)}/on-hand`, {
+): Promise<StockEntry[]> {
+  const res = await api.get<StockEntry[]>(`${basePath(tenantSlug)}/stock`, {
     params,
     headers: headers(tenantSlug),
   });

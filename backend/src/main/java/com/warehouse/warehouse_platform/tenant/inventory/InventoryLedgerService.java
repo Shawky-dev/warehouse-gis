@@ -10,7 +10,6 @@ import com.warehouse.warehouse_platform.tenant.warehouse.layout.WarehouseLayout;
 import com.warehouse.warehouse_platform.tenant.warehouse.layout.WarehouseLayoutRepository;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -65,17 +64,22 @@ public class InventoryLedgerService {
             String lotNumber,
             LocalDate expiryDate,
             String notes,
+            UUID sourceDocumentId,
+            String reasonCode,
             String actor) {
         validateQtyPositive(qty, "receive qty must be positive");
         assertSelectableLocation(locationId);
         Product product = loadProduct(productId);
+        String normalizedLotNumber = normalizeOptional(lotNumber);
 
         StockMovement movement = StockMovement.builder()
                 .locationId(locationId)
                 .productId(product.getId())
                 .qty(qty)
                 .type(MovementType.RECEIVE)
-                .lotNumber(normalizeOptional(lotNumber))
+                .sourceDocumentId(sourceDocumentId)
+                .reasonCode(normalizeOptional(reasonCode))
+                .lotNumber(normalizedLotNumber)
                 .expiryDate(expiryDate)
                 .notes(normalizeOptional(notes))
                 .createdBy(actor)
@@ -92,6 +96,7 @@ public class InventoryLedgerService {
             BigDecimal qty,
             String lotNumber,
             String notes,
+            String reasonCode,
             String actor) {
         validateQtyPositive(qty, "transfer qty must be positive");
 
@@ -102,7 +107,9 @@ public class InventoryLedgerService {
         assertSelectableLocation(fromLocationId);
         assertSelectableLocation(toLocationId);
         Product product = loadProduct(productId);
-        assertSufficientStock(fromLocationId, product.getId(), qty);
+        String normalizedLotNumber = normalizeOptional(lotNumber);
+        String normalizedReasonCode = normalizeOptional(reasonCode);
+        assertSufficientStock(fromLocationId, product, normalizedLotNumber, qty);
 
         UUID referenceId = UUID.randomUUID();
 
@@ -112,7 +119,8 @@ public class InventoryLedgerService {
                 .qty(qty.negate())
                 .type(MovementType.TRANSFER_OUT)
                 .referenceId(referenceId)
-                .lotNumber(normalizeOptional(lotNumber))
+                .reasonCode(normalizedReasonCode)
+                .lotNumber(normalizedLotNumber)
                 .notes(normalizeOptional(notes))
                 .createdBy(actor)
                 .build();
@@ -123,7 +131,8 @@ public class InventoryLedgerService {
                 .qty(qty)
                 .type(MovementType.TRANSFER_IN)
                 .referenceId(referenceId)
-                .lotNumber(normalizeOptional(lotNumber))
+                .reasonCode(normalizedReasonCode)
+                .lotNumber(normalizedLotNumber)
                 .notes(normalizeOptional(notes))
                 .createdBy(actor)
                 .build();
@@ -144,7 +153,10 @@ public class InventoryLedgerService {
             UUID locationId,
             UUID productId,
             BigDecimal qty,
+            String lotNumber,
             String notes,
+            UUID sourceDocumentId,
+            String reasonCode,
             String actor) {
         if (qty == null || qty.compareTo(BigDecimal.ZERO) == 0) {
             throw InventoryLedgerException.badRequest("Adjustment qty must not be zero");
@@ -152,9 +164,10 @@ public class InventoryLedgerService {
 
         assertSelectableLocation(locationId);
         Product product = loadProduct(productId);
+        String normalizedLotNumber = normalizeOptional(lotNumber);
 
         if (qty.compareTo(BigDecimal.ZERO) < 0) {
-            assertSufficientStock(locationId, product.getId(), qty.abs());
+            assertSufficientStock(locationId, product, normalizedLotNumber, qty.abs());
         }
 
         String normalizedNotes = normalizeRequiredNotes(notes);
@@ -164,6 +177,9 @@ public class InventoryLedgerService {
                 .productId(product.getId())
                 .qty(qty)
                 .type(MovementType.ADJUST)
+                .sourceDocumentId(sourceDocumentId)
+                .reasonCode(normalizeOptional(reasonCode))
+                .lotNumber(normalizedLotNumber)
                 .notes(normalizedNotes)
                 .createdBy(actor)
                 .build();
@@ -172,7 +188,7 @@ public class InventoryLedgerService {
     }
 
     @Transactional(readOnly = true)
-    public List<OnHandResult> getOnHand(UUID productId, UUID locationId) {
+    public List<StockResult> getStock(UUID productId, UUID locationId) {
         if (locationId != null) {
             assertLocationExists(locationId);
         }
@@ -180,14 +196,14 @@ public class InventoryLedgerService {
             loadProduct(productId);
         }
 
-        List<OnHandEntry> rows = switch (buildFilterKey(productId, locationId)) {
-            case BOTH -> movementRepository.findOnHandByLocationAndProduct(locationId, productId);
-            case PRODUCT -> movementRepository.findOnHandByProduct(productId);
-            case LOCATION -> movementRepository.findOnHandByLocation(locationId);
-            case NONE -> movementRepository.findAllOnHand();
+        List<StockEntry> rows = switch (buildFilterKey(productId, locationId)) {
+            case BOTH -> movementRepository.findStockByLocationAndProduct(locationId, productId);
+            case PRODUCT -> movementRepository.findStockByProduct(productId);
+            case LOCATION -> movementRepository.findStockByLocation(locationId);
+            case NONE -> movementRepository.findAllStock();
         };
 
-        return enrichOnHand(rows);
+        return enrichStock(rows);
     }
 
     @Transactional(readOnly = true)
@@ -325,9 +341,12 @@ public class InventoryLedgerService {
                 .orElseThrow(() -> InventoryLedgerException.notFound("Product not found: " + productId));
     }
 
-    private void assertSufficientStock(UUID locationId, UUID productId, BigDecimal required) {
-        BigDecimal current = movementRepository.findOnHandQtyByLocationAndProduct(locationId, productId)
-                .orElse(BigDecimal.ZERO);
+    private void assertSufficientStock(UUID locationId, Product product, String lotNumber, BigDecimal required) {
+        BigDecimal current = Boolean.TRUE.equals(product.getTrackLot())
+            ? movementRepository.findStockQtyByLocationProductAndLot(locationId, product.getId(), lotNumber)
+                    .orElse(BigDecimal.ZERO)
+            : movementRepository.findStockQtyByLocationAndProduct(locationId, product.getId())
+                    .orElse(BigDecimal.ZERO);
 
         if (current.compareTo(required) < 0) {
             throw InventoryLedgerException.badRequest(
@@ -357,9 +376,9 @@ public class InventoryLedgerService {
         return normalized.isEmpty() ? null : normalized;
     }
 
-    private List<OnHandResult> enrichOnHand(List<OnHandEntry> rows) {
-        Set<UUID> productIds = rows.stream().map(OnHandEntry::getProductId).collect(Collectors.toSet());
-        Set<UUID> locationIds = rows.stream().map(OnHandEntry::getLocationId).collect(Collectors.toSet());
+    private List<StockResult> enrichStock(List<StockEntry> rows) {
+        Set<UUID> productIds = rows.stream().map(StockEntry::getProductId).collect(Collectors.toSet());
+        Set<UUID> locationIds = rows.stream().map(StockEntry::getLocationId).collect(Collectors.toSet());
         Map<UUID, ProductSummary> products = loadProductSummaryMap(productIds);
         Map<UUID, LocationSummary> locations = buildLocationSummaryMap(locationIds);
 
@@ -367,10 +386,11 @@ public class InventoryLedgerService {
                 .map(row -> {
                     ProductSummary product = products.get(row.getProductId());
                     LocationSummary location = locations.get(row.getLocationId());
-                    return new OnHandResult(
+                        return new StockResult(
                             row.getLocationId(),
                             row.getProductId(),
-                            row.getQtyOnHand(),
+                            row.getLotNumber(),
+                                row.getQtyStock(),
                             location == null ? null : location.label(),
                             location == null ? null : location.pathLabel(),
                             location == null ? null : location.layoutId(),
@@ -455,6 +475,8 @@ public class InventoryLedgerService {
                 movement.getQty(),
                 movement.getType(),
                 movement.getReferenceId(),
+                movement.getSourceDocumentId(),
+                movement.getReasonCode(),
                 movement.getLotNumber(),
                 movement.getExpiryDate(),
                 movement.getNotes(),
@@ -779,10 +801,11 @@ public class InventoryLedgerService {
             int totalPages) {
     }
 
-    public record OnHandResult(
+    public record StockResult(
             UUID locationId,
             UUID productId,
-            BigDecimal qtyOnHand,
+            String lotNumber,
+            BigDecimal qtyStock,
             String locationLabel,
             String locationPathLabel,
             UUID layoutId,
@@ -803,6 +826,8 @@ public class InventoryLedgerService {
             BigDecimal qty,
             MovementType type,
             UUID referenceId,
+            UUID sourceDocumentId,
+            String reasonCode,
             String lotNumber,
             LocalDate expiryDate,
             String notes,

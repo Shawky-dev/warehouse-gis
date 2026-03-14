@@ -21,9 +21,9 @@ class InventoryLedgerControllerAuthorizationMetadataTest {
             + ")";
 
     @Test
-    void getOnHand_shouldRequireInventoryViewPermission() throws Exception {
+        void getStock_shouldRequireInventoryViewPermission() throws Exception {
         Method method = InventoryLedgerController.class.getMethod(
-                "getOnHand",
+                                "getStock",
                 String.class,
                 UUID.class,
                 UUID.class,
@@ -33,9 +33,9 @@ class InventoryLedgerControllerAuthorizationMetadataTest {
     }
 
     @Test
-    void getOnHandByLocation_shouldRequireInventoryViewPermission() throws Exception {
+        void getStockByLocation_shouldRequireInventoryViewPermission() throws Exception {
         Method method = InventoryLedgerController.class.getMethod(
-                "getOnHandByLocation",
+                                "getStockByLocation",
                 String.class,
                 UUID.class,
                 Authentication.class);
@@ -44,9 +44,9 @@ class InventoryLedgerControllerAuthorizationMetadataTest {
     }
 
     @Test
-    void getOnHandByProduct_shouldRequireInventoryViewPermission() throws Exception {
+        void getStockByProduct_shouldRequireInventoryViewPermission() throws Exception {
         Method method = InventoryLedgerController.class.getMethod(
-                "getOnHandByProduct",
+                                "getStockByProduct",
                 String.class,
                 UUID.class,
                 Authentication.class);

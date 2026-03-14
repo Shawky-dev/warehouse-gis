@@ -38,10 +38,10 @@ export interface LocationLookupPageResult {
   totalPages: number;
 }
 
-export interface OnHandEntry {
+export interface StockEntry {
   locationId: string;
   productId: string;
-  qtyOnHand: string;
+  qtyStock: string;
   locationLabel: string | null;
   locationPathLabel: string | null;
   layoutId: string | null;
