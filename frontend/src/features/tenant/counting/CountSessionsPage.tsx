@@ -13,7 +13,7 @@ import {
     updateCountLine,
     voidCountSession,
 } from "@/features/tenant/api/countingApi";
-import { getLocationLookups } from "@/features/tenant/api/inventoryApi";
+import { INVENTORY_LOOKUP_MAX_SIZE, getLocationLookups } from "@/features/tenant/api/inventoryApi";
 import type { LocationLookupItem } from "@/features/tenant/types/inventory";
 import type { CountLine, CountSessionDetail, CountSessionListItem, CountStatus } from "@/features/tenant/types/counting";
 import { Badge } from "@/shared/components/ui/badge";
@@ -168,7 +168,7 @@ export default function CountSessionsPage() {
         try {
             const result = await getLocationLookups(slug, {
                 search: searchTerm || undefined,
-                size: 200,
+                size: INVENTORY_LOOKUP_MAX_SIZE,
             });
             setLocations(result.content);
         } catch {

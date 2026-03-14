@@ -15,12 +15,30 @@ import type {
   TransferResult,
 } from "@/features/tenant/types/inventory";
 
+export const INVENTORY_LOOKUP_DEFAULT_SIZE = 20;
+export const INVENTORY_LOOKUP_MAX_SIZE = 100;
+
 function basePath(tenantSlug: string): string {
   return `/${normalizeTenantSlug(tenantSlug)}/inventory`;
 }
 
 function headers(tenantSlug: string): Record<string, string> {
   return { "X-TENANT-ID": normalizeTenantSlug(tenantSlug) };
+}
+
+function normalizeLookupSize(size: number | undefined): number {
+  if (size === undefined || !Number.isFinite(size)) {
+    return INVENTORY_LOOKUP_DEFAULT_SIZE;
+  }
+
+  const normalized = Math.floor(size);
+  if (normalized < 1) {
+    return 1;
+  }
+  if (normalized > INVENTORY_LOOKUP_MAX_SIZE) {
+    return INVENTORY_LOOKUP_MAX_SIZE;
+  }
+  return normalized;
 }
 
 export async function getStock(
@@ -49,8 +67,9 @@ export async function getProductLookups(
   tenantSlug: string,
   params: ProductLookupParams = {}
 ): Promise<ProductLookupPageResult> {
+  const { size, ...restParams } = params;
   const res = await api.get<ProductLookupPageResult>(`${basePath(tenantSlug)}/lookups/products`, {
-    params: { size: 20, ...params },
+    params: { ...restParams, size: normalizeLookupSize(size) },
     headers: headers(tenantSlug),
   });
   return res.data;
@@ -60,8 +79,9 @@ export async function getLocationLookups(
   tenantSlug: string,
   params: LocationLookupParams = {}
 ): Promise<LocationLookupPageResult> {
+  const { size, ...restParams } = params;
   const res = await api.get<LocationLookupPageResult>(`${basePath(tenantSlug)}/lookups/locations`, {
-    params: { size: 20, ...params },
+    params: { ...restParams, size: normalizeLookupSize(size) },
     headers: headers(tenantSlug),
   });
   return res.data;
