@@ -47,6 +47,10 @@ vi.mock("@/features/tenant/receipts/ReceiptsPage", () => ({
   default: () => <p>tenant-receipts-page</p>,
 }));
 
+vi.mock("@/features/tenant/dispatches/DispatchesPage", () => ({
+  default: () => <p>tenant-dispatches-page</p>,
+}));
+
 function renderTenantRoute(path: string) {
   return render(
     <I18nProvider initialLocale="en" storageKey="test-locale-tenant-routes">
@@ -312,5 +316,30 @@ describe("tenant routes RBAC", () => {
     renderTenantRoute("/acme/receipts");
 
     expect(screen.getByText("tenant-receipts-page")).toBeInTheDocument();
+  });
+
+  it("blocks dispatches route when tenant.dispatches.view permission is missing", () => {
+    mockUseAuth.mockReturnValue({
+      status: "authenticated",
+      hasPermission: () => false,
+      hasAnyPermission: () => false,
+    });
+
+    renderTenantRoute("/acme/dispatches");
+
+    expect(screen.queryByText("tenant-dispatches-page")).not.toBeInTheDocument();
+    expect(screen.getByText("Access denied")).toBeInTheDocument();
+  });
+
+  it("renders dispatches route when tenant.dispatches.view permission is present", () => {
+    mockUseAuth.mockReturnValue({
+      status: "authenticated",
+      hasPermission: (permission: string) => permission === TENANT_PERMISSIONS.DISPATCHES_VIEW,
+      hasAnyPermission: () => false,
+    });
+
+    renderTenantRoute("/acme/dispatches");
+
+    expect(screen.getByText("tenant-dispatches-page")).toBeInTheDocument();
   });
 });

@@ -58,6 +58,11 @@ export const TENANT_PERMISSIONS = {
   RECEIPTS_EDIT: "tenant.receipts.edit",
   RECEIPTS_POST: "tenant.receipts.post",
   RECEIPTS_VOID: "tenant.receipts.void",
+  DISPATCHES_VIEW: "tenant.dispatches.view",
+  DISPATCHES_CREATE: "tenant.dispatches.create",
+  DISPATCHES_EDIT: "tenant.dispatches.edit",
+  DISPATCHES_POST: "tenant.dispatches.post",
+  DISPATCHES_VOID: "tenant.dispatches.void",
 } as const;
 
 export type LandlordPermission = (typeof LANDLORD_PERMISSIONS)[keyof typeof LANDLORD_PERMISSIONS];

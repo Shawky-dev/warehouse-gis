@@ -1,0 +1,661 @@
+import { useEffect, useMemo, useState } from "react";
+import { useParams } from "react-router-dom";
+import { normalizeTenantSlug } from "@/features/auth/shared/scope";
+import { useAuth } from "@/features/auth/context/AuthContext";
+import { TENANT_PERMISSIONS } from "@/features/auth/shared/permissions";
+import { useI18n } from "@/i18n";
+import {
+    addLine,
+    createDraft,
+    extractDispatchErrorMessage,
+    getDispatch,
+    listDispatches,
+    postDispatch,
+    removeLine,
+    voidDispatch,
+} from "@/features/tenant/api/dispatchesApi";
+import { getLocationLookups, getProductLookups } from "@/features/tenant/api/inventoryApi";
+import type { ProductLookupItem, LocationLookupItem } from "@/features/tenant/types/inventory";
+import type { DispatchDetail, DispatchListItem, DispatchStatus } from "@/features/tenant/types/dispatches";
+import { Badge } from "@/shared/components/ui/badge";
+import { Button } from "@/shared/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/shared/components/ui/input";
+import { Label } from "@/shared/components/ui/label";
+import { Textarea } from "@/shared/components/ui/textarea";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/shared/components/ui/alert-dialog";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+
+interface DispatchLineFormState {
+    productId: string;
+    sourceLocationId: string;
+    qty: string;
+    lotNumber: string;
+    notes: string;
+}
+
+const DEFAULT_LINE_FORM: DispatchLineFormState = {
+    productId: "",
+    sourceLocationId: "",
+    qty: "",
+    lotNumber: "",
+    notes: "",
+};
+
+export default function DispatchesPage() {
+    const { t } = useI18n();
+    const { hasPermission } = useAuth();
+    const { tenantSlug } = useParams<{ tenantSlug: string }>();
+    const slug = normalizeTenantSlug(tenantSlug ?? "");
+
+    const canCreate = hasPermission(TENANT_PERMISSIONS.DISPATCHES_CREATE);
+    const canEdit = hasPermission(TENANT_PERMISSIONS.DISPATCHES_EDIT);
+    const canPost = hasPermission(TENANT_PERMISSIONS.DISPATCHES_POST);
+    const canVoid = hasPermission(TENANT_PERMISSIONS.DISPATCHES_VOID);
+
+    const [statusFilter, setStatusFilter] = useState<DispatchStatus | "ALL">("ALL");
+    const [search, setSearch] = useState("");
+    const [pendingStatusFilter, setPendingStatusFilter] = useState<DispatchStatus | "ALL">("ALL");
+    const [pendingSearch, setPendingSearch] = useState("");
+
+    const [listLoading, setListLoading] = useState(false);
+    const [listError, setListError] = useState<string | null>(null);
+    const [dispatches, setDispatches] = useState<DispatchListItem[]>([]);
+
+    const [selectedDispatchId, setSelectedDispatchId] = useState<string | null>(null);
+    const [detailLoading, setDetailLoading] = useState(false);
+    const [detailError, setDetailError] = useState<string | null>(null);
+    const [detail, setDetail] = useState<DispatchDetail | null>(null);
+
+    const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+    const [createReference, setCreateReference] = useState("");
+    const [createDestination, setCreateDestination] = useState("");
+    const [createNotes, setCreateNotes] = useState("");
+    const [createSubmitting, setCreateSubmitting] = useState(false);
+
+    const [lineForm, setLineForm] = useState<DispatchLineFormState>(DEFAULT_LINE_FORM);
+    const [isLineFormOpen, setIsLineFormOpen] = useState(false);
+    const [lineSubmitting, setLineSubmitting] = useState(false);
+    const [lineError, setLineError] = useState<string | null>(null);
+
+    const [products, setProducts] = useState<ProductLookupItem[]>([]);
+    const [locations, setLocations] = useState<LocationLookupItem[]>([]);
+    const [productSearch, setProductSearch] = useState("");
+    const [locationSearch, setLocationSearch] = useState("");
+
+    const [isPostConfirmOpen, setIsPostConfirmOpen] = useState(false);
+    const [isVoidConfirmOpen, setIsVoidConfirmOpen] = useState(false);
+
+    const selectedProduct = useMemo(
+        () => products.find((product) => product.id === lineForm.productId) ?? null,
+        [products, lineForm.productId]
+    );
+
+    useEffect(() => {
+        void Promise.all([loadDispatches(0), loadLookupData()]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [slug]);
+
+    useEffect(() => {
+        if (!selectedDispatchId) {
+            setDetail(null);
+            setDetailError(null);
+            return;
+        }
+        void loadDispatchDetail(selectedDispatchId);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedDispatchId]);
+
+    async function loadDispatches(page: number) {
+        setListLoading(true);
+        setListError(null);
+        try {
+            const result = await listDispatches(slug, {
+                page,
+                size: 20,
+                status: statusFilter === "ALL" ? undefined : statusFilter,
+                search: search || undefined,
+            });
+
+            setDispatches(result.content);
+        } catch (error) {
+            setListError(extractDispatchErrorMessage(error, t("dispatches.loadFailed")));
+        } finally {
+            setListLoading(false);
+        }
+    }
+
+    async function loadDispatchDetail(dispatchId: string) {
+        setDetailLoading(true);
+        setDetailError(null);
+        setLineError(null);
+        try {
+            const result = await getDispatch(slug, dispatchId);
+            setDetail(result);
+        } catch (error) {
+            setDetailError(extractDispatchErrorMessage(error, t("dispatches.loadFailed")));
+        } finally {
+            setDetailLoading(false);
+        }
+    }
+
+    async function loadLookupData() {
+        try {
+            const [productResult, locationResult] = await Promise.all([
+                getProductLookups(slug, { size: 50 }),
+                getLocationLookups(slug, { size: 50 }),
+            ]);
+            setProducts(productResult.content);
+            setLocations(locationResult.content);
+        } catch {
+            // non-blocking lookup load
+        }
+    }
+
+    async function handleSearchProducts(value: string) {
+        setProductSearch(value);
+        try {
+            const result = await getProductLookups(slug, { search: value || undefined, size: 50 });
+            setProducts(result.content);
+        } catch {
+            // keep existing options
+        }
+    }
+
+    async function handleSearchLocations(value: string) {
+        setLocationSearch(value);
+        try {
+            const result = await getLocationLookups(slug, { search: value || undefined, size: 50 });
+            setLocations(result.content);
+        } catch {
+            // keep existing options
+        }
+    }
+
+    async function handleCreateDraft() {
+        setCreateSubmitting(true);
+        setListError(null);
+        try {
+            const created = await createDraft(slug, {
+                reference: createReference.trim() || null,
+                destination: createDestination.trim() || null,
+                notes: createNotes.trim() || null,
+            });
+            setIsCreateDialogOpen(false);
+            setCreateReference("");
+            setCreateDestination("");
+            setCreateNotes("");
+            setSelectedDispatchId(created.id);
+            await loadDispatches(0);
+        } catch (error) {
+            setListError(extractDispatchErrorMessage(error, t("dispatches.actionFailed")));
+        } finally {
+            setCreateSubmitting(false);
+        }
+    }
+
+    async function handleAddLine() {
+        if (!detail) {
+            return;
+        }
+
+        if (!lineForm.productId || !lineForm.sourceLocationId || !lineForm.qty) {
+            setLineError(t("dispatches.validation.requiredLineFields"));
+            return;
+        }
+
+        setLineSubmitting(true);
+        setLineError(null);
+        try {
+            await addLine(slug, detail.id, {
+                productId: lineForm.productId,
+                sourceLocationId: lineForm.sourceLocationId,
+                qty: lineForm.qty,
+                lotNumber: selectedProduct?.trackLot ? lineForm.lotNumber || null : null,
+                notes: lineForm.notes || null,
+            });
+            setLineForm(DEFAULT_LINE_FORM);
+            setIsLineFormOpen(false);
+            await loadDispatchDetail(detail.id);
+            await loadDispatches(0);
+        } catch (error) {
+            setLineError(extractDispatchErrorMessage(error, t("dispatches.actionFailed")));
+        } finally {
+            setLineSubmitting(false);
+        }
+    }
+
+    async function handleDeleteLine(lineId: string) {
+        if (!detail) {
+            return;
+        }
+        try {
+            await removeLine(slug, detail.id, lineId);
+            await loadDispatchDetail(detail.id);
+            await loadDispatches(0);
+        } catch (error) {
+            setLineError(extractDispatchErrorMessage(error, t("dispatches.actionFailed")));
+        }
+    }
+
+    async function handlePostDispatch() {
+        if (!detail) {
+            return;
+        }
+        try {
+            const updated = await postDispatch(slug, detail.id);
+            setIsPostConfirmOpen(false);
+            setDetail(updated);
+            await loadDispatches(0);
+        } catch (error) {
+            setDetailError(extractDispatchErrorMessage(error, t("dispatches.actionFailed")));
+        }
+    }
+
+    async function handleVoidDispatch() {
+        if (!detail) {
+            return;
+        }
+        try {
+            const updated = await voidDispatch(slug, detail.id);
+            setIsVoidConfirmOpen(false);
+            setDetail(updated);
+            await loadDispatches(0);
+        } catch (error) {
+            setDetailError(extractDispatchErrorMessage(error, t("dispatches.actionFailed")));
+        }
+    }
+
+    const statusBadgeClass = (status: DispatchStatus) => {
+        switch (status) {
+            case "DRAFT":
+                return "bg-muted text-foreground";
+            case "POSTED":
+                return "bg-green-100 text-green-800";
+            case "VOID":
+                return "bg-red-100 text-red-800";
+            default:
+                return "bg-muted text-foreground";
+        }
+    };
+
+    if (selectedDispatchId && detailLoading) {
+        return (
+            <div className="flex flex-col gap-4 p-6">
+                <h1 className="text-2xl font-semibold">{t("dispatches.title")}</h1>
+                <p className="text-sm text-muted-foreground">{t("dispatches.loading")}</p>
+            </div>
+        );
+    }
+
+    if (selectedDispatchId && detail) {
+        const isDraft = detail.status === "DRAFT";
+        const isPosted = detail.status === "POSTED";
+
+        return (
+            <div className="flex flex-col gap-4 p-6">
+                <div className="flex items-center justify-between">
+                    <h1 className="text-2xl font-semibold">{t("dispatches.title")}</h1>
+                    <Button variant="outline" onClick={() => setSelectedDispatchId(null)}>
+                        {t("dispatches.backToList")}
+                    </Button>
+                </div>
+
+                {detailError ? <p className="text-sm text-destructive">{detailError}</p> : null}
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <span>{detail.reference || t("dispatches.referenceFallback")}</span>
+                            <Badge className={statusBadgeClass(detail.status)}>{t(`dispatches.status.${detail.status}`)}</Badge>
+                        </CardTitle>
+                        <CardDescription>
+                            {detail.destination || t("dispatches.destinationFallback")} • {new Date(detail.createdAt).toLocaleString()}
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3 text-sm">
+                        <p><strong>{t("dispatches.form.notes")}: </strong>{detail.notes || "—"}</p>
+                        <p><strong>{t("dispatches.form.createdBy")}: </strong>{detail.createdBy}</p>
+                        {detail.postedAt ? (
+                            <p><strong>{t("dispatches.form.postedAt")}: </strong>{new Date(detail.postedAt).toLocaleString()}</p>
+                        ) : null}
+                    </CardContent>
+                </Card>
+
+                {isDraft && canEdit ? (
+                    <Card>
+                        <CardHeader>
+                            <div className="flex items-center justify-between gap-2">
+                                <CardTitle>{t("dispatches.addLine")}</CardTitle>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setIsLineFormOpen((current) => !current)}
+                                >
+                                    {t("dispatches.addLine")}
+                                </Button>
+                            </div>
+                        </CardHeader>
+                        {isLineFormOpen ? (
+                            <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                                <div className="space-y-2 xl:col-span-2">
+                                    <Label>{t("dispatches.form.productSearch")}</Label>
+                                    <Input
+                                        value={productSearch}
+                                        onChange={(event) => void handleSearchProducts(event.target.value)}
+                                        placeholder={t("inventory.lookups.productPlaceholder")}
+                                    />
+                                </div>
+                                <div className="space-y-2 xl:col-span-2">
+                                    <Label>{t("dispatches.form.locationSearch")}</Label>
+                                    <Input
+                                        value={locationSearch}
+                                        onChange={(event) => void handleSearchLocations(event.target.value)}
+                                        placeholder={t("inventory.lookups.locationPlaceholder")}
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label>{t("dispatches.form.product")}</Label>
+                                    <select
+                                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                        value={lineForm.productId}
+                                        onChange={(event) =>
+                                            setLineForm((current) => ({ ...current, productId: event.target.value }))
+                                        }
+                                    >
+                                        <option value="">{t("dispatches.form.selectProduct")}</option>
+                                        {products.map((product) => (
+                                            <option key={product.id} value={product.id}>
+                                                {product.sku} · {product.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label>{t("dispatches.form.source")}</Label>
+                                    <select
+                                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                        value={lineForm.sourceLocationId}
+                                        onChange={(event) =>
+                                            setLineForm((current) => ({ ...current, sourceLocationId: event.target.value }))
+                                        }
+                                    >
+                                        <option value="">{t("dispatches.form.selectSource")}</option>
+                                        {locations.map((location) => (
+                                            <option key={location.id} value={location.id}>
+                                                {location.pathLabel}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label>{t("dispatches.form.qty")}</Label>
+                                    <Input
+                                        type="number"
+                                        min="0.0001"
+                                        step="0.0001"
+                                        value={lineForm.qty}
+                                        onChange={(event) => setLineForm((current) => ({ ...current, qty: event.target.value }))}
+                                    />
+                                </div>
+
+                                {selectedProduct?.trackLot ? (
+                                    <div className="space-y-2">
+                                        <Label>{t("dispatches.form.lot")}</Label>
+                                        <Input
+                                            value={lineForm.lotNumber}
+                                            onChange={(event) => setLineForm((current) => ({ ...current, lotNumber: event.target.value }))}
+                                        />
+                                    </div>
+                                ) : null}
+
+                                <div className="space-y-2 md:col-span-2 xl:col-span-4">
+                                    <Label>{t("dispatches.form.notes")}</Label>
+                                    <Textarea
+                                        value={lineForm.notes}
+                                        onChange={(event) => setLineForm((current) => ({ ...current, notes: event.target.value }))}
+                                    />
+                                </div>
+
+                                {lineError ? <p className="text-sm text-destructive md:col-span-2 xl:col-span-4">{lineError}</p> : null}
+
+                                <div className="md:col-span-2 xl:col-span-4">
+                                    <Button onClick={handleAddLine} disabled={lineSubmitting}>
+                                        {lineSubmitting ? t("dispatches.form.saving") : t("dispatches.form.addLine")}
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        ) : null}
+                    </Card>
+                ) : null}
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>{t("dispatches.linesTitle")}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>{t("dispatches.columns.product")}</TableHead>
+                                    <TableHead>{t("dispatches.columns.source")}</TableHead>
+                                    <TableHead className="text-end">{t("dispatches.columns.qty")}</TableHead>
+                                    <TableHead>{t("dispatches.columns.lot")}</TableHead>
+                                    <TableHead>{t("dispatches.columns.notes")}</TableHead>
+                                    {isDraft && canEdit ? <TableHead>{t("dispatches.columns.actions")}</TableHead> : null}
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {detail.lines.map((line) => (
+                                    <TableRow key={line.id}>
+                                        <TableCell>{line.productName ?? line.productSku ?? line.productId}</TableCell>
+                                        <TableCell>{line.locationPathLabel ?? line.sourceLocationId}</TableCell>
+                                        <TableCell className="text-end">{line.qty}</TableCell>
+                                        <TableCell>{line.lotNumber ?? "—"}</TableCell>
+                                        <TableCell>{line.notes ?? "—"}</TableCell>
+                                        {isDraft && canEdit ? (
+                                            <TableCell>
+                                                <Button variant="ghost" size="sm" onClick={() => void handleDeleteLine(line.id)}>
+                                                    {t("dispatches.deleteLine")}
+                                                </Button>
+                                            </TableCell>
+                                        ) : null}
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                        {detail.lines.length === 0 ? (
+                            <p className="p-4 text-sm text-muted-foreground">{t("dispatches.emptyLines")}</p>
+                        ) : null}
+                    </CardContent>
+                </Card>
+
+                <div className="flex gap-2">
+                    {isDraft && canPost ? (
+                        <Button disabled={detail.lines.length === 0} onClick={() => setIsPostConfirmOpen(true)}>
+                            {t("dispatches.postAction")}
+                        </Button>
+                    ) : null}
+                    {isPosted && canVoid ? (
+                        <Button variant="destructive" onClick={() => setIsVoidConfirmOpen(true)}>
+                            {t("dispatches.voidAction")}
+                        </Button>
+                    ) : null}
+                </div>
+
+                <AlertDialog open={isPostConfirmOpen} onOpenChange={setIsPostConfirmOpen}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>{t("dispatches.post.confirm")}</AlertDialogTitle>
+                            <AlertDialogDescription>{t("dispatches.post.confirmDescription")}</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>{t("dispatches.cancel")}</AlertDialogCancel>
+                            <AlertDialogAction onClick={handlePostDispatch}>{t("dispatches.postAction")}</AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+
+                <AlertDialog open={isVoidConfirmOpen} onOpenChange={setIsVoidConfirmOpen}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>{t("dispatches.void.confirm")}</AlertDialogTitle>
+                            <AlertDialogDescription>{t("dispatches.void.confirmDescription")}</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>{t("dispatches.cancel")}</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleVoidDispatch}>{t("dispatches.voidAction")}</AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex flex-col gap-4 p-6">
+            <div className="flex items-center justify-between">
+                <h1 className="text-2xl font-semibold">{t("dispatches.title")}</h1>
+                {canCreate ? (
+                    <Button onClick={() => setIsCreateDialogOpen(true)}>{t("dispatches.newDispatch")}</Button>
+                ) : null}
+            </div>
+
+            {listError ? <p className="text-sm text-destructive">{listError}</p> : null}
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>{t("dispatches.filtersTitle")}</CardTitle>
+                    <CardDescription>{t("dispatches.filtersDescription")}</CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-wrap gap-3">
+                    <select
+                        className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        value={pendingStatusFilter}
+                        onChange={(event) => setPendingStatusFilter(event.target.value as DispatchStatus | "ALL")}
+                    >
+                        <option value="ALL">{t("dispatches.status.all")}</option>
+                        <option value="DRAFT">{t("dispatches.status.DRAFT")}</option>
+                        <option value="POSTED">{t("dispatches.status.POSTED")}</option>
+                        <option value="VOID">{t("dispatches.status.VOID")}</option>
+                    </select>
+                    <Input
+                        className="max-w-xs"
+                        placeholder={t("dispatches.searchPlaceholder")}
+                        value={pendingSearch}
+                        onChange={(event) => setPendingSearch(event.target.value)}
+                    />
+                    <Button
+                        variant="outline"
+                        onClick={() => {
+                            setStatusFilter(pendingStatusFilter);
+                            setSearch(pendingSearch);
+                            void loadDispatches(0);
+                        }}
+                    >
+                        {t("dispatches.applyFilters")}
+                    </Button>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardContent className="p-0">
+                    {listLoading ? <p className="p-4 text-sm text-muted-foreground">{t("dispatches.loading")}</p> : null}
+                    {!listLoading && dispatches.length === 0 ? (
+                        <p className="p-4 text-sm text-muted-foreground">{t("dispatches.empty")}</p>
+                    ) : null}
+
+                    {dispatches.length > 0 ? (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>{t("dispatches.columns.reference")}</TableHead>
+                                    <TableHead>{t("dispatches.columns.destination")}</TableHead>
+                                    <TableHead>{t("dispatches.columns.status")}</TableHead>
+                                    <TableHead>{t("dispatches.columns.createdAt")}</TableHead>
+                                    <TableHead>{t("dispatches.columns.actions")}</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {dispatches.map((dispatch) => (
+                                    <TableRow
+                                        key={dispatch.id}
+                                        className="cursor-pointer"
+                                        onClick={() => setSelectedDispatchId(dispatch.id)}
+                                    >
+                                        <TableCell>{dispatch.reference || t("dispatches.referenceFallback")}</TableCell>
+                                        <TableCell>{dispatch.destination || t("dispatches.destinationFallback")}</TableCell>
+                                        <TableCell>
+                                            <Badge className={statusBadgeClass(dispatch.status)}>{t(`dispatches.status.${dispatch.status}`)}</Badge>
+                                        </TableCell>
+                                        <TableCell>{new Date(dispatch.createdAt).toLocaleString()}</TableCell>
+                                        <TableCell>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={(event) => {
+                                                    event.stopPropagation();
+                                                    setSelectedDispatchId(dispatch.id);
+                                                }}
+                                            >
+                                                {t("dispatches.open")}
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    ) : null}
+                </CardContent>
+            </Card>
+
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{t("dispatches.newDispatch")}</DialogTitle>
+                        <DialogDescription>{t("dispatches.newDispatchDescription")}</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3">
+                        <div className="space-y-2">
+                            <Label>{t("dispatches.form.reference")}</Label>
+                            <Input value={createReference} onChange={(event) => setCreateReference(event.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>{t("dispatches.form.destination")}</Label>
+                            <Input value={createDestination} onChange={(event) => setCreateDestination(event.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>{t("dispatches.form.notes")}</Label>
+                            <Textarea value={createNotes} onChange={(event) => setCreateNotes(event.target.value)} />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>{t("dispatches.cancel")}</Button>
+                        <Button onClick={() => void handleCreateDraft()} disabled={createSubmitting}>
+                            {createSubmitting ? t("dispatches.form.saving") : t("dispatches.createDraft")}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </div>
+    );
+}

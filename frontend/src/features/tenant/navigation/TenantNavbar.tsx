@@ -14,6 +14,7 @@ import {
   BookOpen,
   PackageOpen,
   PackagePlus,
+  PackageMinus,
   SlidersHorizontal,
   List,
 } from "lucide-react";
@@ -85,6 +86,7 @@ export function TenantNavbar() {
   const canViewAudit = hasPermission(TENANT_PERMISSIONS.AUDIT_VIEW);
   const canViewInventory = hasPermission(TENANT_PERMISSIONS.INVENTORY_VIEW);
   const canViewReceipts = hasPermission(TENANT_PERMISSIONS.RECEIPTS_VIEW);
+  const canViewDispatches = hasPermission(TENANT_PERMISSIONS.DISPATCHES_VIEW);
   const canManageOperations = hasAnyPermission([
     TENANT_PERMISSIONS.INVENTORY_RECEIVE,
     TENANT_PERMISSIONS.INVENTORY_TRANSFER,
@@ -211,6 +213,15 @@ export function TenantNavbar() {
             },
           ]
           : []),
+        ...(canViewDispatches
+          ? [
+            {
+              to: PATHS.TENANT.dispatches(normalizedSlug),
+              label: t("tenant.nav.dispatches"),
+              icon: PackageMinus,
+            },
+          ]
+          : []),
         ...(canViewAudit
           ? [
             {
@@ -231,6 +242,7 @@ export function TenantNavbar() {
       canViewUsers,
       canAccessInventory,
       canViewReceipts,
+      canViewDispatches,
       canViewWarehouse,
       normalizedSlug,
       t,
