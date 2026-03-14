@@ -46,6 +46,7 @@ import {
 } from "@/features/tenant/api/warehouseApi";
 import type {
     AddWarehouseBlockRequest,
+    LocationKind,
     UpsertWarehouseLayoutRequest,
     UpsertWarehouseTemplateRequest,
     WarehouseBlockResult,
@@ -356,6 +357,8 @@ export default function WarehouseLayoutsPage() {
     const [selectedBlockTemplateId, setSelectedBlockTemplateId] = useState("");
     const [selectedBlockParentId, setSelectedBlockParentId] = useState("__root__");
     const [selectedBlockSide, setSelectedBlockSide] = useState("__none__");
+    const [selectedBlockLocationKind, setSelectedBlockLocationKind] = useState<LocationKind>("STORAGE");
+    const [isScanCodeCopied, setIsScanCodeCopied] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
     const [layoutSearch, setLayoutSearch] = useState("");
     const [layoutFilter, setLayoutFilter] = useState<LayoutFilter>("all");
@@ -545,12 +548,16 @@ export default function WarehouseLayoutsPage() {
             setSelectedBlockTemplateId("");
             setSelectedBlockParentId("__root__");
             setSelectedBlockSide("__none__");
+            setSelectedBlockLocationKind("STORAGE");
+            setIsScanCodeCopied(false);
             return;
         }
 
         setSelectedBlockTemplateId(selectedFlattenedNode.node.block.blockTemplateId);
         setSelectedBlockParentId(selectedFlattenedNode.node.block.parentId ?? "__root__");
         setSelectedBlockSide(selectedFlattenedNode.node.block.side ?? "__none__");
+        setSelectedBlockLocationKind(selectedFlattenedNode.node.block.locationKind ?? "STORAGE");
+        setIsScanCodeCopied(false);
     }, [selectedFlattenedNode]);
 
     useEffect(() => {
@@ -852,9 +859,11 @@ export default function WarehouseLayoutsPage() {
             if (
                 selectedBlockTemplateId !== selectedFlattenedNode.node.block.blockTemplateId
                 || nextSide !== (selectedFlattenedNode.node.block.side ?? null)
+                || selectedBlockLocationKind !== selectedFlattenedNode.node.block.locationKind
             ) {
                 await updateWarehouseLayoutBlockMetadata(slug, selectedLayout.id, blockId, {
                     side: nextSide,
+                    locationKind: selectedBlockLocationKind,
                 });
             }
 
@@ -1313,6 +1322,11 @@ export default function WarehouseLayoutsPage() {
                                                                 >
                                                                     <Icon className="h-4 w-4 shrink-0 text-primary" />
                                                                     <span className="flex-1 truncate">{getBlockDisplayLabel(item.node.block, template ?? null, t("warehouse.builder.unknownBlock"))}</span>
+                                                                    {!hasChildren ? (
+                                                                        <Badge variant="outline" className="shrink-0 rounded-none px-1 py-0 text-[10px]">
+                                                                            {t(`warehouse.locationKind.${item.node.block.locationKind}`)}
+                                                                        </Badge>
+                                                                    ) : null}
                                                                 </button>
                                                             </div>
                                                         );
@@ -1404,6 +1418,49 @@ export default function WarehouseLayoutsPage() {
                                                                     ))}
                                                                 </SelectContent>
                                                             </Select>
+                                                        </div>
+                                                    ) : null}
+
+                                                    {selectedFlattenedNode.node.children.length === 0 ? (
+                                                        <div className="space-y-2">
+                                                            <Label htmlFor="selected-kind">{t("warehouse.locationKind.label")}</Label>
+                                                            <Select value={selectedBlockLocationKind} onValueChange={(v) => setSelectedBlockLocationKind(v as LocationKind)}>
+                                                                <SelectTrigger id="selected-kind" className="w-full">
+                                                                    <SelectValue placeholder={t("warehouse.locationKind.placeholder")} />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    {(["STORAGE", "STAGING", "QUARANTINE", "DAMAGED", "DISPATCH", "STRUCTURAL"] as const).map((kind) => (
+                                                                        <SelectItem key={kind} value={kind}>{t(`warehouse.locationKind.${kind}`)}</SelectItem>
+                                                                    ))}
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </div>
+                                                    ) : null}
+
+                                                    {selectedFlattenedNode.node.block.scanCode ? (
+                                                        <div className="space-y-2">
+                                                            <Label>{t("warehouse.scanCode.label")}</Label>
+                                                            <div className="flex items-center gap-2">
+                                                                <Input
+                                                                    readOnly
+                                                                    value={selectedFlattenedNode.node.block.scanCode}
+                                                                    className="font-mono text-sm"
+                                                                />
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    className="shrink-0"
+                                                                    aria-label={t("warehouse.scanCode.copy")}
+                                                                    onClick={() => {
+                                                                        void navigator.clipboard.writeText(selectedFlattenedNode.node.block.scanCode!);
+                                                                        setIsScanCodeCopied(true);
+                                                                        setTimeout(() => setIsScanCodeCopied(false), 2000);
+                                                                    }}
+                                                                >
+                                                                    {isScanCodeCopied ? t("warehouse.scanCode.copied") : <Copy className="h-4 w-4" />}
+                                                                </Button>
+                                                            </div>
                                                         </div>
                                                     ) : null}
 

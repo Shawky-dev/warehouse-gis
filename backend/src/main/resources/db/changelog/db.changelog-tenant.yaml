@@ -125,3 +125,10 @@ databaseChangeLog:
         - sqlFile:
             path: db/migration/tenant/V18__grant_inventory_permissions_to_admin.sql
             relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-c1-location-identity-19
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V19__add_location_identity.sql
+            relativeToChangelogFile: false

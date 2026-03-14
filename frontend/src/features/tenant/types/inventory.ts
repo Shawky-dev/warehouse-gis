@@ -1,3 +1,5 @@
+import type { LocationKind } from "@/features/tenant/types/warehouse";
+
 export type MovementType = "RECEIVE" | "TRANSFER_IN" | "TRANSFER_OUT" | "ADJUST" | "PICK";
 
 export interface ProductLookupItem {
@@ -26,6 +28,8 @@ export interface LocationLookupItem {
   pathLabel: string;
   identifier: string | null;
   side: string | null;
+  locationKind: LocationKind;
+  scanCode: string | null;
 }
 
 export interface LocationLookupPageResult {

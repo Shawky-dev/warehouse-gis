@@ -27,6 +27,7 @@ import type {
   OnHandEntry,
   ProductLookupItem,
 } from "@/features/tenant/types/inventory";
+import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Input } from "@/shared/components/ui/input";
@@ -1053,7 +1054,12 @@ function renderProductOption(option: ProductLookupItem) {
 function renderLocationOption(option: LocationLookupItem) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="font-medium">{option.label}</span>
+      <div className="flex items-center gap-2">
+        <span className="font-medium">{option.label}</span>
+        <Badge variant="outline" className="rounded-none px-1 py-0 text-[10px]">
+          {option.locationKind}
+        </Badge>
+      </div>
       <span className="text-muted-foreground text-[11px]">{option.pathLabel}</span>
     </div>
   );

@@ -1,3 +1,4 @@
+export type LocationKind = "STORAGE" | "STAGING" | "QUARANTINE" | "DAMAGED" | "DISPATCH" | "STRUCTURAL";
 export type WarehouseIdentifierFormat = "NUMERIC" | "ALPHA" | "CUSTOM" | "FREE_TEXT";
 export type WarehouseSideConfig = "NONE" | "LR" | "AB" | "CUSTOM";
 
@@ -81,6 +82,9 @@ export interface WarehouseBlockResult {
     position: number;
     identifier: string | null;
     side: string | null;
+    locationKind: LocationKind;
+    scanCode: string | null;
+    fullCode: string | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -125,6 +129,7 @@ export interface ReassignWarehouseBlockTemplateRequest {
 
 export interface UpdateWarehouseBlockMetadataRequest {
     side?: string | null;
+    locationKind?: LocationKind;
 }
 
 export interface WarehouseApiErrorResponse {
