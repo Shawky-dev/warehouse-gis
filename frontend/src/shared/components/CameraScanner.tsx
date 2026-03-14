@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
-import { X, ScanBarcode } from "lucide-react";
+import { ScanBarcode } from "lucide-react";
 import { resolveCode } from "@/features/tenant/api/scanApi";
 import type { ScanResolveResult, ScanType } from "@/features/tenant/types/scan";
 import {
@@ -20,6 +20,8 @@ interface CameraScannerProps {
 }
 
 const SCANNER_DIV_ID = "camera-scanner-qr-container";
+// BarcodeDetector is available on Chrome/Edge/Android — fast, hardware-accelerated
+const useNativeDetector = typeof window !== "undefined" && "BarcodeDetector" in window;
 
 export function CameraScanner({
   tenantSlug,
@@ -29,6 +31,9 @@ export function CameraScanner({
   acceptTypes,
   title = "Scan QR Code",
 }: CameraScannerProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const rafRef = useRef<number>(0);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const [status, setStatus] = useState<string>("Point camera at a QR code");
   const [error, setError] = useState<string | null>(null);
@@ -36,21 +41,98 @@ export function CameraScanner({
   const [permissionDenied, setPermissionDenied] = useState(false);
   const isProcessing = useRef(false);
 
+  // Fast path: native BarcodeDetector (Chrome / Edge / Android WebView)
+  // Uses requestAnimationFrame — effectively 30-60 fps with hardware decode
   useEffect(() => {
-    if (!open) return;
+    if (!open || !useNativeDetector) return;
+    let cancelled = false;
 
-    // Small delay to ensure DOM element is mounted
+    (async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+        });
+        if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const detector = new (window as any).BarcodeDetector({ formats: ["qr_code"] });
+        let detecting = false;
+
+        const scan = async () => {
+          if (cancelled) return;
+          if (
+            !detecting &&
+            !isProcessing.current &&
+            videoRef.current &&
+            videoRef.current.readyState >= 2
+          ) {
+            detecting = true;
+            try {
+              const codes = await detector.detect(videoRef.current);
+              if (codes.length > 0 && !isProcessing.current) {
+                isProcessing.current = true;
+                setStatus("Resolving...");
+                setError(null);
+                try {
+                  const result = await resolveCode(tenantSlug, codes[0].rawValue);
+                  if (acceptTypes?.length && !acceptTypes.includes(result.type)) {
+                    setError(`Wrong code type (expected: ${acceptTypes.join(", ")})`);
+                    setStatus("Point camera at a QR code");
+                  } else {
+                    onResolved(result);
+                  }
+                } catch {
+                  setError("Code not recognised");
+                  setStatus("Point camera at a QR code");
+                } finally {
+                  isProcessing.current = false;
+                }
+              }
+            } catch { /* detection frame error — ignore */ }
+            detecting = false;
+          }
+          if (!cancelled) rafRef.current = requestAnimationFrame(scan);
+        };
+        rafRef.current = requestAnimationFrame(scan);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("notallowed")) {
+          setPermissionDenied(true);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(rafRef.current);
+      streamRef.current?.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+      isProcessing.current = false;
+    };
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fallback: html5-qrcode for Safari / Firefox (no BarcodeDetector)
+  // Bumped to fps:30 and larger qrbox so alignment is much more forgiving
+  useEffect(() => {
+    if (!open || useNativeDetector) return;
     const timer = setTimeout(async () => {
       const container = document.getElementById(SCANNER_DIV_ID);
       if (!container) return;
-
       try {
         const scanner = new Html5Qrcode(SCANNER_DIV_ID);
         scannerRef.current = scanner;
-
         await scanner.start(
           { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 250, height: 250 } },
+          { fps: 30, qrbox: { width: 300, height: 300 } },
           async (decodedText) => {
             if (isProcessing.current) return;
             isProcessing.current = true;
@@ -58,7 +140,7 @@ export function CameraScanner({
             setError(null);
             try {
               const result = await resolveCode(tenantSlug, decodedText);
-              if (acceptTypes && acceptTypes.length > 0 && !acceptTypes.includes(result.type)) {
+              if (acceptTypes?.length && !acceptTypes.includes(result.type)) {
                 setError(`Wrong code type (expected: ${acceptTypes.join(", ")})`);
                 setStatus("Point camera at a QR code");
               } else {
@@ -73,7 +155,7 @@ export function CameraScanner({
           },
           undefined
         );
-      } catch (err: unknown) {
+      } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         if (message.toLowerCase().includes("permission") || message.toLowerCase().includes("notallowed")) {
           setPermissionDenied(true);
@@ -90,16 +172,16 @@ export function CameraScanner({
       }
       isProcessing.current = false;
     };
-  }, [open]);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function handleManualSubmit(e: React.FormEvent) {
+  async function handleManualSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const trimmed = manualCode.trim();
     if (!trimmed) return;
     setError(null);
     try {
       const result = await resolveCode(tenantSlug, trimmed);
-      if (acceptTypes && acceptTypes.length > 0 && !acceptTypes.includes(result.type)) {
+      if (acceptTypes?.length && !acceptTypes.includes(result.type)) {
         setError(`Wrong code type (expected: ${acceptTypes.join(", ")})`);
         return;
       }
@@ -122,11 +204,32 @@ export function CameraScanner({
 
         {!permissionDenied ? (
           <>
-            <div
-              id={SCANNER_DIV_ID}
-              className="overflow-hidden rounded-md"
-              style={{ width: "100%", minHeight: 280 }}
-            />
+            {useNativeDetector ? (
+              // Native path: plain <video> with a translucent overlay border
+              <div
+                className="relative overflow-hidden rounded-md"
+                style={{ width: "100%", aspectRatio: "1" }}
+              >
+                <video
+                  ref={videoRef}
+                  className="h-full w-full object-cover"
+                  autoPlay
+                  playsInline
+                  muted
+                />
+                {/* Dim surround + bright corner box so user knows where to aim */}
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                  <div className="h-56 w-56 rounded-lg border-2 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]" />
+                </div>
+              </div>
+            ) : (
+              // Fallback path: html5-qrcode renders its own video inside this div
+              <div
+                id={SCANNER_DIV_ID}
+                className="overflow-hidden rounded-md"
+                style={{ width: "100%", minHeight: 280 }}
+              />
+            )}
             <p className="text-center text-sm text-muted-foreground">{status}</p>
           </>
         ) : (
