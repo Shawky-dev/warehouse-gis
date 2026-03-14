@@ -87,6 +87,7 @@ export function TenantNavbar() {
   const canViewInventory = hasPermission(TENANT_PERMISSIONS.INVENTORY_VIEW);
   const canViewReceipts = hasPermission(TENANT_PERMISSIONS.RECEIPTS_VIEW);
   const canViewDispatches = hasPermission(TENANT_PERMISSIONS.DISPATCHES_VIEW);
+  const canViewCounting = hasPermission(TENANT_PERMISSIONS.COUNTING_VIEW);
   const canManageOperations = hasAnyPermission([
     TENANT_PERMISSIONS.INVENTORY_RECEIVE,
     TENANT_PERMISSIONS.INVENTORY_TRANSFER,
@@ -222,6 +223,15 @@ export function TenantNavbar() {
             },
           ]
           : []),
+        ...(canViewCounting
+          ? [
+            {
+              to: PATHS.TENANT.countSessions(normalizedSlug),
+              label: t("tenant.nav.countSessions"),
+              icon: ClipboardList,
+            },
+          ]
+          : []),
         ...(canViewAudit
           ? [
             {
@@ -243,6 +253,7 @@ export function TenantNavbar() {
       canAccessInventory,
       canViewReceipts,
       canViewDispatches,
+      canViewCounting,
       canViewWarehouse,
       normalizedSlug,
       t,

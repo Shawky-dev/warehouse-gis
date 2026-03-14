@@ -40,6 +40,7 @@ export const PATHS = {
     INVENTORY_MOVEMENTS_PATTERN: "/:tenantSlug/inventory/movements",
     RECEIPTS_PATTERN: "/:tenantSlug/receipts",
     DISPATCHES_PATTERN: "/:tenantSlug/dispatches",
+    COUNT_SESSIONS_PATTERN: "/:tenantSlug/count-sessions",
     root: (tenantSlug: string) => `/${tenantSlug}`,
     authLogin: (tenantSlug: string) => `/${tenantSlug}/auth/login`,
     products: (tenantSlug: string) => `/${tenantSlug}/products`,
@@ -60,5 +61,6 @@ export const PATHS = {
     inventoryMovements: (tenantSlug: string) => `/${tenantSlug}/inventory/movements`,
     receipts: (tenantSlug: string) => `/${tenantSlug}/receipts`,
     dispatches: (tenantSlug: string) => `/${tenantSlug}/dispatches`,
+    countSessions: (tenantSlug: string) => `/${tenantSlug}/count-sessions`,
   },
 };

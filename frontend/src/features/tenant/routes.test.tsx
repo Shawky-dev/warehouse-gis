@@ -51,6 +51,10 @@ vi.mock("@/features/tenant/dispatches/DispatchesPage", () => ({
   default: () => <p>tenant-dispatches-page</p>,
 }));
 
+vi.mock("@/features/tenant/counting/CountSessionsPage", () => ({
+  default: () => <p>tenant-count-sessions-page</p>,
+}));
+
 function renderTenantRoute(path: string) {
   return render(
     <I18nProvider initialLocale="en" storageKey="test-locale-tenant-routes">
@@ -341,5 +345,30 @@ describe("tenant routes RBAC", () => {
     renderTenantRoute("/acme/dispatches");
 
     expect(screen.getByText("tenant-dispatches-page")).toBeInTheDocument();
+  });
+
+  it("blocks count sessions route when tenant.counting.view permission is missing", () => {
+    mockUseAuth.mockReturnValue({
+      status: "authenticated",
+      hasPermission: () => false,
+      hasAnyPermission: () => false,
+    });
+
+    renderTenantRoute("/acme/count-sessions");
+
+    expect(screen.queryByText("tenant-count-sessions-page")).not.toBeInTheDocument();
+    expect(screen.getByText("Access denied")).toBeInTheDocument();
+  });
+
+  it("renders count sessions route when tenant.counting.view permission is present", () => {
+    mockUseAuth.mockReturnValue({
+      status: "authenticated",
+      hasPermission: (permission: string) => permission === TENANT_PERMISSIONS.COUNTING_VIEW,
+      hasAnyPermission: () => false,
+    });
+
+    renderTenantRoute("/acme/count-sessions");
+
+    expect(screen.getByText("tenant-count-sessions-page")).toBeInTheDocument();
   });
 });

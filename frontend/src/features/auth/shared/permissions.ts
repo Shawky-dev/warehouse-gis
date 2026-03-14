@@ -63,6 +63,10 @@ export const TENANT_PERMISSIONS = {
   DISPATCHES_EDIT: "tenant.dispatches.edit",
   DISPATCHES_POST: "tenant.dispatches.post",
   DISPATCHES_VOID: "tenant.dispatches.void",
+  COUNTING_VIEW: "tenant.counting.view",
+  COUNTING_CREATE: "tenant.counting.create",
+  COUNTING_POST: "tenant.counting.post",
+  COUNTING_VOID: "tenant.counting.void",
 } as const;
 
 export type LandlordPermission = (typeof LANDLORD_PERMISSIONS)[keyof typeof LANDLORD_PERMISSIONS];
