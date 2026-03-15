@@ -71,6 +71,12 @@ export async function voidCountSession(tenantSlug: string, id: string): Promise<
     return res.data;
 }
 
+export async function deleteDraftCountSession(tenantSlug: string, id: string): Promise<void> {
+    await api.delete(`${basePath(tenantSlug)}/${id}`, {
+        headers: headers(tenantSlug),
+    });
+}
+
 export function extractCountingErrorMessage(error: unknown, fallback: string): string {
     if (
         error &&

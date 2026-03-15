@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { normalizeTenantSlug } from "@/features/auth/shared/scope";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { TENANT_PERMISSIONS } from "@/features/auth/shared/permissions";
 import { useI18n } from "@/i18n";
 import {
+    deleteDraftCountSession,
     extractCountingErrorMessage,
     getCountSession,
     listCountSessions,
@@ -49,6 +50,7 @@ export default function CountSessionsPage() {
     const { t } = useI18n();
     const { hasPermission } = useAuth();
     const { tenantSlug } = useParams<{ tenantSlug: string }>();
+    const [searchParams, setSearchParams] = useSearchParams();
     const slug = normalizeTenantSlug(tenantSlug ?? "");
 
     const canCreate = hasPermission(TENANT_PERMISSIONS.COUNTING_CREATE);
@@ -84,19 +86,103 @@ export default function CountSessionsPage() {
 
     const [isPostConfirmOpen, setIsPostConfirmOpen] = useState(false);
     const [isVoidConfirmOpen, setIsVoidConfirmOpen] = useState(false);
+    const [isDeleteDraftConfirmOpen, setIsDeleteDraftConfirmOpen] = useState(false);
 
     const [docMovements, setDocMovements] = useState<MovementResult[]>([]);
     const [docMovementsLoading, setDocMovementsLoading] = useState(false);
 
     const [scanFilter, setScanFilter] = useState<{ productId?: string; locationId?: string; lotNumber?: string } | null>(null);
+    const [scanNotice, setScanNotice] = useState<{ message: string; tone: "muted" | "warning" | "danger" } | null>(null);
+    const [scannedCodes, setScannedCodes] = useState<Record<string, number>>({});
 
-    function handleLineScan(result: ScanResolveResult) {
+    async function handleLineScan(result: ScanResolveResult) {
         if (result.type === "PRODUCT") {
             setScanFilter({ productId: result.productId });
+            setScanNotice(null);
         } else if (result.type === "LOCATION") {
             setScanFilter({ locationId: result.locationId });
+            setScanNotice(null);
         } else if (result.type === "LOT") {
             setScanFilter({ productId: result.productId, lotNumber: result.lotNumber });
+            setScanNotice(null);
+        } else if (result.type === "RECEIPT_LINE" || result.type === "STOCK_ROW") {
+            setScanFilter({
+                productId: result.productId,
+                locationId: result.locationId,
+                lotNumber: result.lotNumber,
+            });
+
+            if (!detail || detail.status !== "OPEN") {
+                setScanNotice({ message: t("counting.scan.notOpen"), tone: "danger" });
+                return;
+            }
+
+            const matchingLines = detail.lines.filter((line) => {
+                if (result.productId && line.productId !== result.productId) {
+                    return false;
+                }
+                if (result.locationId && line.locationId !== result.locationId) {
+                    return false;
+                }
+
+                const normalizedLineLot = (line.lotNumber ?? "").trim().toLowerCase();
+                const normalizedScanLot = (result.lotNumber ?? "").trim().toLowerCase();
+                if (normalizedScanLot && normalizedLineLot !== normalizedScanLot) {
+                    return false;
+                }
+                return true;
+            });
+
+            if (matchingLines.length === 0) {
+                setScanNotice({ message: t("counting.scan.noMatch"), tone: "danger" });
+                return;
+            }
+
+            if (matchingLines.length > 1) {
+                setScanNotice({ message: t("counting.scan.multipleMatches"), tone: "warning" });
+                return;
+            }
+
+            const matchedLine = matchingLines[0];
+            const currentQty = Number.parseFloat(resolveEffectiveCountedQty(matchedLine) || "0");
+            const parsedIncrement = Number.parseFloat(result.lineQty ?? "");
+            const increment = Number.isFinite(parsedIncrement) && parsedIncrement > 0 ? parsedIncrement : 1;
+            const nextQty = String(currentQty + increment);
+
+            setLineSavingId(matchedLine.id);
+            setLineError(null);
+            try {
+                const updatedLine = await updateCountLine(slug, detail.id, matchedLine.id, { countedQty: nextQty });
+                setDetail((current) => {
+                    if (!current) {
+                        return current;
+                    }
+                    return {
+                        ...current,
+                        lines: current.lines.map((item) => (item.id === updatedLine.id ? updatedLine : item)),
+                    };
+                });
+                setLineTouched((current) => ({ ...current, [matchedLine.id]: true }));
+                setLineDrafts((current) => ({ ...current, [matchedLine.id]: normalizeQtyValue(updatedLine.countedQty) }));
+
+                const duplicate = Boolean(result.scanCode && scannedCodes[result.scanCode] > 0);
+                if (result.scanCode) {
+                    setScannedCodes((current) => ({
+                        ...current,
+                        [result.scanCode!]: (current[result.scanCode!] ?? 0) + 1,
+                    }));
+                }
+
+                setScanNotice({
+                    message: duplicate ? t("counting.scan.duplicate") : t("counting.scan.applied"),
+                    tone: duplicate ? "warning" : "muted",
+                });
+            } catch (error) {
+                setScanNotice(null);
+                setLineError(extractCountingErrorMessage(error, t("counting.actionFailed")));
+            } finally {
+                setLineSavingId(null);
+            }
         }
     }
 
@@ -131,6 +217,33 @@ export default function CountSessionsPage() {
     }, [slug]);
 
     useEffect(() => {
+        const id = searchParams.get("id");
+        if (!id) {
+            return;
+        }
+
+        if (selectedSessionId !== id) {
+            setSelectedSessionId(id);
+        }
+    }, [searchParams, selectedSessionId]);
+
+    useEffect(() => {
+        const next = new URLSearchParams(searchParams);
+        if (selectedSessionId) {
+            if (searchParams.get("id") === selectedSessionId) {
+                return;
+            }
+            next.set("id", selectedSessionId);
+        } else {
+            if (!searchParams.has("id")) {
+                return;
+            }
+            next.delete("id");
+        }
+        setSearchParams(next, { replace: true });
+    }, [searchParams, selectedSessionId, setSearchParams]);
+
+    useEffect(() => {
         if (!selectedSessionId) {
             setDetail(null);
             setDetailError(null);
@@ -158,6 +271,8 @@ export default function CountSessionsPage() {
         if (!detail) {
             setLineDrafts({});
             setLineTouched({});
+            setScannedCodes({});
+            setScanNotice(null);
             return;
         }
 
@@ -376,6 +491,20 @@ export default function CountSessionsPage() {
         }
     }
 
+    async function handleDeleteDraftSession() {
+        if (!detail || detail.status !== "OPEN") {
+            return;
+        }
+        try {
+            await deleteDraftCountSession(slug, detail.id);
+            setIsDeleteDraftConfirmOpen(false);
+            setSelectedSessionId(null);
+            await loadSessions(0);
+        } catch (error) {
+            setDetailError(extractCountingErrorMessage(error, t("counting.actionFailed")));
+        }
+    }
+
     const statusBadgeClass = (status: CountStatus) => {
         switch (status) {
             case "OPEN":
@@ -459,8 +588,8 @@ export default function CountSessionsPage() {
                         <div className="flex items-center gap-2">
                             <ScanInput
                                 tenantSlug={slug}
-                                onResolved={handleLineScan}
-                                acceptTypes={["PRODUCT", "LOCATION", "LOT"]}
+                                onResolved={(result) => void handleLineScan(result)}
+                                acceptTypes={["PRODUCT", "LOCATION", "LOT", "RECEIPT_LINE", "STOCK_ROW"]}
                                 placeholder={t("scan.placeholder")}
                             />
                             {scanFilter ? (
@@ -469,6 +598,18 @@ export default function CountSessionsPage() {
                                 </Button>
                             ) : null}
                         </div>
+                        {scanNotice ? (
+                            <p
+                                className={`text-xs ${scanNotice.tone === "danger"
+                                    ? "text-destructive"
+                                    : scanNotice.tone === "warning"
+                                        ? "text-amber-700"
+                                        : "text-muted-foreground"
+                                    }`}
+                            >
+                                {scanNotice.message}
+                            </p>
+                        ) : null}
                     </CardContent>
                     <CardContent className="p-0">
                         <Table>
@@ -576,6 +717,11 @@ export default function CountSessionsPage() {
                             {t("counting.postAction")}
                         </Button>
                     ) : null}
+                    {isOpen && canCreate ? (
+                        <Button variant="destructive" onClick={() => setIsDeleteDraftConfirmOpen(true)}>
+                            {t("counting.deleteDraftAction")}
+                        </Button>
+                    ) : null}
                     {isOpen && canVoid ? (
                         <Button variant="destructive" onClick={() => setIsVoidConfirmOpen(true)}>
                             {t("counting.voidAction")}
@@ -653,6 +799,19 @@ export default function CountSessionsPage() {
                         <AlertDialogFooter>
                             <AlertDialogCancel>{t("counting.cancel")}</AlertDialogCancel>
                             <AlertDialogAction onClick={handleVoidSession}>{t("counting.voidAction")}</AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+
+                <AlertDialog open={isDeleteDraftConfirmOpen} onOpenChange={setIsDeleteDraftConfirmOpen}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>{t("counting.deleteDraft.confirm")}</AlertDialogTitle>
+                            <AlertDialogDescription>{t("counting.deleteDraft.confirmDescription")}</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>{t("counting.cancel")}</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleDeleteDraftSession}>{t("counting.deleteDraftAction")}</AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>

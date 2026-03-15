@@ -14,6 +14,8 @@ public interface ReceiptLineRepository extends JpaRepository<ReceiptLine, UUID> 
 
     Optional<ReceiptLine> findByReceiptIdAndId(UUID receiptId, UUID id);
 
+    void deleteByReceiptId(UUID receiptId);
+
     @Query("select coalesce(max(rl.position), -1) from ReceiptLine rl where rl.receiptId = :receiptId")
     int findMaxPositionByReceiptId(@Param("receiptId") UUID receiptId);
 }

@@ -153,6 +153,16 @@ public class DispatchService {
     }
 
     @Transactional
+    public void deleteDraft(UUID dispatchId, String actor) {
+        assertActor(actor);
+        DispatchDocument dispatch = loadDispatch(dispatchId);
+        assertDraft(dispatch, "Only draft dispatches can be deleted");
+
+        dispatchLineRepository.deleteByDispatchId(dispatchId);
+        dispatchDocumentRepository.delete(dispatch);
+    }
+
+    @Transactional
     public DispatchDetailResult postDispatch(UUID dispatchId, String actor) {
         String normalizedActor = requireActor(actor);
         DispatchDocument dispatch = loadDispatch(dispatchId);

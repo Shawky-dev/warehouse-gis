@@ -186,6 +186,16 @@ public class CountSessionService {
         return getSession(saved.getId());
     }
 
+    @Transactional
+    public void deleteDraft(UUID sessionId, String actor) {
+        assertActor(actor);
+        CountSession session = loadCountSession(sessionId);
+        assertOpen(session, "Only open count sessions can be deleted");
+
+        countLineRepository.deleteBySessionId(sessionId);
+        countSessionRepository.delete(session);
+    }
+
     @Transactional(readOnly = true)
     public CountSessionPageResult listSessions(int page, int size, CountStatus status, String search) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));

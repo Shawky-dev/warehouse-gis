@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -125,6 +126,17 @@ public class CountSessionController {
             Authentication authentication) {
         tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
         return ResponseEntity.ok(countSessionService.voidSession(sessionId, authentication.getName()));
+    }
+
+    @DeleteMapping("/{sessionId}")
+    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).COUNTING_CREATE)")
+    public ResponseEntity<Void> deleteDraft(
+            @PathVariable String tenantSlug,
+            @PathVariable UUID sessionId,
+            Authentication authentication) {
+        tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
+        countSessionService.deleteDraft(sessionId, authentication.getName());
+        return ResponseEntity.noContent().build();
     }
 
     public record OpenSessionRequest(

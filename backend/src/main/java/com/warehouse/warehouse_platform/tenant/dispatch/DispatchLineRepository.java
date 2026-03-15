@@ -14,6 +14,8 @@ public interface DispatchLineRepository extends JpaRepository<DispatchLine, UUID
 
     Optional<DispatchLine> findByDispatchIdAndId(UUID dispatchId, UUID id);
 
+    void deleteByDispatchId(UUID dispatchId);
+
     @Query("select coalesce(max(dl.position), -1) from DispatchLine dl where dl.dispatchId = :dispatchId")
     int findMaxPositionByDispatchId(@Param("dispatchId") UUID dispatchId);
 }

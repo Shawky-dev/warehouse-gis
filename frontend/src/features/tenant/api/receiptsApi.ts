@@ -89,6 +89,12 @@ export async function voidReceipt(tenantSlug: string, id: string): Promise<Recei
     return res.data;
 }
 
+export async function deleteDraftReceipt(tenantSlug: string, id: string): Promise<void> {
+    await api.delete(`${basePath(tenantSlug)}/${id}`, {
+        headers: headers(tenantSlug),
+    });
+}
+
 export function extractReceiptErrorMessage(error: unknown, fallback: string): string {
     if (
         error &&

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { normalizeTenantSlug } from "@/features/auth/shared/scope";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { TENANT_PERMISSIONS } from "@/features/auth/shared/permissions";
@@ -7,6 +7,7 @@ import { useI18n } from "@/i18n";
 import {
     addLine,
     createDraft,
+    deleteDraftDispatch,
     extractDispatchErrorMessage,
     getDispatch,
     listDispatches,
@@ -66,6 +67,7 @@ export default function DispatchesPage() {
     const { t } = useI18n();
     const { hasPermission } = useAuth();
     const { tenantSlug } = useParams<{ tenantSlug: string }>();
+    const [searchParams, setSearchParams] = useSearchParams();
     const slug = normalizeTenantSlug(tenantSlug ?? "");
 
     const canCreate = hasPermission(TENANT_PERMISSIONS.DISPATCHES_CREATE);
@@ -105,6 +107,7 @@ export default function DispatchesPage() {
 
     const [isPostConfirmOpen, setIsPostConfirmOpen] = useState(false);
     const [isVoidConfirmOpen, setIsVoidConfirmOpen] = useState(false);
+    const [isDeleteDraftConfirmOpen, setIsDeleteDraftConfirmOpen] = useState(false);
 
     const [docMovements, setDocMovements] = useState<MovementResult[]>([]);
     const [docMovementsLoading, setDocMovementsLoading] = useState(false);
@@ -240,6 +243,33 @@ export default function DispatchesPage() {
         void Promise.all([loadDispatches(0), loadLookupData()]);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [slug]);
+
+    useEffect(() => {
+        const id = searchParams.get("id");
+        if (!id) {
+            return;
+        }
+
+        if (selectedDispatchId !== id) {
+            setSelectedDispatchId(id);
+        }
+    }, [searchParams, selectedDispatchId]);
+
+    useEffect(() => {
+        const next = new URLSearchParams(searchParams);
+        if (selectedDispatchId) {
+            if (searchParams.get("id") === selectedDispatchId) {
+                return;
+            }
+            next.set("id", selectedDispatchId);
+        } else {
+            if (!searchParams.has("id")) {
+                return;
+            }
+            next.delete("id");
+        }
+        setSearchParams(next, { replace: true });
+    }, [searchParams, selectedDispatchId, setSearchParams]);
 
     useEffect(() => {
         if (!selectedDispatchId) {
@@ -418,6 +448,20 @@ export default function DispatchesPage() {
             const updated = await voidDispatch(slug, detail.id);
             setIsVoidConfirmOpen(false);
             setDetail(updated);
+            await loadDispatches(0);
+        } catch (error) {
+            setDetailError(extractDispatchErrorMessage(error, t("dispatches.actionFailed")));
+        }
+    }
+
+    async function handleDeleteDraftDispatch() {
+        if (!detail || detail.status !== "DRAFT") {
+            return;
+        }
+        try {
+            await deleteDraftDispatch(slug, detail.id);
+            setIsDeleteDraftConfirmOpen(false);
+            setSelectedDispatchId(null);
             await loadDispatches(0);
         } catch (error) {
             setDetailError(extractDispatchErrorMessage(error, t("dispatches.actionFailed")));
@@ -669,6 +713,11 @@ export default function DispatchesPage() {
                             {t("dispatches.postAction")}
                         </Button>
                     ) : null}
+                    {isDraft && canEdit ? (
+                        <Button variant="destructive" onClick={() => setIsDeleteDraftConfirmOpen(true)}>
+                            {t("dispatches.deleteDraftAction")}
+                        </Button>
+                    ) : null}
                     {isPosted && canVoid ? (
                         <Button variant="destructive" onClick={() => setIsVoidConfirmOpen(true)}>
                             {t("dispatches.voidAction")}
@@ -746,6 +795,19 @@ export default function DispatchesPage() {
                         <AlertDialogFooter>
                             <AlertDialogCancel>{t("dispatches.cancel")}</AlertDialogCancel>
                             <AlertDialogAction onClick={handleVoidDispatch}>{t("dispatches.voidAction")}</AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+
+                <AlertDialog open={isDeleteDraftConfirmOpen} onOpenChange={setIsDeleteDraftConfirmOpen}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>{t("dispatches.deleteDraft.confirm")}</AlertDialogTitle>
+                            <AlertDialogDescription>{t("dispatches.deleteDraft.confirmDescription")}</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>{t("dispatches.cancel")}</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleDeleteDraftDispatch}>{t("dispatches.deleteDraftAction")}</AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>

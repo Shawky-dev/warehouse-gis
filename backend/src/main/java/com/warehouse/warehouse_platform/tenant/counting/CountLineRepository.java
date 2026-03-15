@@ -12,5 +12,7 @@ public interface CountLineRepository extends JpaRepository<CountLine, UUID> {
 
     Optional<CountLine> findBySessionIdAndId(UUID sessionId, UUID id);
 
+    void deleteBySessionId(UUID sessionId);
+
     long countBySessionId(UUID sessionId);
 }

@@ -89,6 +89,12 @@ export async function voidDispatch(tenantSlug: string, id: string): Promise<Disp
     return res.data;
 }
 
+export async function deleteDraftDispatch(tenantSlug: string, id: string): Promise<void> {
+    await api.delete(`${basePath(tenantSlug)}/${id}`, {
+        headers: headers(tenantSlug),
+    });
+}
+
 export function extractDispatchErrorMessage(error: unknown, fallback: string): string {
     if (
         error &&

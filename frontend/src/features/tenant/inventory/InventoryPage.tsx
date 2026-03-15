@@ -22,6 +22,7 @@ import {
 } from "@/features/tenant/api/inventoryApi";
 import type {
   LocationLookupItem,
+  MovementType,
   MovementPageResult,
   MovementResult,
   StockEntry,
@@ -119,11 +120,11 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
   const canTransfer = hasPermission(TENANT_PERMISSIONS.INVENTORY_TRANSFER);
   const canAdjust = hasPermission(TENANT_PERMISSIONS.INVENTORY_ADJUST);
 
-  const availableOperations: Operation[] = [
+  const availableOperations = useMemo<Operation[]>(() => [
     ...(canReceive ? ["receive" as const] : []),
     ...(canTransfer ? ["transfer" as const] : []),
     ...(canAdjust ? ["adjust" as const] : []),
-  ];
+  ], [canAdjust, canReceive, canTransfer]);
   const [operation, setOperation] = useState<Operation>(availableOperations[0] ?? "receive");
   const [transferMode, setTransferMode] = useState<TransferMode>("move");
 
@@ -146,7 +147,12 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
   const [opSuccess, setOpSuccess] = useState<string | null>(null);
   const [opError, setOpError] = useState<string | null>(null);
 
-  const [movementFilters, setMovementFilters] = useState({ productId: "", locationId: "" });
+  const [movementFilters, setMovementFilters] = useState<{
+    productId: string;
+    locationId: string;
+    sourceDocumentId: string;
+    movementType: MovementType | "";
+  }>({ productId: "", locationId: "", sourceDocumentId: "", movementType: "" });
   const [movPage, setMovPage] = useState(0);
   const [movData, setMovData] = useState<MovementPageResult | null>(null);
   const [movLoading, setMovLoading] = useState(false);
@@ -390,10 +396,23 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
 
     const productId = searchParams.get("productId") ?? "";
     const locationId = searchParams.get("locationId") ?? "";
+    const sourceDocumentId = searchParams.get("sourceDocumentId") ?? "";
+    const movementTypeFromQuery = searchParams.get("movementType") ?? "";
+    const movementType: MovementType | "" =
+      movementTypeFromQuery === "RECEIVE"
+        || movementTypeFromQuery === "TRANSFER_IN"
+        || movementTypeFromQuery === "TRANSFER_OUT"
+        || movementTypeFromQuery === "ADJUST"
+        || movementTypeFromQuery === "PICK"
+        ? movementTypeFromQuery
+        : "";
 
-    const nextFilters = { productId, locationId };
+    const nextFilters = { productId, locationId, sourceDocumentId, movementType };
     setMovementFilters((current) =>
-      current.productId === nextFilters.productId && current.locationId === nextFilters.locationId
+      current.productId === nextFilters.productId
+        && current.locationId === nextFilters.locationId
+        && current.sourceDocumentId === nextFilters.sourceDocumentId
+        && current.movementType === nextFilters.movementType
         ? current
         : nextFilters
     );
@@ -465,13 +484,18 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
     }
   }
 
-  async function loadMovements(filters: { productId: string; locationId: string }, page: number) {
+  async function loadMovements(
+    filters: { productId: string; locationId: string; sourceDocumentId: string; movementType: MovementType | "" },
+    page: number
+  ) {
     setMovLoading(true);
     setMovError(null);
     try {
       const result = await getMovements(slug, {
         productId: filters.productId || undefined,
         locationId: filters.locationId || undefined,
+        sourceDocumentId: filters.sourceDocumentId || undefined,
+        movementType: filters.movementType || undefined,
         page,
         size: 25,
       });
@@ -600,6 +624,10 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
     else next.delete("productId");
     if (movementFilters.locationId) next.set("locationId", movementFilters.locationId);
     else next.delete("locationId");
+    if (movementFilters.sourceDocumentId.trim()) next.set("sourceDocumentId", movementFilters.sourceDocumentId.trim());
+    else next.delete("sourceDocumentId");
+    if (movementFilters.movementType) next.set("movementType", movementFilters.movementType);
+    else next.delete("movementType");
     setSearchParams(next);
   }
 
@@ -1115,7 +1143,7 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
               <CardDescription>{t("inventory.movements.filtersDescription")}</CardDescription>
             </CardHeader>
             <CardContent>
-              <form className="grid gap-4 lg:grid-cols-[1fr_1fr_auto_auto]" onSubmit={handleMovementApplyFilters}>
+              <form className="grid gap-4 lg:grid-cols-[1fr_1fr_1fr_1fr_auto_auto]" onSubmit={handleMovementApplyFilters}>
                 <PickerField
                   id="movement-product"
                   label={t("inventory.filters.product")}
@@ -1142,6 +1170,41 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
                   renderOption={renderLocationOption}
                   getOptionLabel={getLocationLabel}
                 />
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="movement-source-document">{t("inventory.movements.filterSourceDocument")}</Label>
+                  <Input
+                    id="movement-source-document"
+                    value={movementFilters.sourceDocumentId}
+                    onChange={(event) =>
+                      setMovementFilters((current) => ({ ...current, sourceDocumentId: event.target.value }))
+                    }
+                    placeholder={t("inventory.movements.filterSourceDocumentPlaceholder")}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="movement-type">{t("inventory.movements.filterMovementType")}</Label>
+                  <Select
+                    value={movementFilters.movementType || "__all__"}
+                    onValueChange={(next) =>
+                      setMovementFilters((current) => ({
+                        ...current,
+                        movementType: next === "__all__" ? "" : (next as MovementType),
+                      }))
+                    }
+                  >
+                    <SelectTrigger id="movement-type" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">{t("inventory.movements.movementTypeAll")}</SelectItem>
+                      <SelectItem value="RECEIVE">{t("inventory.movements.type.RECEIVE")}</SelectItem>
+                      <SelectItem value="TRANSFER_IN">{t("inventory.movements.type.TRANSFER_IN")}</SelectItem>
+                      <SelectItem value="TRANSFER_OUT">{t("inventory.movements.type.TRANSFER_OUT")}</SelectItem>
+                      <SelectItem value="ADJUST">{t("inventory.movements.type.ADJUST")}</SelectItem>
+                      <SelectItem value="PICK">{t("inventory.movements.type.PICK")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <Button type="submit" variant="outline" className="self-end">
                   {t("inventory.filters.apply")}
                 </Button>
@@ -1150,11 +1213,13 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
                   variant="ghost"
                   className="self-end"
                   onClick={() => {
-                    const nextFilters = { productId: "", locationId: "" };
+                    const nextFilters = { productId: "", locationId: "", sourceDocumentId: "", movementType: "" as const };
                     setMovementFilters(nextFilters);
                     const next = new URLSearchParams(searchParams);
                     next.delete("productId");
                     next.delete("locationId");
+                    next.delete("sourceDocumentId");
+                    next.delete("movementType");
                     setSearchParams(next);
                   }}
                 >
@@ -1205,10 +1270,15 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
                                 onClick={() => {
                                   const path =
                                     row.type === "RECEIVE"
-                                      ? PATHS.TENANT.receipts(slug)
+                                      ? `${PATHS.TENANT.receipts(slug)}?id=${row.sourceDocumentId}`
                                       : row.type === "PICK"
-                                        ? PATHS.TENANT.dispatches(slug)
-                                        : PATHS.TENANT.countSessions(slug);
+                                        ? `${PATHS.TENANT.dispatches(slug)}?id=${row.sourceDocumentId}`
+                                        : row.type === "ADJUST"
+                                          ? `${PATHS.TENANT.countSessions(slug)}?id=${row.sourceDocumentId}`
+                                          : "";
+                                  if (!path) {
+                                    return;
+                                  }
                                   navigate(path);
                                 }}
                               >

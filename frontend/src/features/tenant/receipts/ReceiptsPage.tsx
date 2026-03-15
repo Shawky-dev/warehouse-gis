@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { normalizeTenantSlug } from "@/features/auth/shared/scope";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { TENANT_PERMISSIONS } from "@/features/auth/shared/permissions";
@@ -7,6 +7,7 @@ import { useI18n } from "@/i18n";
 import {
     addLine,
     createDraft,
+    deleteDraftReceipt,
     extractReceiptErrorMessage,
     getReceipt,
     listReceipts,
@@ -73,6 +74,7 @@ export default function ReceiptsPage() {
     const { t } = useI18n();
     const { hasPermission } = useAuth();
     const { tenantSlug } = useParams<{ tenantSlug: string }>();
+    const [searchParams, setSearchParams] = useSearchParams();
     const slug = normalizeTenantSlug(tenantSlug ?? "");
 
     const canCreate = hasPermission(TENANT_PERMISSIONS.RECEIPTS_CREATE);
@@ -90,6 +92,7 @@ export default function ReceiptsPage() {
     const [receipts, setReceipts] = useState<ReceiptListItem[]>([]);
 
     const [selectedReceiptId, setSelectedReceiptId] = useState<string | null>(null);
+    const [invalidReceiptId, setInvalidReceiptId] = useState<string | null>(null);
     const [detailLoading, setDetailLoading] = useState(false);
     const [detailError, setDetailError] = useState<string | null>(null);
     const [detail, setDetail] = useState<ReceiptDetail | null>(null);
@@ -113,6 +116,7 @@ export default function ReceiptsPage() {
 
     const [isPostConfirmOpen, setIsPostConfirmOpen] = useState(false);
     const [isVoidConfirmOpen, setIsVoidConfirmOpen] = useState(false);
+    const [isDeleteDraftConfirmOpen, setIsDeleteDraftConfirmOpen] = useState(false);
 
     const [docMovements, setDocMovements] = useState<MovementResult[]>([]);
     const [docMovementsLoading, setDocMovementsLoading] = useState(false);
@@ -123,6 +127,16 @@ export default function ReceiptsPage() {
         () => products.find((product) => product.id === lineForm.productId) ?? null,
         [products, lineForm.productId]
     );
+
+    function clearSelectedReceipt() {
+        setSelectedReceiptId(null);
+        setDetail(null);
+        const next = new URLSearchParams(searchParams);
+        if (next.has("id")) {
+            next.delete("id");
+            setSearchParams(next, { replace: true });
+        }
+    }
 
     function handleProductScanned(result: ScanResolveResult) {
         if (!result.productId) return;
@@ -172,6 +186,40 @@ export default function ReceiptsPage() {
     }, [slug]);
 
     useEffect(() => {
+        const id = searchParams.get("id");
+        if (!id) {
+            return;
+        }
+
+        if (invalidReceiptId && id === invalidReceiptId) {
+            const next = new URLSearchParams(searchParams);
+            next.delete("id");
+            setSearchParams(next, { replace: true });
+            return;
+        }
+
+        if (selectedReceiptId !== id) {
+            setSelectedReceiptId(id);
+        }
+    }, [invalidReceiptId, searchParams, selectedReceiptId, setSearchParams]);
+
+    useEffect(() => {
+        const next = new URLSearchParams(searchParams);
+        if (selectedReceiptId) {
+            if (searchParams.get("id") === selectedReceiptId) {
+                return;
+            }
+            next.set("id", selectedReceiptId);
+        } else {
+            if (!searchParams.has("id")) {
+                return;
+            }
+            next.delete("id");
+        }
+        setSearchParams(next, { replace: true });
+    }, [searchParams, selectedReceiptId, setSearchParams]);
+
+    useEffect(() => {
         if (!selectedReceiptId) {
             setDetail(null);
             setDetailError(null);
@@ -219,9 +267,17 @@ export default function ReceiptsPage() {
         setLineError(null);
         try {
             const result = await getReceipt(slug, receiptId);
+            if (invalidReceiptId === receiptId) {
+                setInvalidReceiptId(null);
+            }
             setDetail(result);
         } catch (error) {
-            setDetailError(extractReceiptErrorMessage(error, t("receipts.loadFailed")));
+            const message = extractReceiptErrorMessage(error, t("receipts.loadFailed"));
+            setDetailError(message);
+            if (message.toLowerCase().includes("not found")) {
+                setInvalidReceiptId(receiptId);
+                clearSelectedReceipt();
+            }
         } finally {
             setDetailLoading(false);
         }
@@ -282,6 +338,7 @@ export default function ReceiptsPage() {
             setCreateReference("");
             setCreateSupplierId("");
             setCreateNotes("");
+            setInvalidReceiptId(null);
             setSelectedReceiptId(created.id);
             await loadReceipts(0);
         } catch (error) {
@@ -364,6 +421,20 @@ export default function ReceiptsPage() {
         }
     }
 
+    async function handleDeleteDraftReceipt() {
+        if (!detail || detail.status !== "DRAFT") {
+            return;
+        }
+        try {
+            await deleteDraftReceipt(slug, detail.id);
+            setIsDeleteDraftConfirmOpen(false);
+            clearSelectedReceipt();
+            await loadReceipts(0);
+        } catch (error) {
+            setDetailError(extractReceiptErrorMessage(error, t("receipts.actionFailed")));
+        }
+    }
+
     const statusBadgeClass = (status: ReceiptStatus) => {
         switch (status) {
             case "DRAFT":
@@ -401,7 +472,7 @@ export default function ReceiptsPage() {
             <div className="flex flex-col gap-4 p-6">
                 <div className="flex items-center justify-between">
                     <h1 className="text-2xl font-semibold">{t("receipts.title")}</h1>
-                    <Button variant="outline" onClick={() => setSelectedReceiptId(null)}>
+                    <Button variant="outline" onClick={clearSelectedReceipt}>
                         {t("receipts.backToList")}
                     </Button>
                 </div>
@@ -612,6 +683,11 @@ export default function ReceiptsPage() {
                             {t("receipts.postAction")}
                         </Button>
                     ) : null}
+                    {isDraft && canEdit ? (
+                        <Button variant="destructive" onClick={() => setIsDeleteDraftConfirmOpen(true)}>
+                            {t("receipts.deleteDraftAction")}
+                        </Button>
+                    ) : null}
                     {isPosted && canVoid ? (
                         <Button variant="destructive" onClick={() => setIsVoidConfirmOpen(true)}>
                             {t("receipts.voidAction")}
@@ -761,6 +837,19 @@ export default function ReceiptsPage() {
                         <AlertDialogFooter>
                             <AlertDialogCancel>{t("receipts.cancel")}</AlertDialogCancel>
                             <AlertDialogAction onClick={handleVoidReceipt}>{t("receipts.voidAction")}</AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+
+                <AlertDialog open={isDeleteDraftConfirmOpen} onOpenChange={setIsDeleteDraftConfirmOpen}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>{t("receipts.deleteDraft.confirm")}</AlertDialogTitle>
+                            <AlertDialogDescription>{t("receipts.deleteDraft.confirmDescription")}</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>{t("receipts.cancel")}</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleDeleteDraftReceipt}>{t("receipts.deleteDraftAction")}</AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>

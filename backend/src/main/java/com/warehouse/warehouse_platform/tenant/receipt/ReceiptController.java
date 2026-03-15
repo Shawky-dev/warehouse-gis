@@ -132,6 +132,17 @@ public class ReceiptController {
         return ResponseEntity.noContent().build();
     }
 
+    @DeleteMapping("/{receiptId}")
+    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).RECEIPTS_EDIT)")
+    public ResponseEntity<Void> deleteDraft(
+            @PathVariable String tenantSlug,
+            @PathVariable UUID receiptId,
+            Authentication authentication) {
+        tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
+        receiptService.deleteDraft(receiptId, authentication.getName());
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/{receiptId}/post")
     @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).RECEIPTS_POST)")
     public ResponseEntity<ReceiptService.ReceiptDetailResult> postReceipt(

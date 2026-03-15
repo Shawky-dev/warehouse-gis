@@ -130,7 +130,11 @@ describe("InventoryPage", () => {
     expect(screen.queryByText("Movements")).not.toBeInTheDocument();
 
     await waitFor(() => {
-      expect(mockGetStock).toHaveBeenCalledWith("acme", { locationId: undefined, productId: undefined });
+      expect(mockGetStock).toHaveBeenCalledWith("acme", {
+        locationId: undefined,
+        locationKind: undefined,
+        productId: undefined,
+      });
     });
 
     expect(screen.getByText("Lot")).toBeInTheDocument();
@@ -180,6 +184,17 @@ describe("InventoryPage", () => {
 
     expect(await screen.findByText("Reason")).toBeInTheDocument();
     expect(screen.getByText("DAMAGED")).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(mockGetMovements).toHaveBeenCalledWith("acme", {
+        locationId: undefined,
+        movementType: undefined,
+        page: 0,
+        productId: undefined,
+        size: 25,
+        sourceDocumentId: undefined,
+      });
+    });
   });
 
   it("shows picker-based transfer flow for operation-only users", async () => {

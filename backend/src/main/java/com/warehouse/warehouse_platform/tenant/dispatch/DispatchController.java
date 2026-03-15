@@ -129,6 +129,17 @@ public class DispatchController {
         return ResponseEntity.noContent().build();
     }
 
+    @DeleteMapping("/{dispatchId}")
+    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).DISPATCHES_EDIT)")
+    public ResponseEntity<Void> deleteDraft(
+            @PathVariable String tenantSlug,
+            @PathVariable UUID dispatchId,
+            Authentication authentication) {
+        tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
+        dispatchService.deleteDraft(dispatchId, authentication.getName());
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/{dispatchId}/post")
     @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).DISPATCHES_POST)")
     public ResponseEntity<DispatchService.DispatchDetailResult> postDispatch(

@@ -128,6 +128,16 @@ public class ReceiptService {
     }
 
     @Transactional
+    public void deleteDraft(UUID receiptId, String actor) {
+        assertActor(actor);
+        ReceiptDocument receipt = loadReceipt(receiptId);
+        assertDraft(receipt, "Only draft receipts can be deleted");
+
+        receiptLineRepository.deleteByReceiptId(receiptId);
+        receiptDocumentRepository.delete(receipt);
+    }
+
+    @Transactional
     public ReceiptLineResult updateLine(
             UUID receiptId,
             UUID lineId,
