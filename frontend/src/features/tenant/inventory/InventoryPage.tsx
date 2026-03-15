@@ -59,17 +59,21 @@ import {
 } from "@/components/ui/table";
 import { ScanInput } from "@/shared/components/ScanInput";
 import type { ScanResolveResult } from "@/features/tenant/types/scan";
-import { LotLabel } from "@/features/tenant/labels/LotLabel";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { DocumentQR } from "@/features/tenant/labels/DocumentQR";
+import { QRCodeSVG } from "qrcode.react";
 
 type Tab = "stock" | "operations" | "movements";
 type Operation = "receive" | "transfer" | "adjust";
 type AdjustmentDirection = "increase" | "decrease";
+type TransferMode = "putaway" | "move";
 
 interface InventoryPageProps {
   section?: Tab;
@@ -106,7 +110,7 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
   const { hasPermission } = useAuth();
   const navigate = useNavigate();
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const slug = normalizeTenantSlug(tenantSlug ?? "");
   const activeTab = section;
 
@@ -121,6 +125,7 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
     ...(canAdjust ? ["adjust" as const] : []),
   ];
   const [operation, setOperation] = useState<Operation>(availableOperations[0] ?? "receive");
+  const [transferMode, setTransferMode] = useState<TransferMode>("move");
 
   const [products, setProducts] = useState<ProductLookupItem[]>([]);
   const [locations, setLocations] = useState<LocationLookupItem[]>([]);
@@ -136,7 +141,7 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
   const [stockError, setStockError] = useState<string | null>(null);
 
   const [opForm, setOpForm] = useState<OperationFormState>(DEFAULT_OPERATION_FORM);
-  const [lotLabelRow, setLotLabelRow] = useState<StockEntry | null>(null);
+  const [stockQrRow, setStockQrRow] = useState<StockEntry | null>(null);
   const [opSubmitting, setOpSubmitting] = useState(false);
   const [opSuccess, setOpSuccess] = useState<string | null>(null);
   const [opError, setOpError] = useState<string | null>(null);
@@ -228,6 +233,75 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
     setOpForm((current) => ({ ...current, [field]: result.locationId! }));
   }
 
+  async function handleTransferStockUnitScan(result: ScanResolveResult) {
+    if (result.type !== "RECEIPT_LINE" && result.type !== "STOCK_ROW") {
+      return;
+    }
+
+    if (transferMode === "putaway" && !opForm.toLocationId) {
+      setOpError(t("inventory.ops.transfer.scanNeedsDestination"));
+      return;
+    }
+
+    if (result.productId) {
+      setProducts((current) => {
+        if (current.some((p) => p.id === result.productId)) return current;
+        return [...current, {
+          id: result.productId!,
+          sku: result.productSku ?? "",
+          name: result.productName ?? "",
+          baseUomCode: "",
+          trackLot: result.trackLot ?? false,
+          trackExpiry: result.trackExpiry ?? false,
+          active: true,
+        }];
+      });
+    }
+
+    if (result.locationId) {
+      setLocations((current) => {
+        if (current.some((l) => l.id === result.locationId)) return current;
+        return [...current, {
+          id: result.locationId!,
+          layoutId: "",
+          layoutName: null,
+          label: result.locationPathLabel ?? result.scanCode ?? result.locationId!,
+          pathLabel: result.locationPathLabel ?? result.scanCode ?? result.locationId!,
+          identifier: null,
+          side: null,
+          locationKind: result.locationKindName ?? null,
+          scanCode: result.scanCode ?? null,
+        }];
+      });
+    }
+
+    const normalizeLot = (value: string | null | undefined) => (value ?? "").trim().toLowerCase();
+    let resolvedQty = result.lineQty ?? null;
+    if (result.productId && result.locationId) {
+      try {
+        const rows = await getStock(slug, {
+          productId: result.productId,
+          locationId: result.locationId,
+        });
+        const currentRow = rows.find((row) => normalizeLot(row.lotNumber) === normalizeLot(result.lotNumber));
+        if (currentRow?.qtyStock) {
+          resolvedQty = currentRow.qtyStock;
+        }
+      } catch {
+        // fallback to encoded line quantity when stock lookup fails
+      }
+    }
+
+    setOpError(null);
+    setOpForm((current) => ({
+      ...current,
+      fromLocationId: result.locationId ?? current.fromLocationId,
+      productId: result.productId ?? current.productId,
+      lotNumber: result.lotNumber ?? current.lotNumber,
+      qty: resolvedQty ?? current.qty,
+    }));
+  }
+
   const sortedStock = useMemo(
     () =>
       [...stock].sort((left, right) => {
@@ -289,18 +363,40 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
   }, [activeTab, availableOperations, operation, searchParams]);
 
   useEffect(() => {
+    if (activeTab !== "stock" || !canView) {
+      return;
+    }
+
+    const productId = searchParams.get("productId") ?? "";
+    const locationId = searchParams.get("locationId") ?? "";
+    const locationKind = searchParams.get("locationKind") ?? "";
+
+    const nextFilters = { productId, locationId, locationKind };
+    setStockFilters((current) =>
+      current.productId === nextFilters.productId
+        && current.locationId === nextFilters.locationId
+        && current.locationKind === nextFilters.locationKind
+        ? current
+        : nextFilters
+    );
+
+    void loadStock(nextFilters);
+  }, [activeTab, canView, searchParams]);
+
+  useEffect(() => {
     if (activeTab !== "movements" || !canView) {
       return;
     }
 
     const productId = searchParams.get("productId") ?? "";
     const locationId = searchParams.get("locationId") ?? "";
-    if (!productId && !locationId) {
-      return;
-    }
 
     const nextFilters = { productId, locationId };
-    setMovementFilters(nextFilters);
+    setMovementFilters((current) =>
+      current.productId === nextFilters.productId && current.locationId === nextFilters.locationId
+        ? current
+        : nextFilters
+    );
     setMovPage(0);
     void loadMovements(nextFilters, 0);
   }, [activeTab, canView, searchParams]);
@@ -308,12 +404,6 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
   useEffect(() => {
     void loadPickers();
   }, [slug]);
-
-  useEffect(() => {
-    if (activeTab === "stock" && canView) {
-      void loadStock(stockFilters);
-    }
-  }, [activeTab, canView]);
 
   useEffect(() => {
     if (activeTab === "movements" && canView) {
@@ -470,7 +560,14 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
         setOpSuccess(t("inventory.ops.successAdjust"));
       }
 
-      setOpForm(DEFAULT_OPERATION_FORM);
+      if (operation === "transfer" && transferMode === "putaway") {
+        setOpForm((current) => ({
+          ...DEFAULT_OPERATION_FORM,
+          toLocationId: current.toLocationId,
+        }));
+      } else {
+        setOpForm(DEFAULT_OPERATION_FORM);
+      }
       if (canView) {
         void loadStock(stockFilters);
         if (activeTab === "movements") {
@@ -486,13 +583,24 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
 
   function handleStockApplyFilters(event: FormEvent) {
     event.preventDefault();
-    void loadStock(stockFilters);
+    const next = new URLSearchParams(searchParams);
+    if (stockFilters.productId) next.set("productId", stockFilters.productId);
+    else next.delete("productId");
+    if (stockFilters.locationId) next.set("locationId", stockFilters.locationId);
+    else next.delete("locationId");
+    if (stockFilters.locationKind.trim()) next.set("locationKind", stockFilters.locationKind.trim());
+    else next.delete("locationKind");
+    setSearchParams(next);
   }
 
   function handleMovementApplyFilters(event: FormEvent) {
     event.preventDefault();
-    setMovPage(0);
-    void loadMovements(movementFilters, 0);
+    const next = new URLSearchParams(searchParams);
+    if (movementFilters.productId) next.set("productId", movementFilters.productId);
+    else next.delete("productId");
+    if (movementFilters.locationId) next.set("locationId", movementFilters.locationId);
+    else next.delete("locationId");
+    setSearchParams(next);
   }
 
   function handleQuickAction(action: "receive" | "transfer" | "adjust" | "movements", row: StockEntry) {
@@ -587,7 +695,11 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
                   onClick={() => {
                     const nextFilters = { productId: "", locationId: "", locationKind: "" };
                     setStockFilters(nextFilters);
-                    void loadStock(nextFilters);
+                    const next = new URLSearchParams(searchParams);
+                    next.delete("productId");
+                    next.delete("locationId");
+                    next.delete("locationKind");
+                    setSearchParams(next);
                   }}
                 >
                   {t("inventory.filters.reset")}
@@ -647,10 +759,13 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
                         </TableCell>
                         <TableCell>
                           <div className={`flex flex-wrap gap-2 ${isRtl ? "justify-end" : ""}`}>
-                            {row.trackLot && row.lotNumber ? (
-                              <Button type="button" variant="outline" size="sm" onClick={() => setLotLabelRow(row)}>
-                                {t("labels.printLabel")}
-                              </Button>
+                            {row.stockRowQrData ? (
+                              <div className="flex items-center gap-2 rounded-md border px-2 py-1">
+                                <QRCodeSVG value={row.stockRowQrData} size={28} />
+                                <Button type="button" variant="outline" size="sm" onClick={() => setStockQrRow(row)}>
+                                  {t("inventory.actions.stockRowQr")}
+                                </Button>
+                              </div>
                             ) : null}
                             {canReceive ? (
                               <Button type="button" variant="outline" size="sm" onClick={() => handleQuickAction("receive", row)}>
@@ -735,6 +850,43 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
               <form className="grid gap-4 md:grid-cols-2" onSubmit={handleOperationSubmit}>
                 {operation === "transfer" ? (
                   <>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label>{t("inventory.ops.transfer.mode")}</Label>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          variant={transferMode === "putaway" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setTransferMode("putaway")}
+                        >
+                          {t("inventory.ops.transfer.mode.putaway")}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={transferMode === "move" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setTransferMode("move")}
+                        >
+                          {t("inventory.ops.transfer.mode.move")}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 md:col-span-2">
+                      <Label>{t("inventory.ops.transfer.scanStockUnit")}</Label>
+                      <ScanInput
+                        tenantSlug={slug}
+                        onResolved={handleTransferStockUnitScan}
+                        acceptTypes={["RECEIPT_LINE", "STOCK_ROW"]}
+                        placeholder={t("scan.placeholder")}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {transferMode === "putaway"
+                          ? t("inventory.ops.transfer.putawayHint")
+                          : t("inventory.ops.transfer.moveHint")}
+                      </p>
+                    </div>
+
                     <div className="space-y-2">
                       <ScanInput
                         tenantSlug={slug}
@@ -1000,8 +1152,10 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
                   onClick={() => {
                     const nextFilters = { productId: "", locationId: "" };
                     setMovementFilters(nextFilters);
-                    setMovPage(0);
-                    void loadMovements(nextFilters, 0);
+                    const next = new URLSearchParams(searchParams);
+                    next.delete("productId");
+                    next.delete("locationId");
+                    setSearchParams(next);
                   }}
                 >
                   {t("inventory.filters.reset")}
@@ -1145,18 +1299,27 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
           </Card>
         </div>
       ) : null}
-      <Dialog open={lotLabelRow !== null} onOpenChange={(open) => { if (!open) setLotLabelRow(null); }}>
+      <Dialog open={stockQrRow !== null} onOpenChange={(open) => { if (!open) setStockQrRow(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t("labels.lot.title")}</DialogTitle>
+            <DialogTitle>{t("inventory.stock.rowQrTitle")}</DialogTitle>
+            <DialogDescription>{t("inventory.stock.rowQrDescription")}</DialogDescription>
           </DialogHeader>
-          {lotLabelRow?.lotNumber ? (
-            <LotLabel
-              sku={lotLabelRow.productSku ?? lotLabelRow.productId}
-              productName={lotLabelRow.productName ?? lotLabelRow.productSku ?? lotLabelRow.productId}
-              lotNumber={lotLabelRow.lotNumber}
+          {stockQrRow?.stockRowQrData ? (
+            <DocumentQR
+              qrData={stockQrRow.stockRowQrData}
+              label={`${stockQrRow.productName ?? stockQrRow.productSku ?? stockQrRow.productId} · ${stockQrRow.locationPathLabel ?? stockQrRow.locationLabel ?? stockQrRow.locationId}`}
             />
           ) : null}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setStockQrRow(null)}
+            >
+              {t("inventory.stock.rowQrClose")}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

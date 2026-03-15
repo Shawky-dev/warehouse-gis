@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { QRCodeSVG } from "qrcode.react";
 
 interface ProductLabelProps {
@@ -7,44 +8,57 @@ interface ProductLabelProps {
 }
 
 export function ProductLabel({ sku, name, categoryName }: ProductLabelProps) {
+  const rawId = useId();
+  const printId = `prod-${rawId.replace(/[^a-zA-Z0-9]/g, "")}`;
+
   function handlePrint() {
+    document.body.dataset.printTarget = printId;
+    const cleanup = () => {
+      delete document.body.dataset.printTarget;
+      window.removeEventListener("afterprint", cleanup);
+    };
+    window.addEventListener("afterprint", cleanup);
     window.print();
   }
 
   return (
-    <div>
-      <div
-        id="printable-label"
-        className="flex flex-col items-center gap-3 rounded-lg border p-6 print:border-none print:p-0"
-      >
+    <div className="flex items-center gap-4">
+      <div id={printId} className="flex flex-col items-center gap-1">
         <QRCodeSVG value={sku} size={128} />
-        <p className="text-center text-base font-bold">{name}</p>
-        <p className="font-mono text-sm text-muted-foreground">{sku}</p>
-        {categoryName && (
-          <p className="text-xs text-muted-foreground">{categoryName}</p>
-        )}
+        <p className="hidden text-center text-sm font-medium print:block">{name}</p>
+        <p className="hidden font-mono text-xs print:block">{sku}</p>
+        {categoryName ? <p className="hidden text-xs print:block">{categoryName}</p> : null}
       </div>
-      <div className="mt-4 flex justify-center print:hidden">
+
+      <div className="flex flex-col gap-1">
+        <p className="text-sm font-medium">{name}</p>
+        <p className="font-mono text-xs text-muted-foreground">{sku}</p>
+        {categoryName ? <p className="text-xs text-muted-foreground">{categoryName}</p> : null}
         <button
           type="button"
           onClick={handlePrint}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          className="mt-1 w-fit rounded-md border px-2 py-1 text-xs hover:bg-accent print:hidden"
         >
           Print
         </button>
       </div>
+
       <style>{`
         @media print {
-          body * { visibility: hidden; }
-          #printable-label, #printable-label * { visibility: visible; }
-          #printable-label {
+          body[data-print-target="${printId}"] * { visibility: hidden; }
+          body[data-print-target="${printId}"] #${printId},
+          body[data-print-target="${printId}"] #${printId} * { visibility: visible; }
+          body[data-print-target="${printId}"] #${printId} {
             position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
             text-align: center;
           }
-          #printable-label svg { width: 200px !important; height: 200px !important; }
+          body[data-print-target="${printId}"] #${printId} svg {
+            width: 200px !important;
+            height: 200px !important;
+          }
         }
       `}</style>
     </div>

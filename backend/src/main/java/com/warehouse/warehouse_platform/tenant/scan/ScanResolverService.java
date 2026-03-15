@@ -18,6 +18,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -116,6 +119,54 @@ public class ScanResolverService {
             }
         }
 
+        // Step 3.5: STOCK_ROW:{locationId}:{productId}:{encodedLot}
+        if (code.startsWith("STOCK_ROW:")) {
+            String[] parts = code.split(":", 4);
+            if (parts.length == 4) {
+                UUID locationId = tryParseUuid(parts[1]);
+                UUID productId = tryParseUuid(parts[2]);
+                String encodedLot = parts[3];
+                String lotNumber = "-".equals(encodedLot) ? null
+                        : URLDecoder.decode(encodedLot, StandardCharsets.UTF_8);
+
+                if (locationId != null && productId != null) {
+                    BigDecimal liveQty = stockMovementRepository
+                            .findStockQtyByLocationProductAndLot(locationId, productId, lotNumber)
+                            .orElse(BigDecimal.ZERO);
+
+                    if (liveQty.compareTo(BigDecimal.ZERO) > 0) {
+                        Product product = productRepository.findById(productId).orElse(null);
+                        LayoutBlock block = layoutBlockRepository.findById(locationId).orElse(null);
+                        String locationLabel = block != null && block.getFullCode() != null
+                                && !block.getFullCode().isBlank()
+                                        ? block.getFullCode()
+                                        : block != null ? block.getScanCode() : locationId.toString();
+                        String productLabel = product != null
+                                ? product.getName() + " (" + product.getSku() + ")"
+                                : productId.toString();
+
+                        return ScanResolveResult.builder()
+                                .type(ScanType.STOCK_ROW)
+                                .locationId(locationId)
+                                .locationPathLabel(locationLabel)
+                                .scanCode(block != null ? block.getScanCode() : null)
+                                .fullCode(block != null ? block.getFullCode() : null)
+                                .productId(productId)
+                                .productSku(product != null ? product.getSku() : null)
+                                .productName(product != null ? product.getName() : null)
+                                .trackLot(product != null ? product.getTrackLot() : null)
+                                .trackExpiry(product != null ? product.getTrackExpiry() : null)
+                                .lotNumber(lotNumber)
+                                .lineQty(liveQty)
+                                .displayLabel(productLabel
+                                        + (lotNumber != null ? " / Lot " + lotNumber : "")
+                                        + " @ " + locationLabel)
+                                .build();
+                    }
+                }
+            }
+        }
+
         // Step 4: RECEIPT_LINE:{uuid} — Stock Unit QR generated at receipt post
         if (code.startsWith("RECEIPT_LINE:")) {
             UUID id = tryParseUuid(code.substring(13));
@@ -126,13 +177,15 @@ public class ScanResolverService {
                     UUID productId = line.getProductId();
                     UUID locationId = line.getDestinationLocationId();
                     Product product = productId != null ? productRepository.findById(productId).orElse(null) : null;
-                    LayoutBlock block = locationId != null ? layoutBlockRepository.findById(locationId).orElse(null) : null;
+                    LayoutBlock block = locationId != null ? layoutBlockRepository.findById(locationId).orElse(null)
+                            : null;
                     String productLabel = product != null
                             ? product.getName() + " (" + product.getSku() + ")"
                             : line.getProductId().toString();
-                    String locationLabel = block != null && block.getFullCode() != null && !block.getFullCode().isBlank()
-                            ? block.getFullCode()
-                            : block != null ? block.getScanCode() : line.getDestinationLocationId().toString();
+                    String locationLabel = block != null && block.getFullCode() != null
+                            && !block.getFullCode().isBlank()
+                                    ? block.getFullCode()
+                                    : block != null ? block.getScanCode() : line.getDestinationLocationId().toString();
                     String displayLabel = productLabel
                             + (line.getLotNumber() != null ? " / Lot " + line.getLotNumber() : "")
                             + " @ " + locationLabel;

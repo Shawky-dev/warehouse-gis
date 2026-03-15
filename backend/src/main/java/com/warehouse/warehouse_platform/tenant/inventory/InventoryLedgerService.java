@@ -20,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -439,7 +441,8 @@ public class InventoryLedgerService {
 
         return rows.stream()
                 .filter(row -> {
-                    if (locationKind == null) return true;
+                    if (locationKind == null)
+                        return true;
                     LocationSummary loc = locations.get(row.getLocationId());
                     return loc != null && locationKind.equalsIgnoreCase(loc.locationKind());
                 })
@@ -461,9 +464,17 @@ public class InventoryLedgerService {
                             product == null ? null : product.name(),
                             product == null ? null : product.baseUomCode(),
                             product == null ? null : product.trackLot(),
-                            product == null ? null : product.trackExpiry());
+                            product == null ? null : product.trackExpiry(),
+                            buildStockRowQrData(row.getLocationId(), row.getProductId(), row.getLotNumber()));
                 })
                 .toList();
+    }
+
+    private String buildStockRowQrData(UUID locationId, UUID productId, String lotNumber) {
+        String encodedLot = lotNumber == null
+                ? "-"
+                : URLEncoder.encode(lotNumber, StandardCharsets.UTF_8);
+        return "STOCK_ROW:" + locationId + ":" + productId + ":" + encodedLot;
     }
 
     private Specification<StockMovement> buildMovementSpec(
@@ -902,7 +913,8 @@ public class InventoryLedgerService {
             String productName,
             String baseUomCode,
             Boolean trackLot,
-            Boolean trackExpiry) {
+            Boolean trackExpiry,
+            String stockRowQrData) {
     }
 
     public record MovementResult(

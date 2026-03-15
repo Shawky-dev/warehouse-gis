@@ -2,6 +2,7 @@ export type ScanType =
   | "PRODUCT"
   | "LOCATION"
   | "LOT"
+  | "STOCK_ROW"
   | "RECEIPT"
   | "RECEIPT_LINE"
   | "DISPATCH"

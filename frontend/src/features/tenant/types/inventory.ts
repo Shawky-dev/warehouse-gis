@@ -54,6 +54,7 @@ export interface StockEntry {
   baseUomCode: string | null;
   trackLot: boolean | null;
   trackExpiry: boolean | null;
+  stockRowQrData: string | null;
 }
 
 export interface MovementResult {

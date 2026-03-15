@@ -14,7 +14,7 @@ import {
     removeLine,
     voidDispatch,
 } from "@/features/tenant/api/dispatchesApi";
-import { getDocumentMovements, getLocationLookups, getProductLookups } from "@/features/tenant/api/inventoryApi";
+import { getDocumentMovements, getLocationLookups, getProductLookups, getStock } from "@/features/tenant/api/inventoryApi";
 import type { MovementResult, ProductLookupItem, LocationLookupItem } from "@/features/tenant/types/inventory";
 import type { DispatchDetail, DispatchListItem, DispatchStatus } from "@/features/tenant/types/dispatches";
 import { Badge } from "@/shared/components/ui/badge";
@@ -154,6 +154,86 @@ export default function DispatchesPage() {
             ];
         });
         setLineForm((prev) => ({ ...prev, sourceLocationId: result.locationId! }));
+    }
+
+    async function handleStockUnitScanned(result: ScanResolveResult) {
+        if (result.type !== "RECEIPT_LINE" && result.type !== "STOCK_ROW") return;
+
+        const normalizeLot = (value: string | null | undefined) => (value ?? "").trim().toLowerCase();
+
+        let resolvedQty = result.lineQty ?? null;
+        if (result.productId && result.locationId) {
+            try {
+                const rows = await getStock(slug, {
+                    productId: result.productId,
+                    locationId: result.locationId,
+                });
+                const currentRow = rows.find((row) => normalizeLot(row.lotNumber) === normalizeLot(result.lotNumber));
+                if (currentRow?.qtyStock) {
+                    const liveQty = Number.parseFloat(currentRow.qtyStock);
+                    const alreadyInDraft = (detail?.lines ?? [])
+                        .filter(
+                            (line) =>
+                                line.productId === result.productId &&
+                                line.sourceLocationId === result.locationId &&
+                                normalizeLot(line.lotNumber) === normalizeLot(result.lotNumber)
+                        )
+                        .reduce((sum, line) => sum + Number.parseFloat(line.qty || "0"), 0);
+
+                    const remaining = Math.max(liveQty - alreadyInDraft, 0);
+                    resolvedQty = String(remaining);
+                }
+            } catch {
+                // fallback to encoded line quantity when stock lookup fails
+            }
+        }
+
+        if (result.productId) {
+            setProducts((prev) => {
+                if (prev.some((p) => p.id === result.productId)) return prev;
+                return [
+                    ...prev,
+                    {
+                        id: result.productId!,
+                        sku: result.productSku ?? "",
+                        name: result.productName ?? result.productSku ?? result.productId!,
+                        baseUomCode: "",
+                        trackLot: result.trackLot ?? false,
+                        trackExpiry: result.trackExpiry ?? false,
+                        active: true,
+                    },
+                ];
+            });
+        }
+
+        if (result.locationId) {
+            setLocations((prev) => {
+                if (prev.some((l) => l.id === result.locationId)) return prev;
+                return [
+                    ...prev,
+                    {
+                        id: result.locationId!,
+                        layoutId: "",
+                        layoutName: null,
+                        label: result.locationPathLabel ?? result.locationId!,
+                        pathLabel: result.locationPathLabel ?? result.locationId!,
+                        identifier: null,
+                        side: null,
+                        locationKind: result.locationKindName ?? null,
+                        scanCode: result.scanCode ?? null,
+                    },
+                ];
+            });
+        }
+
+        setLineForm((prev) => ({
+            ...prev,
+            productId: result.productId ?? prev.productId,
+            sourceLocationId: result.locationId ?? prev.sourceLocationId,
+            lotNumber: result.lotNumber ?? prev.lotNumber,
+            qty: resolvedQty ?? prev.qty,
+        }));
+        setLineError(null);
     }
 
     useEffect(() => {
@@ -426,6 +506,16 @@ export default function DispatchesPage() {
                         </CardHeader>
                         {isLineFormOpen ? (
                             <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                                <div className="space-y-2 md:col-span-2 xl:col-span-4">
+                                    <Label>{t("dispatches.form.stockUnitScan")}</Label>
+                                    <ScanInput
+                                        tenantSlug={slug}
+                                        acceptTypes={["RECEIPT_LINE", "STOCK_ROW"]}
+                                        onResolved={handleStockUnitScanned}
+                                        placeholder={t("scan.placeholder")}
+                                    />
+                                </div>
+
                                 <div className="space-y-2 xl:col-span-2">
                                     <Label>{t("dispatches.form.productSearch")}</Label>
                                     <ScanInput

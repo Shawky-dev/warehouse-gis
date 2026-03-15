@@ -52,7 +52,11 @@ export function ScanInput({
     try {
       const result = await resolveCode(tenantSlug, trimmed);
       if (acceptTypes && acceptTypes.length > 0 && !acceptTypes.includes(result.type)) {
-        setError(`Wrong code type (expected: ${acceptTypes.join(", ")})`);
+        if (result.type === "RECEIPT" && acceptTypes.includes("RECEIPT_LINE")) {
+          setError("Scanned a receipt document QR. Scan a stock unit label (RECEIPT_LINE) instead.");
+        } else {
+          setError(`Wrong code type: ${result.type} (expected: ${acceptTypes.join(", ")})`);
+        }
         onError?.(trimmed);
         return;
       }

@@ -22,6 +22,11 @@ export function useScanNavigation(tenantSlug: string) {
           `${PATHS.TENANT.inventoryStock(tenantSlug)}?productId=${result.productId}&lot=${encodeURIComponent(result.lotNumber ?? "")}`
         );
         break;
+      case "STOCK_ROW":
+        navigate(
+          `${PATHS.TENANT.inventoryStock(tenantSlug)}?productId=${result.productId}&locationId=${result.locationId}`
+        );
+        break;
       case "RECEIPT":
         navigate(
           `${PATHS.TENANT.receipts(tenantSlug)}?id=${result.receiptId}`
