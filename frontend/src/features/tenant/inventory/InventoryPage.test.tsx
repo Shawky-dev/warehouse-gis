@@ -205,6 +205,9 @@ describe("InventoryPage", () => {
     expect(screen.getByLabelText("From Location")).toBeInTheDocument();
     expect(screen.getByLabelText("To Location")).toBeInTheDocument();
     expect(screen.getByLabelText("Product")).toBeInTheDocument();
+    expect(screen.queryByText("Transfer mode")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Putaway" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Internal move" })).not.toBeInTheDocument();
     expect(screen.queryByDisplayValue("UUID")).not.toBeInTheDocument();
 
     await waitFor(() => {

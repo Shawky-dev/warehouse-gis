@@ -74,7 +74,6 @@ import { QRCodeSVG } from "qrcode.react";
 type Tab = "stock" | "operations" | "movements";
 type Operation = "receive" | "transfer" | "adjust";
 type AdjustmentDirection = "increase" | "decrease";
-type TransferMode = "putaway" | "move";
 
 interface InventoryPageProps {
   section?: Tab;
@@ -126,7 +125,6 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
     ...(canAdjust ? ["adjust" as const] : []),
   ], [canAdjust, canReceive, canTransfer]);
   const [operation, setOperation] = useState<Operation>(availableOperations[0] ?? "receive");
-  const [transferMode, setTransferMode] = useState<TransferMode>("move");
 
   const [products, setProducts] = useState<ProductLookupItem[]>([]);
   const [locations, setLocations] = useState<LocationLookupItem[]>([]);
@@ -241,11 +239,6 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
 
   async function handleTransferStockUnitScan(result: ScanResolveResult) {
     if (result.type !== "RECEIPT_LINE" && result.type !== "STOCK_ROW") {
-      return;
-    }
-
-    if (transferMode === "putaway" && !opForm.toLocationId) {
-      setOpError(t("inventory.ops.transfer.scanNeedsDestination"));
       return;
     }
 
@@ -584,14 +577,7 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
         setOpSuccess(t("inventory.ops.successAdjust"));
       }
 
-      if (operation === "transfer" && transferMode === "putaway") {
-        setOpForm((current) => ({
-          ...DEFAULT_OPERATION_FORM,
-          toLocationId: current.toLocationId,
-        }));
-      } else {
-        setOpForm(DEFAULT_OPERATION_FORM);
-      }
+      setOpForm(DEFAULT_OPERATION_FORM);
       if (canView) {
         void loadStock(stockFilters);
         if (activeTab === "movements") {
@@ -879,28 +865,6 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
                 {operation === "transfer" ? (
                   <>
                     <div className="space-y-2 md:col-span-2">
-                      <Label>{t("inventory.ops.transfer.mode")}</Label>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          type="button"
-                          variant={transferMode === "putaway" ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setTransferMode("putaway")}
-                        >
-                          {t("inventory.ops.transfer.mode.putaway")}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant={transferMode === "move" ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setTransferMode("move")}
-                        >
-                          {t("inventory.ops.transfer.mode.move")}
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 md:col-span-2">
                       <Label>{t("inventory.ops.transfer.scanStockUnit")}</Label>
                       <ScanInput
                         tenantSlug={slug}
@@ -909,9 +873,7 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
                         placeholder={t("scan.placeholder")}
                       />
                       <p className="text-xs text-muted-foreground">
-                        {transferMode === "putaway"
-                          ? t("inventory.ops.transfer.putawayHint")
-                          : t("inventory.ops.transfer.moveHint")}
+                        {t("inventory.ops.transfer.hint")}
                       </p>
                     </div>
 
