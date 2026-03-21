@@ -5,8 +5,8 @@ windows:
   - window_name: infra
     layout: even-vertical
     panes:
-      - docker compose -f docker-compose.dev.yml --env-file .env.dev up -d db
-      - watch -n 3 docker compose -f docker-compose.dev.yml --env-file .env.dev ps db
+      - docker compose -f docker-compose.dev.yml --env-file .env.dev up -d db geoserver
+      - watch -n 3 docker compose -f docker-compose.dev.yml --env-file .env.dev ps db geoserver
 
   - window_name: backend
     panes:
@@ -19,3 +19,7 @@ windows:
   - window_name: db-logs
     panes:
       - docker compose -f docker-compose.dev.yml --env-file .env.dev logs -f --tail=200 db
+
+  - window_name: geoserver-logs
+    panes:
+      - docker compose -f docker-compose.dev.yml --env-file .env.dev logs -f --tail=200 geoserver

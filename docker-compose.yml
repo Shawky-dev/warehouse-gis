@@ -14,14 +14,13 @@ services:
     networks:
       - warehouse-backend
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 10s
     ports:
       - "5432:5432"
-
 
   backend:
     build:
@@ -79,6 +78,26 @@ services:
     networks:
       - warehouse-frontend
 
+  geoserver:
+    image: kartoza/geoserver:2.25.2
+    container_name: warehouse-geoserver
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      GEOSERVER_ADMIN_USER: ${GEOSERVER_ADMIN_USER:-admin}
+      GEOSERVER_ADMIN_PASSWORD: ${GEOSERVER_ADMIN_PASSWORD:-geoserver}
+      GEOSERVER_DATA_DIR: /opt/geoserver_data
+      INITIAL_MEMORY: 512M
+      MAXIMUM_MEMORY: 1G
+    volumes:
+      - geoserver_data:/opt/geoserver_data
+    ports:
+      - "${GEOSERVER_PORT:-8600}:8080" # access at http://localhost:${GEOSERVER_PORT:-8600}/geoserver
+    networks:
+      - warehouse-backend
+
 networks:
   warehouse-backend:
     driver: bridge
@@ -87,6 +106,8 @@ networks:
 
 volumes:
   postgres_data:
+  geoserver_data:
+
 
 secrets:
   postgres_password:
