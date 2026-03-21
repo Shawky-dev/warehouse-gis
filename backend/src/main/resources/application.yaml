@@ -37,6 +37,16 @@ multitenancy:
       enabled: true
       change-log: classpath:db/changelog/db.changelog-tenant.yaml
 
+geoserver:
+  url: ${GEOSERVER_URL:http://geoserver:8080/geoserver}
+  admin-user: ${GEOSERVER_ADMIN_USER:admin}
+  admin-password: ${GEOSERVER_ADMIN_PASSWORD:geoserver}
+  db-host: ${GEOSERVER_DB_HOST:db}
+  db-port: ${GEOSERVER_DB_PORT:5432}
+  db-name: ${GEOSERVER_DB_NAME:warehouse}
+  db-user: ${spring.datasource.username}
+  db-password: ${spring.datasource.password}
+
 security:
   cors:
     allowed-origin-patterns: ${SECURITY_CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:*,http://127.0.0.1:*}

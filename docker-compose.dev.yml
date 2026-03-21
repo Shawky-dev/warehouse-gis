@@ -37,6 +37,12 @@ services:
       SECURITY_AUTH_REFRESH_COOKIE_DOMAIN: ${SECURITY_AUTH_REFRESH_COOKIE_DOMAIN}
       SECURITY_JWT_PRIVATE_KEY: file:/workspace/backend/src/test/resources/keys/jwt-private.pem
       SECURITY_JWT_PUBLIC_KEY: file:/workspace/backend/src/test/resources/keys/jwt-public.pem
+      GEOSERVER_URL: http://geoserver:8080/geoserver
+      GEOSERVER_ADMIN_USER: ${DEV_GEOSERVER_ADMIN_USER:-admin}
+      GEOSERVER_ADMIN_PASSWORD: ${DEV_GEOSERVER_ADMIN_PASSWORD:-geoserver}
+      GEOSERVER_DB_HOST: db
+      GEOSERVER_DB_PORT: 5432
+      GEOSERVER_DB_NAME: ${DEV_POSTGRES_DB}
     volumes:
       - ./backend:/workspace/backend
       - ./scripts:/workspace/scripts:ro

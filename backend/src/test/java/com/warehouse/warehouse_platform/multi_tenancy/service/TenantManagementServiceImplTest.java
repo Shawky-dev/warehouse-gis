@@ -21,6 +21,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.warehouse.warehouse_platform.multi_tenancy.domain.entity.Tenant;
+import com.warehouse.warehouse_platform.multi_tenancy.geoserver.GeoServerClient;
 import com.warehouse.warehouse_platform.multi_tenancy.repository.TenantRepository;
 
 import liquibase.integration.spring.SpringLiquibase;
@@ -83,13 +84,15 @@ class TenantManagementServiceImplTest {
         LiquibaseProperties liquibaseProperties = new LiquibaseProperties();
         liquibaseProperties.setEnabled(true);
         ResourceLoader resourceLoader = mock(ResourceLoader.class);
+        GeoServerClient geoServerClient = mock(GeoServerClient.class);
         return new TenantManagementServiceImpl(
                 dataSource,
                 jdbcTemplate,
                 liquibaseProperties,
                 resourceLoader,
                 tenantRepository,
-                passwordEncoder) {
+                passwordEncoder,
+                geoServerClient) {
             @Override
             protected SpringLiquibase getSpringLiquibase(DataSource ds, String schema) {
                 return mock(SpringLiquibase.class);

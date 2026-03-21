@@ -6,6 +6,8 @@ import java.util.UUID;
 
 import javax.sql.DataSource;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.liquibase.LiquibaseProperties;
 import org.springframework.core.io.ResourceLoader;
@@ -15,8 +17,10 @@ import org.springframework.jdbc.core.StatementCallback;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import org.springframework.web.client.RestClientException;
 
 import com.warehouse.warehouse_platform.multi_tenancy.domain.entity.Tenant;
+import com.warehouse.warehouse_platform.multi_tenancy.geoserver.GeoServerClient;
 import com.warehouse.warehouse_platform.multi_tenancy.repository.TenantRepository;
 
 import liquibase.exception.LiquibaseException;
@@ -25,6 +29,7 @@ import liquibase.integration.spring.SpringLiquibase;
 @Service
 public class TenantManagementServiceImpl implements TenantManagementService {
 
+    private static final Logger log = LoggerFactory.getLogger(TenantManagementServiceImpl.class);
     private static final String VALID_SCHEMA_NAME_REGEXP = "[A-Za-z0-9_]*";
 
     private final DataSource dataSource;
@@ -33,6 +38,7 @@ public class TenantManagementServiceImpl implements TenantManagementService {
     private final ResourceLoader resourceLoader;
     private final TenantRepository tenantRepository;
     private final PasswordEncoder passwordEncoder;
+    private final GeoServerClient geoServerClient;
 
     public TenantManagementServiceImpl(
             DataSource dataSource,
@@ -40,13 +46,15 @@ public class TenantManagementServiceImpl implements TenantManagementService {
             @Qualifier("tenantLiquibaseProperties") LiquibaseProperties liquibaseProperties,
             ResourceLoader resourceLoader,
             TenantRepository tenantRepository,
-            PasswordEncoder passwordEncoder) {
+            PasswordEncoder passwordEncoder,
+            GeoServerClient geoServerClient) {
         this.dataSource = dataSource;
         this.jdbcTemplate = jdbcTemplate;
         this.liquibaseProperties = liquibaseProperties;
         this.resourceLoader = resourceLoader;
         this.tenantRepository = tenantRepository;
         this.passwordEncoder = passwordEncoder;
+        this.geoServerClient = geoServerClient;
     }
 
     @Override
@@ -81,6 +89,14 @@ public class TenantManagementServiceImpl implements TenantManagementService {
             createTenantAdmin(normalizedSchema, adminEmail, adminPassword);
         } catch (DataAccessException exception) {
             throw new TenantCreationException("Error when creating tenant admin for tenant: " + tenantId, exception);
+        }
+
+        try {
+            geoServerClient.provisionTenant(tenantId, normalizedSchema);
+        } catch (RestClientException e) {
+            log.warn("GeoServer provisioning failed for tenant '{}' (schema '{}'). " +
+                    "Workspace can be provisioned manually. Error: {}",
+                    tenantId, normalizedSchema, e.getMessage());
         }
     }
 
