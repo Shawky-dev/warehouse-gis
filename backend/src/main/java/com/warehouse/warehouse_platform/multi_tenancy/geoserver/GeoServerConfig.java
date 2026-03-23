@@ -21,7 +21,10 @@ public class GeoServerConfig {
             String credentials = props.adminUser() + ":" + props.adminPassword();
             String encoded = Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
             request.getHeaders().set(HttpHeaders.AUTHORIZATION, "Basic " + encoded);
-            request.getHeaders().setContentType(MediaType.APPLICATION_JSON);
+            MediaType contentType = request.getHeaders().getContentType();
+            if (contentType == null || MediaType.TEXT_PLAIN.isCompatibleWith(contentType)) {
+                request.getHeaders().setContentType(MediaType.APPLICATION_JSON);
+            }
             return execution.execute(request, body);
         });
         return restTemplate;

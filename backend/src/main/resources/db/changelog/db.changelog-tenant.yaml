@@ -188,3 +188,31 @@ databaseChangeLog:
         - sqlFile:
             path: db/migration/tenant/V27__create_count_sessions.sql
             relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-gis-shadow-tables-28
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V28__create_gis_shadow_tables.sql
+            relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-gis-permissions-29
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V29__seed_gis_permissions.sql
+            relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-gis-replace-tables-30
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V30__replace_gis_tables_with_gis_blocks.sql
+            relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-gis-add-depth-31
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V31__add_depth_to_gis_blocks.sql
+            relativeToChangelogFile: false

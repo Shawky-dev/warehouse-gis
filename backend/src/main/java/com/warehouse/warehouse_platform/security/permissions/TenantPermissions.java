@@ -58,6 +58,8 @@ public final class TenantPermissions {
     public static final String COUNTING_CREATE = "tenant.counting.create";
     public static final String COUNTING_POST = "tenant.counting.post";
     public static final String COUNTING_VOID = "tenant.counting.void";
+    public static final String GIS_LAYOUT_REGENERATE = "gis.layout.regenerate";
+    public static final String GIS_LAYOUT_VIEW = "gis.layout.view";
 
     private TenantPermissions() {
     }

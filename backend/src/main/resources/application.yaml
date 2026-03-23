@@ -30,9 +30,9 @@ multitenancy:
       change-log: classpath:db/changelog/db.changelog-master.yaml
   tenant:
     repository:
-      packages: com.warehouse.warehouse_platform.user,com.warehouse.warehouse_platform.auth.session,com.warehouse.warehouse_platform.tenant.uom,com.warehouse.warehouse_platform.tenant.supplier,com.warehouse.warehouse_platform.tenant.product,com.warehouse.warehouse_platform.tenant.category,com.warehouse.warehouse_platform.tenant.audit,com.warehouse.warehouse_platform.tenant.warehouse.layout,com.warehouse.warehouse_platform.tenant.warehouse.block,com.warehouse.warehouse_platform.tenant.warehouse.locationkind,com.warehouse.warehouse_platform.tenant.inventory,com.warehouse.warehouse_platform.tenant.receipt,com.warehouse.warehouse_platform.tenant.dispatch,com.warehouse.warehouse_platform.tenant.counting
+      packages: com.warehouse.warehouse_platform.user,com.warehouse.warehouse_platform.auth.session,com.warehouse.warehouse_platform.tenant.uom,com.warehouse.warehouse_platform.tenant.supplier,com.warehouse.warehouse_platform.tenant.product,com.warehouse.warehouse_platform.tenant.category,com.warehouse.warehouse_platform.tenant.audit,com.warehouse.warehouse_platform.tenant.warehouse.layout,com.warehouse.warehouse_platform.tenant.warehouse.block,com.warehouse.warehouse_platform.tenant.warehouse.locationkind,com.warehouse.warehouse_platform.tenant.inventory,com.warehouse.warehouse_platform.tenant.receipt,com.warehouse.warehouse_platform.tenant.dispatch,com.warehouse.warehouse_platform.tenant.counting,com.warehouse.warehouse_platform.tenant.gis.repository
     entityManager:
-      packages: com.warehouse.warehouse_platform.user,com.warehouse.warehouse_platform.auth.session,com.warehouse.warehouse_platform.tenant.uom,com.warehouse.warehouse_platform.tenant.supplier,com.warehouse.warehouse_platform.tenant.product,com.warehouse.warehouse_platform.tenant.category,com.warehouse.warehouse_platform.tenant.audit,com.warehouse.warehouse_platform.tenant.warehouse.layout,com.warehouse.warehouse_platform.tenant.warehouse.block,com.warehouse.warehouse_platform.tenant.warehouse.locationkind,com.warehouse.warehouse_platform.tenant.inventory,com.warehouse.warehouse_platform.tenant.receipt,com.warehouse.warehouse_platform.tenant.dispatch,com.warehouse.warehouse_platform.tenant.counting
+      packages: com.warehouse.warehouse_platform.user,com.warehouse.warehouse_platform.auth.session,com.warehouse.warehouse_platform.tenant.uom,com.warehouse.warehouse_platform.tenant.supplier,com.warehouse.warehouse_platform.tenant.product,com.warehouse.warehouse_platform.tenant.category,com.warehouse.warehouse_platform.tenant.audit,com.warehouse.warehouse_platform.tenant.warehouse.layout,com.warehouse.warehouse_platform.tenant.warehouse.block,com.warehouse.warehouse_platform.tenant.warehouse.locationkind,com.warehouse.warehouse_platform.tenant.inventory,com.warehouse.warehouse_platform.tenant.receipt,com.warehouse.warehouse_platform.tenant.dispatch,com.warehouse.warehouse_platform.tenant.counting,com.warehouse.warehouse_platform.tenant.gis.model
     liquibase:
       enabled: true
       change-log: classpath:db/changelog/db.changelog-tenant.yaml
@@ -46,6 +46,14 @@ geoserver:
   db-name: ${GEOSERVER_DB_NAME:warehouse}
   db-user: ${spring.datasource.username}
   db-password: ${spring.datasource.password}
+
+warehouse:
+  gis:
+    anchor-lat: 0.0
+    anchor-lon: 0.0
+    width-meters: 100.0
+    length-meters: 60.0
+
 
 security:
   cors:

@@ -40,6 +40,7 @@ import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplateRepo
 import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlockRepository;
 import com.warehouse.warehouse_platform.tenant.warehouse.layout.WarehouseLayoutRepository;
 import com.warehouse.warehouse_platform.tenant.warehouse.locationkind.WarehouseLocationKindRepository;
+import com.warehouse.warehouse_platform.tenant.gis.repository.GisBlockRepository;
 import com.warehouse.warehouse_platform.user.UserRepository;
 
 import jakarta.persistence.EntityManagerFactory;
@@ -64,7 +65,8 @@ import jakarta.persistence.EntityManagerFactory;
                 DispatchDocumentRepository.class,
                 DispatchLineRepository.class,
                 CountSessionRepository.class,
-                CountLineRepository.class
+                CountLineRepository.class,
+                GisBlockRepository.class
 }, entityManagerFactoryRef = "tenantEntityManagerFactory", transactionManagerRef = "tenantTransactionManager")
 @EnableConfigurationProperties(JpaProperties.class)
 public class TenantPersistenceConfig {

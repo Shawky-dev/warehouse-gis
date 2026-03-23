@@ -1,5 +1,8 @@
 package com.warehouse.warehouse_platform.multi_tenancy.config.tenant.liquibase;
 
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Collection;
 
 import javax.sql.DataSource;
@@ -11,6 +14,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.liquibase.LiquibaseProperties;
 import org.springframework.context.ResourceLoaderAware;
 import org.springframework.core.io.ResourceLoader;
+import org.springframework.jdbc.datasource.DelegatingDataSource;
 
 import com.warehouse.warehouse_platform.multi_tenancy.domain.entity.Tenant;
 import com.warehouse.warehouse_platform.multi_tenancy.repository.TenantRepository;
@@ -59,8 +63,7 @@ public class DynamicSchemaBasedMultiTenantSpringLiquibase implements Initializin
     protected SpringLiquibase getSpringLiquibase(DataSource dataSource, String schema) {
         SpringLiquibase liquibase = new SpringLiquibase();
         liquibase.setResourceLoader(getResourceLoader());
-        liquibase.setDataSource(dataSource);
-        liquibase.setDefaultSchema(schema);
+        liquibase.setDataSource(schemaAwareDataSource(dataSource, schema));
         liquibase.setChangeLog(liquibaseProperties.getChangeLog());
         liquibase.setContexts(joinContexts());
         liquibase.setLiquibaseSchema(liquibaseProperties.getLiquibaseSchema());
@@ -74,6 +77,19 @@ public class DynamicSchemaBasedMultiTenantSpringLiquibase implements Initializin
         liquibase.setTestRollbackOnUpdate(liquibaseProperties.isTestRollbackOnUpdate());
         liquibase.setTag(liquibaseProperties.getTag());
         return liquibase;
+    }
+
+    private static DataSource schemaAwareDataSource(DataSource delegate, String schema) {
+        return new DelegatingDataSource(delegate) {
+            @Override
+            public Connection getConnection() throws SQLException {
+                Connection c = delegate.getConnection();
+                try (Statement s = c.createStatement()) {
+                    s.execute("SET search_path TO " + schema + ", public");
+                }
+                return c;
+            }
+        };
     }
 
     private String joinContexts() {

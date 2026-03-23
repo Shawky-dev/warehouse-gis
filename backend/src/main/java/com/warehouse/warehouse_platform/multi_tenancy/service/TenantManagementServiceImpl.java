@@ -1,5 +1,8 @@
 package com.warehouse.warehouse_platform.multi_tenancy.service;
 
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
@@ -14,6 +17,7 @@ import org.springframework.core.io.ResourceLoader;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.StatementCallback;
+import org.springframework.jdbc.datasource.DelegatingDataSource;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -145,14 +149,26 @@ public class TenantManagementServiceImpl implements TenantManagementService {
     protected SpringLiquibase getSpringLiquibase(DataSource dataSource, String schema) {
         SpringLiquibase liquibase = new SpringLiquibase();
         liquibase.setResourceLoader(resourceLoader);
-        liquibase.setDataSource(dataSource);
-        liquibase.setDefaultSchema(schema);
+        liquibase.setDataSource(schemaAwareDataSource(dataSource, schema));
         liquibase.setChangeLog(liquibaseProperties.getChangeLog());
         liquibase.setContexts(joinContexts());
         liquibase.setDropFirst(liquibaseProperties.isDropFirst());
         liquibase.setShouldRun(liquibaseProperties.isEnabled());
         liquibase.setChangeLogParameters(liquibaseProperties.getParameters());
         return liquibase;
+    }
+
+    private static DataSource schemaAwareDataSource(DataSource delegate, String schema) {
+        return new DelegatingDataSource(delegate) {
+            @Override
+            public Connection getConnection() throws SQLException {
+                Connection c = delegate.getConnection();
+                try (Statement s = c.createStatement()) {
+                    s.execute("SET search_path TO " + schema + ", public");
+                }
+                return c;
+            }
+        };
     }
 
     private String joinContexts() {
