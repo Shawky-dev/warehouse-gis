@@ -13,6 +13,8 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -21,7 +23,8 @@ public class GeoServerProvisioningService {
 
     private static final Logger log = LoggerFactory.getLogger(GeoServerProvisioningService.class);
 
-    private static final String DATASTORE_NAME = "warehouse_postgis";
+    private static final String DATASTORE_NAME  = "warehouse_postgis";
+    private static final String LAYER_GROUP_NAME = "floorplan";
 
     private final RestTemplate geoServerRestTemplate;
     private final GeoServerProperties props;
@@ -40,8 +43,10 @@ public class GeoServerProvisioningService {
      * Provisions (or updates) the GeoServer workspace for a tenant:
      * 1. Creates the workspace (idempotent)
      * 2. Creates the PostGIS datastore (idempotent)
-     * 3. For each distinct template_name currently in gis_blocks, publishes
-     *    a SQL View layer (idempotent — 409 = already exists, skip)
+     * 3. For each distinct template_name in gis_blocks, publishes a SQL View layer
+     *    with its SLD style (idempotent — 409 = already exists, skip/update)
+     * 4. Creates or updates a WMS layer group ("floorplan") compositing all layers
+     *    ordered by depth so larger areas render beneath more specific ones
      */
     public void provisionTenantWorkspace(String tenantSlug) {
         String workspaceName = "wh_" + tenantSlug;
@@ -50,14 +55,24 @@ public class GeoServerProvisioningService {
         createDataStore(workspaceName, tenantSlug);
 
         List<String> templateNames = gisBlockRepository.findDistinctTemplateNames();
+        List<LayerEntry> layerEntries = new ArrayList<>();
         for (String templateName : templateNames) {
             String layerSlug = toLayerSlug(templateName);
             publishSqlViewLayer(workspaceName, tenantSlug, layerSlug, templateName);
             int depth = Optional.ofNullable(gisBlockRepository.findMinDepthByTemplateName(templateName)).orElse(0);
             createOrReplaceLayerStyle(workspaceName, layerSlug, depth);
             assignDefaultStyle(workspaceName, layerSlug);
+            layerEntries.add(new LayerEntry(layerSlug, depth));
         }
+
+        // Order layers by depth ascending: lowest depth (biggest areas) renders first
+        // so it sits at the bottom of the WMS composite image.
+        layerEntries.sort(Comparator.comparingInt(LayerEntry::depth));
+        List<String> orderedSlugs = layerEntries.stream().map(LayerEntry::slug).toList();
+        createOrReplaceLayerGroup(workspaceName, orderedSlugs);
     }
+
+    private record LayerEntry(String slug, int depth) {}
 
     // ─── GeoServer workspace ──────────────────────────────────────────────────
 
@@ -220,19 +235,19 @@ public class GeoServerProvisioningService {
         }
     }
 
+    /**
+     * Builds an outline-only SLD for a given depth level.
+     *
+     * All fills are transparent so nested child polygons never obscure their parents.
+     * Only colored borders are drawn, with width and color varying by depth so the
+     * hierarchy is immediately readable:
+     *
+     *   depth 0 (Zone/top-level): thick blue-grey border, large bold label
+     *   depth 1 (Aisle):          medium blue border, normal label
+     *   depth 2 (Bay):            thin green border, small label
+     *   depth 3+ (Shelf/leaf):    fine orange border, tiny label (hidden at overview zoom)
+     */
     private String buildSldXml(String layerSlug, int depth) {
-        String fill = switch (depth) {
-            case 0 -> "#FFFFFF";
-            case 1 -> "#bbdefb";
-            case 2 -> "#c8e6c9";
-            default -> "#ffe0b2";
-        };
-        double fillOpacity = switch (depth) {
-            case 0 -> 0.0;
-            case 1 -> 0.10;
-            case 2 -> 0.18;
-            default -> 0.35;
-        };
         String stroke = switch (depth) {
             case 0 -> "#455a64";
             case 1 -> "#1565c0";
@@ -240,10 +255,10 @@ public class GeoServerProvisioningService {
             default -> "#e65100";
         };
         double strokeWidth = switch (depth) {
-            case 0 -> 2.5;
-            case 1 -> 1.5;
-            case 2 -> 1.0;
-            default -> 0.5;
+            case 0 -> 3.0;
+            case 1 -> 2.0;
+            case 2 -> 1.2;
+            default -> 0.6;
         };
         int fontSize = switch (depth) {
             case 0 -> 14;
@@ -252,6 +267,7 @@ public class GeoServerProvisioningService {
             default -> 8;
         };
         String fontWeight = depth == 0 ? "bold" : "normal";
+        // Hide leaf-level labels at overview zoom to avoid clutter
         String minScaleDenominator = depth >= 3 ? "<MinScaleDenominator>500</MinScaleDenominator>" : "";
 
         return """
@@ -269,8 +285,8 @@ public class GeoServerProvisioningService {
                           %s
                           <PolygonSymbolizer>
                             <Fill>
-                              <CssParameter name="fill">%s</CssParameter>
-                              <CssParameter name="fill-opacity">%s</CssParameter>
+                              <CssParameter name="fill">#000000</CssParameter>
+                              <CssParameter name="fill-opacity">0</CssParameter>
                             </Fill>
                             <Stroke>
                               <CssParameter name="stroke">%s</CssParameter>
@@ -298,7 +314,72 @@ public class GeoServerProvisioningService {
                     </UserStyle>
                   </NamedLayer>
                 </StyledLayerDescriptor>
-                """.formatted(layerSlug, minScaleDenominator, fill, fillOpacity, stroke, strokeWidth, fontSize, fontWeight);
+                """.formatted(layerSlug, minScaleDenominator, stroke, strokeWidth, fontSize, fontWeight);
+    }
+
+    // ─── WMS layer group (floor plan composite) ───────────────────────────────
+
+    /**
+     * Creates or replaces the "floorplan" layer group in GeoServer.
+     *
+     * <p>The group composites all individual SQL View layers into a single WMS
+     * endpoint. Layers are ordered by depth ascending so the largest areas
+     * (e.g. Zone, depth 0) render at the bottom and the most specific areas
+     * (e.g. Shelf, depth 3) render on top.
+     *
+     * <p>Idempotent: 409 on POST triggers a full PUT to update the layer list.
+     */
+    private void createOrReplaceLayerGroup(String workspaceName, List<String> layerSlugs) {
+        if (layerSlugs.isEmpty()) {
+            log.debug("No layers to group — skipping layer group creation");
+            return;
+        }
+
+        String url  = props.url() + "/rest/workspaces/" + workspaceName + "/layergroups";
+        String body = buildLayerGroupJson(workspaceName, layerSlugs);
+
+        try {
+            geoServerRestTemplate.postForEntity(url, body, Void.class);
+            log.debug("GeoServer layer group created: {}/{}", workspaceName, LAYER_GROUP_NAME);
+        } catch (HttpClientErrorException e) {
+            if (e.getStatusCode() == HttpStatusCode.valueOf(409)) {
+                String putUrl = url + "/" + LAYER_GROUP_NAME;
+                RequestEntity<String> putReq = RequestEntity.put(URI.create(putUrl)).body(body);
+                geoServerRestTemplate.exchange(putReq, Void.class);
+                log.debug("GeoServer layer group updated: {}/{}", workspaceName, LAYER_GROUP_NAME);
+            } else {
+                log.warn("GeoServer layer group creation failed [{}]: {}", e.getStatusCode(), e.getMessage());
+            }
+        }
+    }
+
+    private String buildLayerGroupJson(String workspaceName, List<String> layerSlugs) {
+        StringBuilder publishables = new StringBuilder();
+        StringBuilder styles       = new StringBuilder();
+
+        for (int i = 0; i < layerSlugs.size(); i++) {
+            String slug = layerSlugs.get(i);
+            if (i > 0) { publishables.append(","); styles.append(","); }
+            publishables.append("{\"@type\":\"layer\",\"name\":\"%s:%s\"}".formatted(workspaceName, slug));
+            styles.append("{\"name\":\"%s:%s\"}".formatted(workspaceName, slug));
+        }
+
+        return """
+                {
+                  "layerGroup": {
+                    "name": "%s",
+                    "title": "Warehouse Floor Plan",
+                    "mode": "SINGLE",
+                    "workspace": {"name": "%s"},
+                    "publishables": {
+                      "published": [%s]
+                    },
+                    "styles": {
+                      "style": [%s]
+                    }
+                  }
+                }
+                """.formatted(LAYER_GROUP_NAME, workspaceName, publishables, styles);
     }
 
     // ─── Utilities ────────────────────────────────────────────────────────────

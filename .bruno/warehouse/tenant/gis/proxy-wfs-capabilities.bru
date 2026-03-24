@@ -1,7 +1,7 @@
 meta {
   name: proxy-wfs-capabilities
   type: http
-  seq: 5
+  seq: 3
 }
 
 get {
@@ -21,4 +21,11 @@ headers {
 settings {
   encodeUrl: true
   timeout: 0
+}
+
+docs {
+  Proxies a WFS GetCapabilities request to GeoServer for this tenant's workspace (wh_<tenantSlug>).
+  Lists all available feature type layers (one per BlockTemplate type after regenerate-layout).
+
+  Required permission: gis.layout.view
 }

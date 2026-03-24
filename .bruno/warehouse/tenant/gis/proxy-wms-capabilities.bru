@@ -1,0 +1,31 @@
+meta {
+  name: proxy-wms-capabilities
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{URL}}/{{TENANT_SLUG}}/gis/proxy/ows?service=WMS&version=1.3.0&request=GetCapabilities
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Proxies a WMS GetCapabilities request to GeoServer for this tenant's workspace (wh_<tenantSlug>).
+  Lists all available WMS layers and their supported CRS, bounding boxes, and styles.
+
+  Required permission: gis.layout.view
+}

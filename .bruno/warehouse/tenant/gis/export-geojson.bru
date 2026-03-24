@@ -1,0 +1,58 @@
+meta {
+  name: export-geojson
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{URL}}/{{TENANT_SLUG}}/gis/layout/geojson?layer={{TEMPLATE_NAME}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+vars:pre-request {
+  TEMPLATE_NAME: Aisle
+}
+
+docs {
+  Returns a GeoJSON FeatureCollection of all gis_blocks for the given template name.
+  Returns an empty FeatureCollection if no data exists yet (run regenerate-layout first).
+
+  Required permission: gis.layout.view (ADMIN, MANAGER)
+
+  Query param:
+    layer  — the BlockTemplate name exactly as stored in the database.
+             Examples: Zone, Aisle, Bay, Level, Shelf
+             (check block-templates/list-templates for the names in your setup)
+
+  Response: GeoJSON FeatureCollection
+  {
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "id": "<gis_block_id>",
+        "geometry": { "type": "Polygon", "coordinates": [...] },
+        "properties": {
+          "templateName": "Aisle",
+          "label": "A.01.L",
+          "positionPath": "A.01.L",
+          "depth": 1
+        }
+      }
+    ]
+  }
+}

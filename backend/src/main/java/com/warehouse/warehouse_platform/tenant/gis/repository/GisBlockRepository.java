@@ -9,6 +9,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
+
 public interface GisBlockRepository extends JpaRepository<GisBlock, UUID> {
 
     void deleteAllByLayoutBlockIdIn(Collection<UUID> layoutBlockIds);
@@ -19,10 +20,5 @@ public interface GisBlockRepository extends JpaRepository<GisBlock, UUID> {
     @Query(value = "SELECT MIN(depth) FROM gis_blocks WHERE template_name = :templateName", nativeQuery = true)
     Integer findMinDepthByTemplateName(@Param("templateName") String templateName);
 
-    @Query(value = """
-            SELECT id::text, label, position_path, depth, ST_AsGeoJSON(geometry)
-            FROM gis_blocks
-            WHERE template_name = :templateName
-            """, nativeQuery = true)
-    List<Object[]> findAllForGeoJsonByTemplateName(@Param("templateName") String templateName);
+    List<GisBlock> findAllByTemplateNameOrderByDepthAsc(String templateName);
 }

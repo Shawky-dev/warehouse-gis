@@ -2,6 +2,9 @@ package com.warehouse.warehouse_platform.tenant.gis.service;
 
 import com.warehouse.warehouse_platform.tenant.gis.GisException;
 import com.warehouse.warehouse_platform.tenant.gis.config.WarehouseGisProperties;
+import com.warehouse.warehouse_platform.tenant.gis.layout.LayoutNode;
+import com.warehouse.warehouse_platform.tenant.gis.layout.LayoutNodeBuilder;
+import com.warehouse.warehouse_platform.tenant.gis.layout.SimpleTreeLayout;
 import com.warehouse.warehouse_platform.tenant.gis.model.GisBlock;
 import com.warehouse.warehouse_platform.tenant.gis.repository.GisBlockRepository;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplate;
@@ -29,9 +32,6 @@ import java.util.stream.Collectors;
 @Service
 public class LayoutToGisConversionService {
 
-    private static final double LAT_DEGREE_PER_METER = 1.0 / 111_000.0;
-    private static final double LON_DEGREE_PER_METER = 1.0 / 111_000.0;
-
     private final WarehouseLayoutRepository warehouseLayoutRepository;
     private final LayoutBlockRepository layoutBlockRepository;
     private final BlockTemplateRepository blockTemplateRepository;
@@ -53,13 +53,21 @@ public class LayoutToGisConversionService {
         this.gisProperties = gisProperties;
     }
 
-    private record Bounds(double minLon, double minLat, double maxLon, double maxLat) {}
-
     /**
      * Converts the active warehouse layout into GIS shadow data.
-     * Every block in the tree is stored in gis_blocks with its template_name.
      *
-     * @return map of templateName → count of blocks converted
+     * <p>Uses {@link SimpleTreeLayout} to assign each block a normalized 0–100
+     * bounding box, then maps those boxes to real EPSG:4326 polygons using the
+     * warehouse anchor and dimensions from {@link WarehouseGisProperties}.
+     *
+     * <p>Coordinate-system assumptions:
+     * <ul>
+     *   <li>{@code anchorLon}/{@code anchorLat} = SW corner (minimum lon/lat).</li>
+     *   <li>Normalized Y=0 = north edge (max lat); Y=100 = south edge (anchorLat).</li>
+     *   <li>1 degree ≈ 111 000 m (used for both lat and lon — sufficient for small warehouses).</li>
+     * </ul>
+     *
+     * @return map of templateName → count of GisBlocks created
      */
     @Transactional
     public Map<String, Integer> convertActiveLayout() {
@@ -85,136 +93,112 @@ public class LayoutToGisConversionService {
             gisBlockRepository.deleteAllByLayoutBlockIdIn(allBlockIds);
         }
 
-        // Step 4 — Build in-memory parent→children tree (null key = root blocks)
-        Map<UUID, List<LayoutBlock>> childrenByParentId = new HashMap<>();
-        for (LayoutBlock block : blocks) {
-            childrenByParentId.computeIfAbsent(block.getParentId(), k -> new ArrayList<>()).add(block);
+        // Step 4 — Build LayoutNode tree and apply SimpleTreeLayout
+        List<LayoutNode> rootNodes = LayoutNodeBuilder.buildForest(blocks, templateById);
+
+        // Wrap all DB root nodes under a synthetic root (depth = -1) so that
+        // SimpleTreeLayout divides the full 0-100 space equally among them, and
+        // they naturally receive depth = -1 + 1 = 0.
+        LayoutNode syntheticRoot = new LayoutNode(null, "__root__", null, null, 0);
+        syntheticRoot.setDepth(-1);
+        for (LayoutNode r : rootNodes) {
+            syntheticRoot.addChild(r);
         }
 
-        // Step 5 — Recursive geometry subdivision
+        SimpleTreeLayout treeLayout = new SimpleTreeLayout();
+        treeLayout.layout(syntheticRoot);
+
+        // Flatten; skip the synthetic root (nodeId == null, not persisted)
+        List<LayoutNode> allNodes = new ArrayList<>(treeLayout.flatten(syntheticRoot));
+        allNodes.removeFirst();
+
+        // Step 5 — Map normalized 0-100 coords → real EPSG:4326 and persist GisBlocks
+        //
+        // anchorLon/anchorLat = SW corner of the warehouse (minimum lon/lat).
+        // Normalized X [0,100] maps linearly to [anchorLon, anchorLon + lonSpan].
+        // Normalized Y [0,100] maps INVERTED: Y=0 = north (max lat), Y=100 = south (anchorLat).
         double anchorLon = gisProperties.getAnchorLon();
         double anchorLat = gisProperties.getAnchorLat();
-        Bounds warehouseBounds = new Bounds(
-                anchorLon,
-                anchorLat,
-                anchorLon + (gisProperties.getWidthMeters() * LON_DEGREE_PER_METER),
-                anchorLat + (gisProperties.getLengthMeters() * LAT_DEGREE_PER_METER)
-        );
+        double lonSpan   = gisProperties.getWidthMeters()  / 111_000.0;
+        double latSpan   = gisProperties.getLengthMeters() / 111_000.0;
 
         Map<String, Integer> counts = new HashMap<>();
-        List<LayoutBlock> rootBlocks = childrenByParentId.getOrDefault(null, List.of());
-        processLevel(rootBlocks, warehouseBounds, false, templateById, childrenByParentId, counts, 0);
+        for (LayoutNode node : allNodes) {
+            double minLon = anchorLon + (node.getX()                       / 100.0) * lonSpan;
+            double maxLon = anchorLon + ((node.getX() + node.getWidth())   / 100.0) * lonSpan;
+            double maxLat = anchorLat + ((100.0 - node.getY())                        / 100.0) * latSpan;
+            double minLat = anchorLat + ((100.0 - (node.getY() + node.getHeight()))   / 100.0) * latSpan;
 
-        return counts;
-    }
-
-    private void processLevel(
-            List<LayoutBlock> siblings,
-            Bounds parentBounds,
-            boolean splitAlongWidth,
-            Map<UUID, BlockTemplate> templateById,
-            Map<UUID, List<LayoutBlock>> childrenByParentId,
-            Map<String, Integer> counts,
-            int depth) {
-
-        int n = siblings.size();
-        if (n == 0) return;
-
-        for (int i = 0; i < n; i++) {
-            LayoutBlock block = siblings.get(i);
-            Bounds blockBounds;
-
-            if (splitAlongWidth) {
-                double sliceWidth = (parentBounds.maxLon() - parentBounds.minLon()) / n;
-                double bMinLon = parentBounds.minLon() + i * sliceWidth;
-                double bMaxLon = parentBounds.minLon() + (i + 1) * sliceWidth;
-                double bMinLat = parentBounds.minLat();
-                double bMaxLat = parentBounds.maxLat();
-
-                // Side split: halve lat range for L/A (left) vs R/B (right)
-                if (block.getSide() != null) {
-                    double midLat = (bMinLat + bMaxLat) / 2.0;
-                    String side = block.getSide();
-                    if ("L".equalsIgnoreCase(side) || "A".equalsIgnoreCase(side)) {
-                        bMaxLat = midLat;
-                    } else {
-                        bMinLat = midLat;
-                    }
-                }
-                blockBounds = new Bounds(bMinLon, bMinLat, bMaxLon, bMaxLat);
-            } else {
-                double sliceHeight = (parentBounds.maxLat() - parentBounds.minLat()) / n;
-                blockBounds = new Bounds(
-                        parentBounds.minLon(),
-                        parentBounds.minLat() + i * sliceHeight,
-                        parentBounds.maxLon(),
-                        parentBounds.minLat() + (i + 1) * sliceHeight
-                );
-            }
-
-            // Build JTS Polygon: SW → SE → NE → NW → SW (closed ring)
+            // SW → SE → NE → NW → SW (closed ring)
             Polygon polygon = geometryFactory.createPolygon(new Coordinate[]{
-                    new Coordinate(blockBounds.minLon(), blockBounds.minLat()),
-                    new Coordinate(blockBounds.maxLon(), blockBounds.minLat()),
-                    new Coordinate(blockBounds.maxLon(), blockBounds.maxLat()),
-                    new Coordinate(blockBounds.minLon(), blockBounds.maxLat()),
-                    new Coordinate(blockBounds.minLon(), blockBounds.minLat())
+                    new Coordinate(minLon, minLat),
+                    new Coordinate(maxLon, minLat),
+                    new Coordinate(maxLon, maxLat),
+                    new Coordinate(minLon, maxLat),
+                    new Coordinate(minLon, minLat)
             });
             Point centroid = polygon.getCentroid();
 
-            BlockTemplate template = templateById.get(block.getBlockTemplateId());
-            String templateName = template != null ? template.getName() : "Unknown";
-
             GisBlock gisBlock = GisBlock.builder()
-                    .layoutBlockId(block.getId())
-                    .templateName(templateName)
-                    .label(block.getFullCode())
-                    .positionPath(block.getFullCode())
-                    .depth(depth)
+                    .layoutBlockId(node.getNodeId())
+                    .templateName(node.getBlockType())
+                    .label(node.getBlockName())
+                    .positionPath(node.getBlockName())
+                    .depth(node.getDepth())
                     .geometry(polygon)
                     .centroidGeom((Point) centroid)
                     .build();
             gisBlockRepository.save(gisBlock);
-            counts.merge(templateName, 1, Integer::sum);
-
-            // Recurse into children, alternating split axis
-            List<LayoutBlock> children = childrenByParentId.getOrDefault(block.getId(), List.of());
-            if (!children.isEmpty()) {
-                processLevel(children, blockBounds, !splitAlongWidth, templateById, childrenByParentId, counts, depth + 1);
-            }
+            counts.merge(node.getBlockType(), 1, Integer::sum);
         }
+
+        return counts;
     }
 
     /**
      * Returns a GeoJSON FeatureCollection of all gis_blocks for the given templateName.
-     * Returns an empty FeatureCollection if no data exists for that template name.
+     * Returns an empty FeatureCollection if no data exists yet (run regenerate-layout first).
+     *
+     * Geometry is serialized from the JTS Polygon in Java to avoid a dependency on
+     * ST_AsGeoJSON, which is unreachable when the connection search_path is scoped to
+     * a tenant schema that does not include the public PostGIS schema.
      */
     public String buildGeoJsonFeatureCollection(String templateName) {
-        List<Object[]> rows = gisBlockRepository.findAllForGeoJsonByTemplateName(templateName);
+        List<GisBlock> blocks = gisBlockRepository.findAllByTemplateNameOrderByDepthAsc(templateName);
 
         StringBuilder sb = new StringBuilder();
         sb.append("{\"type\":\"FeatureCollection\",\"features\":[");
-        for (int i = 0; i < rows.size(); i++) {
+        for (int i = 0; i < blocks.size(); i++) {
             if (i > 0) sb.append(",");
-            Object[] row = rows.get(i);
-            // row: [0]=id, [1]=label, [2]=position_path, [3]=depth, [4]=geom_json
-            String id = row[0] != null ? row[0].toString() : "";
-            String label = row[1] != null ? jsonEscape(row[1].toString()) : "";
-            String positionPath = row[2] != null ? jsonEscape(row[2].toString()) : "";
-            int depth = row[3] != null ? Integer.parseInt(row[3].toString()) : 0;
-            String geomJson = row[4] != null ? row[4].toString() : "null";
+            GisBlock block = blocks.get(i);
 
             sb.append("{\"type\":\"Feature\"");
-            sb.append(",\"id\":\"").append(id).append("\"");
-            sb.append(",\"geometry\":").append(geomJson);
+            sb.append(",\"id\":\"").append(block.getId()).append("\"");
+            sb.append(",\"geometry\":").append(polygonToGeoJson(block.getGeometry()));
             sb.append(",\"properties\":{");
             sb.append("\"templateName\":\"").append(jsonEscape(templateName)).append("\"");
-            sb.append(",\"label\":\"").append(label).append("\"");
-            sb.append(",\"positionPath\":\"").append(positionPath).append("\"");
-            sb.append(",\"depth\":").append(depth);
+            sb.append(",\"label\":\"").append(jsonEscape(block.getLabel())).append("\"");
+            sb.append(",\"positionPath\":\"").append(jsonEscape(block.getPositionPath())).append("\"");
+            sb.append(",\"depth\":").append(block.getDepth());
             sb.append("}}");
         }
         sb.append("]}");
+        return sb.toString();
+    }
+
+    /**
+     * Serializes a JTS Polygon to a GeoJSON geometry string.
+     * Coordinates are [longitude, latitude] (x=lon, y=lat in EPSG:4326).
+     */
+    private static String polygonToGeoJson(Polygon polygon) {
+        if (polygon == null) return "null";
+        StringBuilder sb = new StringBuilder("{\"type\":\"Polygon\",\"coordinates\":[[");
+        Coordinate[] coords = polygon.getCoordinates();
+        for (int i = 0; i < coords.length; i++) {
+            if (i > 0) sb.append(",");
+            sb.append("[").append(coords[i].x).append(",").append(coords[i].y).append("]");
+        }
+        sb.append("]]}");
         return sb.toString();
     }
 

@@ -1,0 +1,49 @@
+meta {
+  name: proxy-wms-getmap
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{URL}}/{{TENANT_SLUG}}/gis/proxy/ows?service=WMS&version=1.3.0&request=GetMap&layers=floorplan&bbox={{BBOX}}&width=1024&height=768&crs=EPSG:4326&format=image/png&transparent=true
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+settings {
+  encodeUrl: false
+  timeout: 0
+}
+
+vars:pre-request {
+  BBOX: -0.001,-0.001,0.001,0.001
+}
+
+docs {
+  Returns a WMS floor plan image (PNG) from the "floorplan" layer group.
+  The layer group composites all block template layers in depth order
+  (Zone at the bottom, Shelf on top).
+
+  Required permission: gis.layout.view
+
+  Key params:
+    layers      — "floorplan" (the layer group created by regenerate-layout)
+    bbox        — minLat,minLon,maxLat,maxLon in EPSG:4326.
+                  Set {{BBOX}} to your warehouse anchor bounds, e.g.
+                  "30.0,31.0,30.001,31.002" for a 100m x 200m warehouse
+                  at lat=30, lon=31.
+    width/height — output image dimensions in pixels
+    format       — image/png (supports transparency), image/jpeg
+    transparent  — true allows the background to be transparent
+
+  Note: encodeUrl is false so the bbox commas are not percent-encoded.
+  If your Bruno version encodes them anyway, set the bbox directly in the URL.
+}

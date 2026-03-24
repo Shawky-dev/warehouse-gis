@@ -22,3 +22,20 @@ settings {
   encodeUrl: true
   timeout: 0
 }
+
+docs {
+  Converts the active warehouse layout into GIS shadow data (gis_blocks table)
+  and provisions/updates GeoServer SQL-View layers for each block template type.
+
+  Required permission: gis.layout.regenerate (ADMIN, MANAGER)
+
+  Response:
+  {
+    "layersConverted": {
+      "Zone": 2,
+      "Aisle": 4,
+      "Bay": 8,
+      "Shelf": 24
+    }
+  }
+}
