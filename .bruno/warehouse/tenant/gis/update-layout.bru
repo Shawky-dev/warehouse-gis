@@ -1,11 +1,11 @@
 meta {
-  name: generate-layout
+  name: update-layout
   type: http
-  seq: 1
+  seq: 2
 }
 
 post {
-  url: {{URL}}/{{TENANT_SLUG}}/gis/layout/generate
+  url: {{URL}}/{{TENANT_SLUG}}/gis/layout/update
   body: none
   auth: bearer
 }
@@ -24,10 +24,10 @@ settings {
 }
 
 docs {
-  Generates GIS shadow data from the active warehouse layout (gis_blocks table)
-  and provisions/updates GeoServer SQL-View layers for each block template type.
+  Overwrites existing GIS shadow data using the current active layout.
 
-  Returns CONFLICT if GIS data already exists. Use update-layout to overwrite.
+  The endpoint first clears tenant GeoServer workspace resources,
+  then rebuilds GIS rows and republishes layers/styles.
 
   Required permission: gis.layout.regenerate (ADMIN, MANAGER)
 

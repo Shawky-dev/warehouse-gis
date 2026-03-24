@@ -21,10 +21,19 @@ public class GeoServerProvisioningException extends RuntimeException {
         return new GeoServerProvisioningException(HttpStatus.NOT_FOUND, "NOT_FOUND", message);
     }
 
+    public static GeoServerProvisioningException conflict(String message) {
+        return new GeoServerProvisioningException(HttpStatus.CONFLICT, "CONFLICT", message);
+    }
+
     public static GeoServerProvisioningException serverError(String message) {
         return new GeoServerProvisioningException(HttpStatus.INTERNAL_SERVER_ERROR, "GEOSERVER_ERROR", message);
     }
 
-    public HttpStatus getStatus() { return status; }
-    public String getCode() { return code; }
+    public HttpStatus getStatus() {
+        return status;
+    }
+
+    public String getCode() {
+        return code;
+    }
 }

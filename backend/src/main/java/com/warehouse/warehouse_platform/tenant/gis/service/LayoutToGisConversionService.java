@@ -29,7 +29,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-
 @Service
 public class LayoutToGisConversionService {
 
@@ -55,23 +54,51 @@ public class LayoutToGisConversionService {
     }
 
     /**
+     * Generates GIS shadow data from the active warehouse layout.
+     *
+     * <p>
+     * Fails with conflict if GIS shadow data already exists.
+     */
+    @Transactional
+    public Map<String, Integer> generateFromActiveLayout() {
+        return convertActiveLayout(false);
+    }
+
+    /**
+     * Rebuilds GIS shadow data from the active warehouse layout,
+     * replacing any existing GIS rows.
+     */
+    @Transactional
+    public Map<String, Integer> updateFromActiveLayout() {
+        return convertActiveLayout(true);
+    }
+
+    /**
      * Converts the active warehouse layout into GIS shadow data.
      *
-     * <p>Uses {@link SimpleTreeLayout} to assign each block a normalized 0–100
+     * <p>
+     * Uses {@link SimpleTreeLayout} to assign each block a normalized 0–100
      * bounding box, then maps those boxes to real EPSG:4326 polygons using the
      * warehouse anchor and dimensions from {@link WarehouseGisProperties}.
      *
-     * <p>Coordinate-system assumptions:
+     * <p>
+     * Coordinate-system assumptions:
      * <ul>
-     *   <li>{@code anchorLon}/{@code anchorLat} = SW corner (minimum lon/lat).</li>
-     *   <li>Normalized Y=0 = north edge (max lat); Y=100 = south edge (anchorLat).</li>
-     *   <li>1 degree ≈ 111 000 m (used for both lat and lon — sufficient for small warehouses).</li>
+     * <li>{@code anchorLon}/{@code anchorLat} = SW corner (minimum lon/lat).</li>
+     * <li>Normalized Y=0 = north edge (max lat); Y=100 = south edge
+     * (anchorLat).</li>
+     * <li>1 degree ≈ 111 000 m (used for both lat and lon — sufficient for small
+     * warehouses).</li>
      * </ul>
      *
      * @return map of templateName → count of GisBlocks created
      */
-    @Transactional
-    public Map<String, Integer> convertActiveLayout() {
+    private Map<String, Integer> convertActiveLayout(boolean overwriteExisting) {
+        if (!overwriteExisting && gisBlockRepository.count() > 0) {
+            throw GisException.conflict(
+                    "Warehouse GIS layout already exists. Use /gis/layout/update to overwrite using the active layout.");
+        }
+
         // Step 1 — Load active layout
         WarehouseLayout layout = warehouseLayoutRepository.findByIsActiveTrue()
                 .orElseThrow(() -> GisException.notFound("No active warehouse layout found"));
@@ -88,8 +115,10 @@ public class LayoutToGisConversionService {
                 .stream()
                 .collect(Collectors.toMap(BlockTemplate::getId, t -> t));
 
-        // Step 3 — Clear ALL existing GIS rows before regenerating from scratch
-        gisBlockRepository.deleteAllInBatch();
+        if (overwriteExisting) {
+            // Step 3 — Clear existing GIS rows before rebuilding from active layout
+            gisBlockRepository.deleteAllInBatch();
+        }
 
         // Step 4 — Build LayoutNode tree and apply SimpleTreeLayout
         List<LayoutNode> rootNodes = LayoutNodeBuilder.buildForest(blocks, templateById);
@@ -114,21 +143,22 @@ public class LayoutToGisConversionService {
         //
         // anchorLon/anchorLat = SW corner of the warehouse (minimum lon/lat).
         // Normalized X [0,100] maps linearly to [anchorLon, anchorLon + lonSpan].
-        // Normalized Y [0,100] maps INVERTED: Y=0 = north (max lat), Y=100 = south (anchorLat).
+        // Normalized Y [0,100] maps INVERTED: Y=0 = north (max lat), Y=100 = south
+        // (anchorLat).
         double anchorLon = gisProperties.getAnchorLon();
         double anchorLat = gisProperties.getAnchorLat();
-        double lonSpan   = gisProperties.getWidthMeters()  / 111_000.0;
-        double latSpan   = gisProperties.getLengthMeters() / 111_000.0;
+        double lonSpan = gisProperties.getWidthMeters() / 111_000.0;
+        double latSpan = gisProperties.getLengthMeters() / 111_000.0;
 
         Map<String, Integer> counts = new HashMap<>();
         for (LayoutNode node : allNodes) {
-            double minLon = anchorLon + (node.getX()                       / 100.0) * lonSpan;
-            double maxLon = anchorLon + ((node.getX() + node.getWidth())   / 100.0) * lonSpan;
-            double maxLat = anchorLat + ((100.0 - node.getY())                        / 100.0) * latSpan;
-            double minLat = anchorLat + ((100.0 - (node.getY() + node.getHeight()))   / 100.0) * latSpan;
+            double minLon = anchorLon + (node.getX() / 100.0) * lonSpan;
+            double maxLon = anchorLon + ((node.getX() + node.getWidth()) / 100.0) * lonSpan;
+            double maxLat = anchorLat + ((100.0 - node.getY()) / 100.0) * latSpan;
+            double minLat = anchorLat + ((100.0 - (node.getY() + node.getHeight())) / 100.0) * latSpan;
 
             // SW → SE → NE → NW → SW (closed ring)
-            Polygon polygon = geometryFactory.createPolygon(new Coordinate[]{
+            Polygon polygon = geometryFactory.createPolygon(new Coordinate[] {
                     new Coordinate(minLon, minLat),
                     new Coordinate(maxLon, minLat),
                     new Coordinate(maxLon, maxLat),
@@ -154,11 +184,14 @@ public class LayoutToGisConversionService {
     }
 
     /**
-     * Returns a GeoJSON FeatureCollection of all gis_blocks for the given templateName.
-     * Returns an empty FeatureCollection if no data exists yet (run regenerate-layout first).
+     * Returns a GeoJSON FeatureCollection of all gis_blocks for the given
+     * templateName.
+     * Returns an empty FeatureCollection if no data exists yet (run generate or
+     * update first).
      *
      * Geometry is serialized from the JTS Polygon in Java to avoid a dependency on
-     * ST_AsGeoJSON, which is unreachable when the connection search_path is scoped to
+     * ST_AsGeoJSON, which is unreachable when the connection search_path is scoped
+     * to
      * a tenant schema that does not include the public PostGIS schema.
      */
     public String buildGeoJsonFeatureCollection(String templateName) {
@@ -167,7 +200,8 @@ public class LayoutToGisConversionService {
         StringBuilder sb = new StringBuilder();
         sb.append("{\"type\":\"FeatureCollection\",\"features\":[");
         for (int i = 0; i < blocks.size(); i++) {
-            if (i > 0) sb.append(",");
+            if (i > 0)
+                sb.append(",");
             GisBlock block = blocks.get(i);
 
             sb.append("{\"type\":\"Feature\"");
@@ -189,11 +223,13 @@ public class LayoutToGisConversionService {
      * Coordinates are [longitude, latitude] (x=lon, y=lat in EPSG:4326).
      */
     private static String polygonToGeoJson(Polygon polygon) {
-        if (polygon == null) return "null";
+        if (polygon == null)
+            return "null";
         StringBuilder sb = new StringBuilder("{\"type\":\"Polygon\",\"coordinates\":[[");
         Coordinate[] coords = polygon.getCoordinates();
         for (int i = 0; i < coords.length; i++) {
-            if (i > 0) sb.append(",");
+            if (i > 0)
+                sb.append(",");
             sb.append("[").append(coords[i].x).append(",").append(coords[i].y).append("]");
         }
         sb.append("]]}");
@@ -201,7 +237,8 @@ public class LayoutToGisConversionService {
     }
 
     private static String jsonEscape(String s) {
-        if (s == null) return "";
+        if (s == null)
+            return "";
         return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
     }
 }

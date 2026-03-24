@@ -21,6 +21,15 @@ public class GisException extends RuntimeException {
         return new GisException(HttpStatus.NOT_FOUND, "NOT_FOUND", message);
     }
 
-    public HttpStatus getStatus() { return status; }
-    public String getCode() { return code; }
+    public static GisException conflict(String message) {
+        return new GisException(HttpStatus.CONFLICT, "CONFLICT", message);
+    }
+
+    public HttpStatus getStatus() {
+        return status;
+    }
+
+    public String getCode() {
+        return code;
+    }
 }

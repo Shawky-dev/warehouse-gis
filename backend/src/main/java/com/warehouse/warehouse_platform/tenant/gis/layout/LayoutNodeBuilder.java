@@ -13,35 +13,43 @@ import java.util.UUID;
 /**
  * Builds a {@link LayoutNode} forest from flat lists of database entities.
  *
- * <p>This is a pure static utility — no Spring beans, no I/O.
+ * <p>
+ * This is a pure static utility — no Spring beans, no I/O.
  * It is designed to consume exactly the inputs that
- * {@code LayoutToGisConversionService.convertActiveLayout()} already loads:
+ * {@code LayoutToGisConversionService.generateFromActiveLayout()} and
+ * {@code LayoutToGisConversionService.updateFromActiveLayout()} already load:
  * <ul>
- *   <li>The flat list from
- *       {@code layoutBlockRepository.findByLayoutIdOrderByParentIdAscPositionAsc()}</li>
- *   <li>The {@code Map<UUID, BlockTemplate>} already built in that method.</li>
+ * <li>The flat list from
+ * {@code layoutBlockRepository.findByLayoutIdOrderByParentIdAscPositionAsc()}</li>
+ * <li>The {@code Map<UUID, BlockTemplate>} already built in that method.</li>
  * </ul>
  */
 public final class LayoutNodeBuilder {
 
-    private LayoutNodeBuilder() {}
+    private LayoutNodeBuilder() {
+    }
 
     /**
-     * Assembles a forest (list of root {@link LayoutNode}s) from the flat entity lists.
+     * Assembles a forest (list of root {@link LayoutNode}s) from the flat entity
+     * lists.
      *
-     * <p>Two-pass algorithm:
+     * <p>
+     * Two-pass algorithm:
      * <ol>
-     *   <li>Create one {@link LayoutNode} per {@link LayoutBlock}.</li>
-     *   <li>Wire parent→child relationships; collect nodes whose
-     *       {@code parentId == null} as roots.</li>
+     * <li>Create one {@link LayoutNode} per {@link LayoutBlock}.</li>
+     * <li>Wire parent→child relationships; collect nodes whose
+     * {@code parentId == null} as roots.</li>
      * </ol>
      *
-     * <p>Orphan nodes (non-null {@code parentId} but missing parent) are treated
+     * <p>
+     * Orphan nodes (non-null {@code parentId} but missing parent) are treated
      * as additional roots rather than silently dropped.
      *
-     * @param blocks       flat list of all {@link LayoutBlock} rows for the active layout,
+     * @param blocks       flat list of all {@link LayoutBlock} rows for the active
+     *                     layout,
      *                     ordered by parentId ASC, position ASC
-     * @param templateById map from {@link BlockTemplate#getId()} to {@link BlockTemplate}
+     * @param templateById map from {@link BlockTemplate#getId()} to
+     *                     {@link BlockTemplate}
      * @return list of root-level nodes, each with its full child subtree attached
      */
     public static List<LayoutNode> buildForest(
