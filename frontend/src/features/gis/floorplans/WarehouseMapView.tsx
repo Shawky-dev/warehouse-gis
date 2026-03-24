@@ -79,6 +79,7 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
     const lastCreatedGraphicRef = useRef<Graphic | null>(null);
     const selectedGraphicRef = useRef<Graphic | null>(null);
     const activeTemplateNameRef = useRef<string | null>(activeTemplateName ?? null);
+    const selectedGisBlockIdRef = useRef<string | null | undefined>(selectedGisBlockId);
     // Stable callback refs so event listeners always call the latest version
     const onPolygonCompleteRef = useRef(onPolygonComplete);
     const onPolygonSelectRef = useRef(onPolygonSelect);
@@ -90,6 +91,7 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
     useEffect(() => { onPolygonSelectRef.current = onPolygonSelect; }, [onPolygonSelect]);
     useEffect(() => { onDrawModeChangeRef.current = onDrawModeChange; }, [onDrawModeChange]);
     useEffect(() => { activeTemplateNameRef.current = activeTemplateName ?? null; }, [activeTemplateName]);
+    useEffect(() => { selectedGisBlockIdRef.current = selectedGisBlockId; }, [selectedGisBlockId]);
 
     // ── Imperative handle: remove the unassigned drawn polygon ───────────────
     useImperativeHandle(ref, () => ({
@@ -367,14 +369,17 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
         }
       }
 
-      // Re-apply selection highlight after re-render
-      if (selectedGisBlockId) {
+      // Re-apply selection highlight after re-render (use ref to avoid adding
+      // selectedGisBlockId to this effect's deps — the dedicated highlight effect
+      // handles it for normal selection changes; this only covers the redraw case)
+      const currentSelectedId = selectedGisBlockIdRef.current;
+      if (currentSelectedId) {
         for (const layer of layersRef.current.values()) {
           const found = layer.graphics
             .toArray()
             .find(
               (g: Graphic) =>
-                g.attributes?.gisBlockId === selectedGisBlockId && !g.attributes?.isLabel
+                g.attributes?.gisBlockId === currentSelectedId && !g.attributes?.isLabel
             );
           if (found) {
             const tplName = found.attributes?.templateName as string | undefined;
@@ -388,7 +393,7 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
           }
         }
       }
-    }, [existingPolygons, editorMode, selectedGisBlockId]);
+    }, [existingPolygons, editorMode]);
 
     return (
       <div className="relative">
