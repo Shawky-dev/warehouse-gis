@@ -216,3 +216,10 @@ databaseChangeLog:
         - sqlFile:
             path: db/migration/tenant/V31__add_depth_to_gis_blocks.sql
             relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-gis-floor-plan-permissions-32
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V32__seed_gis_floor_plan_permissions.sql
+            relativeToChangelogFile: false

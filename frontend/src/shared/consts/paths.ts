@@ -41,6 +41,7 @@ export const PATHS = {
     RECEIPTS_PATTERN: "/:tenantSlug/receipts",
     DISPATCHES_PATTERN: "/:tenantSlug/dispatches",
     COUNT_SESSIONS_PATTERN: "/:tenantSlug/count-sessions",
+    GIS_FLOOR_PLANS_PATTERN: "/:tenantSlug/gis/floor-plans",
     root: (tenantSlug: string) => `/${tenantSlug}`,
     authLogin: (tenantSlug: string) => `/${tenantSlug}/auth/login`,
     products: (tenantSlug: string) => `/${tenantSlug}/products`,
@@ -62,5 +63,6 @@ export const PATHS = {
     receipts: (tenantSlug: string) => `/${tenantSlug}/receipts`,
     dispatches: (tenantSlug: string) => `/${tenantSlug}/dispatches`,
     countSessions: (tenantSlug: string) => `/${tenantSlug}/count-sessions`,
+    gisFloorPlans: (tenantSlug: string) => `/${tenantSlug}/gis/floor-plans`,
   },
 };

@@ -9,3 +9,9 @@ secrets/*
 
 # Backend local key files (legacy/dev)
 backend/keys/*.pem
+
+# Uploaded GIS floor plans
+data/floorplans/
+
+# Generated ArcGIS runtime assets copied for Vite
+frontend/public/assets/

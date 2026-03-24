@@ -15,6 +15,7 @@ import {
   PackageOpen,
   PackagePlus,
   PackageMinus,
+  Map,
   SlidersHorizontal,
   List,
   ScanBarcode,
@@ -88,6 +89,7 @@ export function TenantNavbar() {
   const canViewWarehouse = hasPermission(TENANT_PERMISSIONS.WAREHOUSE_VIEW);
   const canViewAudit = hasPermission(TENANT_PERMISSIONS.AUDIT_VIEW);
   const canViewInventory = hasPermission(TENANT_PERMISSIONS.INVENTORY_VIEW);
+  const canViewGisFloorPlans = hasPermission(TENANT_PERMISSIONS.GIS_FLOOR_PLAN_VIEW);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const { navigateFromResult } = useScanNavigation(normalizedSlug);
   const canViewReceipts = hasPermission(TENANT_PERMISSIONS.RECEIPTS_VIEW);
@@ -159,6 +161,22 @@ export function TenantNavbar() {
           icon: Warehouse,
           children: warehouseChildren,
         },
+        ...(canViewGisFloorPlans
+          ? [
+            {
+              id: "gis",
+              label: t("tenant.nav.gis"),
+              icon: Map,
+              children: [
+                {
+                  to: PATHS.TENANT.gisFloorPlans(normalizedSlug),
+                  label: t("tenant.nav.gisFloorPlans"),
+                  icon: Map,
+                },
+              ],
+            },
+          ]
+          : []),
         {
           id: "accounts",
           label: t("tenant.nav.accounts"),
@@ -259,6 +277,7 @@ export function TenantNavbar() {
       canViewReceipts,
       canViewDispatches,
       canViewCounting,
+      canViewGisFloorPlans,
       canViewWarehouse,
       normalizedSlug,
       t,

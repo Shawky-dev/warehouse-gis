@@ -12,6 +12,7 @@ import InventoryPage from "@/features/tenant/inventory/InventoryPage";
 import ReceiptsPage from "@/features/tenant/receipts/ReceiptsPage";
 import DispatchesPage from "@/features/tenant/dispatches/DispatchesPage";
 import CountSessionsPage from "@/features/tenant/counting/CountSessionsPage";
+import FloorPlansPage from "@/features/gis/floorplans/FloorPlansPage";
 import { RequirePermission } from "@/features/auth/guards/RequirePermission";
 import { RequireAnyPermission } from "@/features/auth/guards/RequireAnyPermission";
 import { TENANT_PERMISSIONS } from "@/features/auth/shared/permissions";
@@ -153,6 +154,14 @@ export const tenantRoutes = [
     element: (
       <RequirePermission permission={TENANT_PERMISSIONS.COUNTING_VIEW}>
         <CountSessionsPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: PATHS.TENANT.GIS_FLOOR_PLANS_PATTERN,
+    element: (
+      <RequirePermission permission={TENANT_PERMISSIONS.GIS_FLOOR_PLAN_VIEW}>
+        <FloorPlansPage />
       </RequirePermission>
     ),
   },

@@ -11,6 +11,9 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), tailwindcss()],
+    optimizeDeps: {
+      exclude: ["@arcgis/core"],
+    },
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
