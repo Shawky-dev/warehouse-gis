@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 
@@ -18,4 +19,6 @@ public interface GisBlockRepository extends JpaRepository<GisBlock, UUID> {
     Integer findMinDepthByTemplateName(@Param("templateName") String templateName);
 
     List<GisBlock> findAllByTemplateNameOrderByDepthAsc(String templateName);
+
+    Optional<GisBlock> findByLayoutBlockId(UUID layoutBlockId);
 }
