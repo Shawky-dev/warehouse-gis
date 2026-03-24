@@ -5,17 +5,17 @@ meta {
 }
 
 get {
-  url: {{URL}}/{{TENANT_SLUG}}/warehouse-layouts/{{LAYOUT_ID}}
+  url: {{URL}}/{{TENANT_SLUG}}/warehouse-layouts/ccf86307-1f41-4972-9b2a-3960b7b20984
   body: none
   auth: bearer
 }
 
-auth:bearer {
-  token: {{ACCESS_TOKEN}}
-}
-
 headers {
   X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
 }
 
 settings {

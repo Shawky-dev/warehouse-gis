@@ -10,12 +10,16 @@ get {
   auth: bearer
 }
 
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
 auth:bearer {
   token: {{ACCESS_TOKEN}}
 }
 
-headers {
-  X-TENANT-ID: {{TENANT_SLUG}}
+vars:pre-request {
+  LAYOUT_ID: e1c399c0-a33c-4dca-8ba5-b9a8b4ead4b8
 }
 
 settings {

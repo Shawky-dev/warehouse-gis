@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.RequestEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestTemplate;
 
 import java.net.URI;
@@ -100,8 +101,11 @@ public class GeoServerProvisioningService {
         try {
             geoServerRestTemplate.postForEntity(url, buildDataStoreJson(tenantSlug), Void.class);
             log.debug("GeoServer datastore created: {}/{}", workspaceName, DATASTORE_NAME);
-        } catch (HttpClientErrorException e) {
-            if (e.getStatusCode() == HttpStatusCode.valueOf(409)) {
+        } catch (RestClientResponseException e) {
+            // GeoServer returns 409 on conflict, but may return 500 with "already exists" body
+            boolean alreadyExists = e.getStatusCode() == HttpStatusCode.valueOf(409)
+                    || e.getResponseBodyAsString().contains("already exists");
+            if (alreadyExists) {
                 log.debug("GeoServer datastore already exists, skipping: {}/{}", workspaceName, DATASTORE_NAME);
             } else {
                 log.warn("GeoServer datastore creation failed [{}]: {}", e.getStatusCode(), e.getMessage());
@@ -247,6 +251,22 @@ public class GeoServerProvisioningService {
      *   depth 2 (Bay):            thin green border, small label
      *   depth 3+ (Shelf/leaf):    fine orange border, tiny label (hidden at overview zoom)
      */
+    /**
+     * Builds an outline-only SLD for a given depth level.
+     *
+     * Two separate Rules are used:
+     *   Rule 1 — polygon outline, no scale constraint (always rendered).
+     *   Rule 2 — text label, gated by MaxScaleDenominator so labels only
+     *             appear when the user has zoomed in enough to read them:
+     *               depth 0 (Aisle):  always
+     *               depth 1 (Bay):    scale ≤ 1500
+     *               depth 2 (Level):  scale ≤ 700
+     *               depth 3+ (Shelf): scale ≤ 350
+     *
+     * Depth 2 (Level) anchors its label to the top of the polygon
+     * (AnchorPointY=1.0) so it doesn't collide with the Bay label
+     * (AnchorPointY=0.5) when both share the same 1:1 polygon.
+     */
     private String buildSldXml(String layerSlug, int depth) {
         String stroke = switch (depth) {
             case 0 -> "#455a64";
@@ -267,8 +287,20 @@ public class GeoServerProvisioningService {
             default -> 8;
         };
         String fontWeight = depth == 0 ? "bold" : "normal";
-        // Hide leaf-level labels at overview zoom to avoid clutter
-        String minScaleDenominator = depth >= 3 ? "<MinScaleDenominator>500</MinScaleDenominator>" : "";
+
+        // MaxScaleDenominator X = "only render when scale denominator <= X"
+        // = only render when zoomed IN to this level of detail.
+        String maxScaleDenominator = switch (depth) {
+            case 0 -> "";
+            case 1 -> "<MaxScaleDenominator>1500</MaxScaleDenominator>";
+            case 2 -> "<MaxScaleDenominator>700</MaxScaleDenominator>";
+            default -> "<MaxScaleDenominator>350</MaxScaleDenominator>";
+        };
+
+        // Level (depth 2) shares the same polygon as its Bay parent when 1:1.
+        // AnchorPointY=1.0 places the label above the centroid so it doesn't
+        // sit on top of the Bay label which is centered (AnchorPointY=0.5).
+        String anchorPointY = depth == 2 ? "1.0" : "0.5";
 
         return """
                 <?xml version="1.0" encoding="UTF-8"?>
@@ -282,7 +314,6 @@ public class GeoServerProvisioningService {
                     <UserStyle>
                       <FeatureTypeStyle>
                         <Rule>
-                          %s
                           <PolygonSymbolizer>
                             <Fill>
                               <CssParameter name="fill">#000000</CssParameter>
@@ -293,6 +324,9 @@ public class GeoServerProvisioningService {
                               <CssParameter name="stroke-width">%s</CssParameter>
                             </Stroke>
                           </PolygonSymbolizer>
+                        </Rule>
+                        <Rule>
+                          %s
                           <TextSymbolizer>
                             <Label><ogc:PropertyName>label</ogc:PropertyName></Label>
                             <Font>
@@ -303,18 +337,20 @@ public class GeoServerProvisioningService {
                               <PointPlacement>
                                 <AnchorPoint>
                                   <AnchorPointX>0.5</AnchorPointX>
-                                  <AnchorPointY>0.5</AnchorPointY>
+                                  <AnchorPointY>%s</AnchorPointY>
                                 </AnchorPoint>
                               </PointPlacement>
                             </LabelPlacement>
                             <Fill><CssParameter name="fill">#000000</CssParameter></Fill>
+                            <VendorOption name="conflictResolution">true</VendorOption>
+                            <VendorOption name="spaceAround">2</VendorOption>
                           </TextSymbolizer>
                         </Rule>
                       </FeatureTypeStyle>
                     </UserStyle>
                   </NamedLayer>
                 </StyledLayerDescriptor>
-                """.formatted(layerSlug, minScaleDenominator, stroke, strokeWidth, fontSize, fontWeight);
+                """.formatted(layerSlug, stroke, strokeWidth, maxScaleDenominator, fontSize, fontWeight, anchorPointY);
     }
 
     // ─── WMS layer group (floor plan composite) ───────────────────────────────

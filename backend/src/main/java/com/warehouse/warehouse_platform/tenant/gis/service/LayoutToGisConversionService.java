@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+
 @Service
 public class LayoutToGisConversionService {
 
@@ -87,11 +88,8 @@ public class LayoutToGisConversionService {
                 .stream()
                 .collect(Collectors.toMap(BlockTemplate::getId, t -> t));
 
-        // Step 3 — Clear existing GIS rows for this layout
-        List<UUID> allBlockIds = blocks.stream().map(LayoutBlock::getId).collect(Collectors.toList());
-        if (!allBlockIds.isEmpty()) {
-            gisBlockRepository.deleteAllByLayoutBlockIdIn(allBlockIds);
-        }
+        // Step 3 — Clear ALL existing GIS rows before regenerating from scratch
+        gisBlockRepository.deleteAllInBatch();
 
         // Step 4 — Build LayoutNode tree and apply SimpleTreeLayout
         List<LayoutNode> rootNodes = LayoutNodeBuilder.buildForest(blocks, templateById);

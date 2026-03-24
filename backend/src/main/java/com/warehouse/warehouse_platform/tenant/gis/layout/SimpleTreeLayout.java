@@ -48,8 +48,15 @@ public class SimpleTreeLayout {
     }
 
     /**
-     * Recursively divides {@code parent}'s height equally among its children,
-     * stacking them as horizontal strips (top to bottom).
+     * Recursively divides {@code parent}'s space equally among its children.
+     *
+     * <p>Division axis:
+     * <ul>
+     *   <li>Synthetic root ({@code depth == -1}): divides <em>width</em> so
+     *       top-level blocks appear as side-by-side columns in the floor plan.</li>
+     *   <li>All other nodes: divides <em>height</em> so children stack as
+     *       horizontal rows inside their parent column.</li>
+     * </ul>
      */
     private void layoutChildren(LayoutNode parent) {
         List<LayoutNode> children = parent.getChildren();
@@ -58,23 +65,38 @@ public class SimpleTreeLayout {
         }
 
         int n = children.size();
-        double sliceHeight = parent.getHeight() / n;
+        int childDepth = parent.getDepth() + 1;
 
-        for (int i = 0; i < n; i++) {
-            LayoutNode child = children.get(i);
-            child.setX(parent.getX());
-            child.setY(parent.getY() + i * sliceHeight);
-            child.setWidth(parent.getWidth());
-            child.setHeight(sliceHeight);
-            child.setDepth(parent.getDepth() + 1);
+        if (parent.getDepth() == -1) {
+            // Top level: divide width → Aisles become columns
+            double sliceWidth = parent.getWidth() / n;
+            for (int i = 0; i < n; i++) {
+                LayoutNode child = children.get(i);
+                child.setX(parent.getX() + i * sliceWidth);
+                child.setY(parent.getY());
+                child.setWidth(sliceWidth);
+                child.setHeight(parent.getHeight());
+                child.setDepth(childDepth);
+            }
+            // Snap the last child's right edge to absorb float rounding.
+            LayoutNode last = children.get(n - 1);
+            last.setWidth(parent.getX() + parent.getWidth() - last.getX());
+        } else {
+            // All other levels: divide height → children stack as rows
+            double sliceHeight = parent.getHeight() / n;
+            for (int i = 0; i < n; i++) {
+                LayoutNode child = children.get(i);
+                child.setX(parent.getX());
+                child.setY(parent.getY() + i * sliceHeight);
+                child.setWidth(parent.getWidth());
+                child.setHeight(sliceHeight);
+                child.setDepth(childDepth);
+            }
+            // Snap the last child's bottom edge to absorb float rounding.
+            LayoutNode last = children.get(n - 1);
+            last.setHeight(parent.getY() + parent.getHeight() - last.getY());
         }
 
-        // Snap the last child's bottom edge to the parent's bottom to absorb
-        // any floating-point rounding error accumulated over many divisions.
-        LayoutNode last = children.get(n - 1);
-        last.setHeight(parent.getY() + parent.getHeight() - last.getY());
-
-        // Recurse
         for (LayoutNode child : children) {
             layoutChildren(child);
         }

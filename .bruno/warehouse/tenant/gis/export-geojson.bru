@@ -10,12 +10,20 @@ get {
   auth: bearer
 }
 
-auth:bearer {
-  token: {{ACCESS_TOKEN}}
+params:query {
+  layer: {{TEMPLATE_NAME}}
 }
 
 headers {
   X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+vars:pre-request {
+  TEMPLATE_NAME: Aisle
 }
 
 settings {
@@ -23,21 +31,17 @@ settings {
   timeout: 0
 }
 
-vars:pre-request {
-  TEMPLATE_NAME: Aisle
-}
-
 docs {
   Returns a GeoJSON FeatureCollection of all gis_blocks for the given template name.
   Returns an empty FeatureCollection if no data exists yet (run regenerate-layout first).
-
+  
   Required permission: gis.layout.view (ADMIN, MANAGER)
-
+  
   Query param:
     layer  — the BlockTemplate name exactly as stored in the database.
              Examples: Zone, Aisle, Bay, Level, Shelf
              (check block-templates/list-templates for the names in your setup)
-
+  
   Response: GeoJSON FeatureCollection
   {
     "type": "FeatureCollection",
