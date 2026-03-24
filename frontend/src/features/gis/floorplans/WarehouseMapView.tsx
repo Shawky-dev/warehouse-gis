@@ -9,24 +9,19 @@ import ImageElement from "@arcgis/core/layers/support/ImageElement.js";
 import ExtentAndRotationGeoreference from "@arcgis/core/layers/support/ExtentAndRotationGeoreference.js";
 import EsriMap from "@arcgis/core/Map.js";
 import SimpleFillSymbol from "@arcgis/core/symbols/SimpleFillSymbol.js";
+import TextSymbol from "@arcgis/core/symbols/TextSymbol.js";
 import MapView from "@arcgis/core/views/MapView.js";
 import Sketch from "@arcgis/core/widgets/Sketch.js";
+import { getTemplateColor } from "./templateColors";
 import type { ExistingPolygon, EditorTemplate } from "./useEditorState";
 
 esriConfig.assetsPath = `${import.meta.env.BASE_URL}assets`;
 
-// ── Color palette keyed by template name ──────────────────────────────────────
-
-const TEMPLATE_COLORS: Record<string, { fill: string; stroke: string }> = {
-  Zone:  { fill: "rgba(59, 130, 246, 0.15)",  stroke: "#3b82f6" },
-  Aisle: { fill: "rgba(16, 185, 129, 0.15)",  stroke: "#10b981" },
-  Bay:   { fill: "rgba(245, 158, 11, 0.15)",  stroke: "#f59e0b" },
-  Shelf: { fill: "rgba(239, 68, 68, 0.15)",   stroke: "#ef4444" },
-};
-const DEFAULT_COLOR = { fill: "rgba(139, 92, 246, 0.15)", stroke: "#8b5cf6" };
-
-function getTemplateColor(name: string) {
-  return TEMPLATE_COLORS[name] ?? DEFAULT_COLOR;
+function getLabelFontSize(depth: number): number {
+  if (depth <= 0) return 15;
+  if (depth === 1) return 13;
+  if (depth === 2) return 11;
+  return 9;
 }
 
 // ── Props & handle types ──────────────────────────────────────────────────────
@@ -46,7 +41,11 @@ interface WarehouseMapViewProps {
   templates?: EditorTemplate[];
   activeTemplateName?: string | null;
   onPolygonComplete?: (rings: number[][][], templateName: string) => void;
-  onPolygonDelete?: (gisBlockId: string, templateName: string) => void;
+  onPolygonSelect?: (gisBlockId: string | null, templateName: string | null, label: string | null) => void;
+  selectedGisBlockId?: string | null;
+  isDrawMode?: boolean;
+  onDrawModeChange?: (drawing: boolean) => void;
+  visibilityByTemplate?: Record<string, boolean>;
   existingPolygons?: ExistingPolygon[];
 }
 
@@ -64,7 +63,11 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
       templates,
       activeTemplateName,
       onPolygonComplete,
-      onPolygonDelete,
+      onPolygonSelect,
+      selectedGisBlockId,
+      isDrawMode,
+      onDrawModeChange,
+      visibilityByTemplate,
       existingPolygons,
     },
     ref
@@ -74,15 +77,18 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
     const sketchRef = useRef<Sketch | null>(null);
     const layersRef = useRef<Map<string, GraphicsLayer>>(new Map());
     const lastCreatedGraphicRef = useRef<Graphic | null>(null);
+    const selectedGraphicRef = useRef<Graphic | null>(null);
     const activeTemplateNameRef = useRef<string | null>(activeTemplateName ?? null);
     // Stable callback refs so event listeners always call the latest version
     const onPolygonCompleteRef = useRef(onPolygonComplete);
-    const onPolygonDeleteRef = useRef(onPolygonDelete);
+    const onPolygonSelectRef = useRef(onPolygonSelect);
+    const onDrawModeChangeRef = useRef(onDrawModeChange);
     const [renderError, setRenderError] = useState<string | null>(null);
 
     // Keep callback and active-template refs in sync with latest props
     useEffect(() => { onPolygonCompleteRef.current = onPolygonComplete; }, [onPolygonComplete]);
-    useEffect(() => { onPolygonDeleteRef.current = onPolygonDelete; }, [onPolygonDelete]);
+    useEffect(() => { onPolygonSelectRef.current = onPolygonSelect; }, [onPolygonSelect]);
+    useEffect(() => { onDrawModeChangeRef.current = onDrawModeChange; }, [onDrawModeChange]);
     useEffect(() => { activeTemplateNameRef.current = activeTemplateName ?? null; }, [activeTemplateName]);
 
     // ── Imperative handle: remove the unassigned drawn polygon ───────────────
@@ -98,8 +104,6 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
     }));
 
     // ── Main effect: build map, layers, view, sketch ─────────────────────────
-    // Only the stable spatial properties are in the dep list — template switches
-    // and polygon list updates are handled by the two separate effects below.
     useEffect(() => {
       if (!containerRef.current) return;
 
@@ -125,7 +129,6 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
       });
 
       // Create one GraphicsLayer per template synchronously before view.when()
-      // so the existingPolygons effect can add graphics to them immediately
       const layers = new Map<string, GraphicsLayer>();
       if (editorMode && templates && templates.length > 0) {
         for (const tpl of templates) {
@@ -188,6 +191,8 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
                     rings?: number[][][];
                   };
                   onPolygonCompleteRef.current?.(geomJson.rings ?? [], tplName);
+                  // Auto-switch to select mode after drawing
+                  onDrawModeChangeRef.current?.(false);
                 }
               });
 
@@ -196,23 +201,27 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
             }
           }
 
-          // Click-to-delete existing polygons
+          // Click to select / deselect existing polygons
           if (editorMode) {
             view.on("click", async (clickEvent) => {
               const result = await view.hitTest(clickEvent);
               const hit = result.results
                 .filter((r) => r.type === "graphic")
                 .map((r) => (r as { graphic: Graphic }).graphic)
-                .find((g) => g.attributes?.gisBlockId);
+                .find((g) => g.attributes?.gisBlockId && !g.attributes?.isLabel);
 
               if (hit) {
-                const confirmed = window.confirm("Remove this polygon mapping?");
-                if (confirmed) {
-                  onPolygonDeleteRef.current?.(
-                    hit.attributes.gisBlockId as string,
-                    hit.attributes.templateName as string
-                  );
-                }
+                onPolygonSelectRef.current?.(
+                  hit.attributes.gisBlockId as string,
+                  hit.attributes.templateName as string,
+                  hit.attributes.label as string
+                );
+                void view.goTo((hit.geometry as Polygon).extent.expand(3), {
+                  animate: true,
+                  duration: 400,
+                });
+              } else {
+                onPolygonSelectRef.current?.(null, null, null);
               }
             });
           }
@@ -229,6 +238,7 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
       return () => {
         cancelled = true;
         sketchRef.current = null;
+        selectedGraphicRef.current = null;
         view.destroy();
         viewRef.current = null;
       };
@@ -242,8 +252,59 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
       if (layer) sketchRef.current.layer = layer;
     }, [activeTemplateName]);
 
+    // ── Effect: cancel sketch when switching to select mode ───────────────────
+    useEffect(() => {
+      if (!sketchRef.current) return;
+      if (!isDrawMode) {
+        sketchRef.current.cancel();
+      }
+    }, [isDrawMode]);
+
+    // ── Effect: toggle layer visibility ──────────────────────────────────────
+    useEffect(() => {
+      if (!visibilityByTemplate) return;
+      for (const [name, layer] of layersRef.current.entries()) {
+        layer.visible = visibilityByTemplate[name] ?? true;
+      }
+    }, [visibilityByTemplate]);
+
+    // ── Effect: highlight the selected polygon ────────────────────────────────
+    useEffect(() => {
+      // Reset previous selection to its original style
+      if (selectedGraphicRef.current) {
+        const prev = selectedGraphicRef.current;
+        const tplName = prev.attributes?.templateName as string | undefined;
+        const color = getTemplateColor(tplName ?? "");
+        prev.symbol = new SimpleFillSymbol({
+          color: color.fill,
+          outline: { color: color.stroke, width: 2 },
+        });
+        selectedGraphicRef.current = null;
+      }
+
+      if (!selectedGisBlockId) return;
+
+      for (const layer of layersRef.current.values()) {
+        const found = layer.graphics
+          .toArray()
+          .find(
+            (g: Graphic) =>
+              g.attributes?.gisBlockId === selectedGisBlockId && !g.attributes?.isLabel
+          );
+        if (found) {
+          const tplName = found.attributes?.templateName as string | undefined;
+          const color = getTemplateColor(tplName ?? "");
+          found.symbol = new SimpleFillSymbol({
+            color: color.fill.replace(", 0.15)", ", 0.35)"),
+            outline: { color: color.stroke, width: 3 },
+          });
+          selectedGraphicRef.current = found;
+          break;
+        }
+      }
+    }, [selectedGisBlockId]);
+
     // ── Effect: sync existing polygons into their graphics layers ────────────
-    // Runs on mount (initial load) and after every save / delete.
     useEffect(() => {
       if (!editorMode || layersRef.current.size === 0) return;
 
@@ -259,6 +320,8 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
           rings: ep.rings,
           spatialReference: { wkid: 4326 },
         });
+
+        // Polygon graphic
         layer.graphics.add(
           new Graphic({
             geometry: polygon,
@@ -273,8 +336,59 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
             },
           })
         );
+
+        // Label graphic — non-interactive
+        const centroid = polygon.centroid;
+        if (centroid) {
+          const fontSize = getLabelFontSize(ep.depth);
+          layer.graphics.add(
+            new Graphic({
+              geometry: centroid,
+              symbol: new TextSymbol({
+                text: ep.label,
+                color: color.stroke,
+                haloColor: "white",
+                haloSize: "1.5px",
+                font: {
+                  size: fontSize,
+                  weight: "bold",
+                },
+                horizontalAlignment: "center",
+                verticalAlignment: "middle",
+                xoffset: 0,
+                yoffset: 0,
+              }),
+              attributes: {
+                isLabel: true,
+                gisBlockId: ep.gisBlockId,
+              },
+            })
+          );
+        }
       }
-    }, [existingPolygons, editorMode]);
+
+      // Re-apply selection highlight after re-render
+      if (selectedGisBlockId) {
+        for (const layer of layersRef.current.values()) {
+          const found = layer.graphics
+            .toArray()
+            .find(
+              (g: Graphic) =>
+                g.attributes?.gisBlockId === selectedGisBlockId && !g.attributes?.isLabel
+            );
+          if (found) {
+            const tplName = found.attributes?.templateName as string | undefined;
+            const color = getTemplateColor(tplName ?? "");
+            found.symbol = new SimpleFillSymbol({
+              color: color.fill.replace(", 0.15)", ", 0.35)"),
+              outline: { color: color.stroke, width: 3 },
+            });
+            selectedGraphicRef.current = found;
+            break;
+          }
+        }
+      }
+    }, [existingPolygons, editorMode, selectedGisBlockId]);
 
     return (
       <div className="relative">

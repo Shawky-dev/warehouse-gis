@@ -9,6 +9,7 @@ interface BlockAssignmentDialogProps {
   templateName: string;
   availableBlocks: AvailableBlock[];
   loadingBlocks: boolean;
+  currentLabel?: string;
   onAssign: (layoutBlockId: string, fullCode: string) => void;
   onCancel: () => void;
 }
@@ -18,6 +19,7 @@ export function BlockAssignmentDialog({
   templateName,
   availableBlocks,
   loadingBlocks,
+  currentLabel,
   onAssign,
   onCancel,
 }: BlockAssignmentDialogProps) {
@@ -52,6 +54,12 @@ export function BlockAssignmentDialog({
         <h2 className="text-sm font-semibold">
           {t("gis.editor.assignDialogTitle").replace("{templateName}", templateName)}
         </h2>
+
+        {currentLabel && (
+          <p className="rounded-sm bg-muted px-2 py-1.5 text-xs text-muted-foreground">
+            {t("gis.editor.currentAssignment").replace("{label}", currentLabel)}
+          </p>
+        )}
 
         <Input
           placeholder={t("gis.editor.assignSearchPlaceholder")}

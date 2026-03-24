@@ -1,4 +1,5 @@
 import { useRoutes } from "react-router-dom";
+import { Toaster } from "sonner";
 import { ThemeProvider } from "@/lib/theme-provider";
 import { AuthProvider } from "@/features/auth/context/AuthContext";
 import { I18nProvider } from "@/i18n";
@@ -11,6 +12,7 @@ export default function App() {
     <I18nProvider>
       <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
         <AuthProvider>{element}</AuthProvider>
+        <Toaster richColors />
       </ThemeProvider>
     </I18nProvider>
   );

@@ -1,5 +1,6 @@
-import { useRef, useState, type ChangeEvent } from "react";
-import { Map, Trash2, Upload } from "lucide-react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { Map, Upload, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { useAuth } from "@/features/auth/context/AuthContext";
@@ -10,11 +11,6 @@ import { useEditorState } from "./useEditorState";
 import { WarehouseMapView, type WarehouseMapViewHandle } from "./WarehouseMapView";
 import { BlockAssignmentDialog } from "./BlockAssignmentDialog";
 import { TemplateLayerPanel } from "./TemplateLayerPanel";
-
-type FeedbackState =
-  | { tone: "success"; message: string }
-  | { tone: "error"; message: string }
-  | null;
 
 export default function FloorPlansPage() {
   const { t } = useI18n();
@@ -28,32 +24,88 @@ export default function FloorPlansPage() {
     setActiveTemplateName,
     existingPolygons,
     polygonCountByTemplate,
+    totalBlocksByTemplate,
     pendingPolygon,
+    pendingReassign,
     availableBlocks,
     loadingBlocks,
     hasActiveLayout,
     openAssignmentDialog,
+    openReassignDialog,
     savePolygon,
+    reassignPolygon,
     deletePolygon,
     clearPendingPolygon,
+    clearPendingReassign,
   } = useEditorState();
 
   const mapViewRef = useRef<WarehouseMapViewHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [feedback, setFeedback] = useState<FeedbackState>(null);
+
+  // Editor UI state
+  const [selectedPolygon, setSelectedPolygon] = useState<{
+    gisBlockId: string;
+    templateName: string;
+    label: string;
+  } | null>(null);
+  const [isDrawMode, setIsDrawMode] = useState(false);
+  const [visibilityByTemplate, setVisibilityByTemplate] = useState<Record<string, boolean>>({});
+  const [canUndo, setCanUndo] = useState(false);
+
+  // Initialise visibility when templates first load (don't overwrite user toggles)
+  useEffect(() => {
+    if (templates.length === 0) return;
+    setVisibilityByTemplate((prev) => {
+      if (Object.keys(prev).length > 0) return prev;
+      return Object.fromEntries(templates.map((tpl) => [tpl.name, true]));
+    });
+  }, [templates]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const dialogOpen = pendingPolygon !== null || pendingReassign !== null;
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (dialogOpen) return;
+      // D — toggle draw mode on
+      if ((e.key === "d" || e.key === "D") && !e.metaKey && !e.ctrlKey) {
+        setIsDrawMode(true);
+      }
+      // Escape — exit draw mode
+      if (e.key === "Escape") {
+        setIsDrawMode(false);
+      }
+      // Delete / Backspace — delete the selected polygon
+      if ((e.key === "Delete" || e.key === "Backspace") && selectedPolygon) {
+        void deletePolygon(selectedPolygon.gisBlockId, selectedPolygon.templateName);
+        setSelectedPolygon(null);
+        toast.success(t("gis.editor.deleteSuccess"));
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [pendingPolygon, pendingReassign, selectedPolygon, deletePolygon, t]);
+
+  // ── Stats ──────────────────────────────────────────────────────────────────
+  const totalMapped = Object.values(polygonCountByTemplate).reduce((a, b) => a + b, 0);
+  const totalBlocksAll = Object.values(totalBlocksByTemplate).reduce((a, b) => a + b, 0);
+  const totalUnmapped = Math.max(0, totalBlocksAll - totalMapped);
+
+  // ── Handlers ───────────────────────────────────────────────────────────────
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
     setUploading(true);
-    setFeedback(null);
     try {
       await upload(file);
-      setFeedback({ tone: "success", message: t("gis.floorPlans.uploadSuccess") });
+      toast.success(t("gis.floorPlans.uploadSuccess"));
     } catch {
-      setFeedback({ tone: "error", message: t("gis.floorPlans.uploadError") });
+      toast.error(t("gis.floorPlans.uploadError"));
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -62,15 +114,36 @@ export default function FloorPlansPage() {
 
   async function handleDelete() {
     setDeleting(true);
-    setFeedback(null);
     try {
       await remove();
-      setFeedback({ tone: "success", message: t("gis.floorPlans.deleteSuccess") });
+      toast.success(t("gis.floorPlans.deleteSuccess"));
     } catch {
-      setFeedback({ tone: "error", message: t("gis.floorPlans.uploadError") });
+      toast.error(t("gis.floorPlans.uploadError"));
     } finally {
       setDeleting(false);
     }
+  }
+
+  function handleDeleteSelected() {
+    if (!selectedPolygon) return;
+    void deletePolygon(selectedPolygon.gisBlockId, selectedPolygon.templateName);
+    setSelectedPolygon(null);
+    toast.success(t("gis.editor.deleteSuccess"));
+  }
+
+  function handleReassignSelected() {
+    if (!selectedPolygon) return;
+    void openReassignDialog(selectedPolygon.gisBlockId, selectedPolygon.templateName);
+  }
+
+  function handleUndo() {
+    mapViewRef.current?.cancelPendingPolygon();
+    clearPendingPolygon();
+    setCanUndo(false);
+  }
+
+  function handleVisibilityToggle(templateName: string) {
+    setVisibilityByTemplate((prev) => ({ ...prev, [templateName]: !(prev[templateName] ?? true) }));
   }
 
   return (
@@ -121,17 +194,28 @@ export default function FloorPlansPage() {
                 </Button>
               ) : null}
             </div>
-            {feedback ? (
-              <p
-                className={
-                  feedback.tone === "success"
-                    ? "text-sm text-emerald-600"
-                    : "text-sm text-destructive"
-                }
-              >
-                {feedback.message}
-              </p>
-            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {/* Stats summary card */}
+      {config?.hasFloorPlan && templates.length > 0 ? (
+        <Card>
+          <CardContent className="pt-4">
+            <div className="grid grid-cols-3 divide-x">
+              <div className="flex flex-col items-center gap-0.5 px-4 py-2">
+                <span className="text-2xl font-semibold">{totalMapped}</span>
+                <span className="text-xs text-muted-foreground">{t("gis.editor.statsMapped")}</span>
+              </div>
+              <div className="flex flex-col items-center gap-0.5 px-4 py-2">
+                <span className="text-2xl font-semibold">{totalUnmapped}</span>
+                <span className="text-xs text-muted-foreground">{t("gis.editor.statsUnmapped")}</span>
+              </div>
+              <div className="flex flex-col items-center gap-0.5 px-4 py-2">
+                <span className="text-2xl font-semibold">{templates.length}</span>
+                <span className="text-xs text-muted-foreground">{t("gis.editor.statsLayers")}</span>
+              </div>
+            </div>
           </CardContent>
         </Card>
       ) : null}
@@ -171,7 +255,17 @@ export default function FloorPlansPage() {
                     activeTemplateName={activeTemplateName}
                     onSelect={setActiveTemplateName}
                     polygonCountByTemplate={polygonCountByTemplate}
+                    totalBlocksByTemplate={totalBlocksByTemplate}
                     hasActiveLayout={hasActiveLayout}
+                    isDrawMode={isDrawMode}
+                    onDrawModeChange={setIsDrawMode}
+                    visibilityByTemplate={visibilityByTemplate}
+                    onVisibilityToggle={handleVisibilityToggle}
+                    selectedPolygon={selectedPolygon}
+                    onDeleteSelected={handleDeleteSelected}
+                    onReassignSelected={handleReassignSelected}
+                    canUndo={canUndo}
+                    onUndo={handleUndo}
                   />
                 </div>
               ) : null}
@@ -187,11 +281,20 @@ export default function FloorPlansPage() {
                   templates={templates}
                   activeTemplateName={activeTemplateName}
                   existingPolygons={existingPolygons}
-                  onPolygonComplete={(rings, templateName) => {
-                    void openAssignmentDialog({ rings, templateName });
+                  isDrawMode={isDrawMode}
+                  onDrawModeChange={setIsDrawMode}
+                  visibilityByTemplate={visibilityByTemplate}
+                  selectedGisBlockId={selectedPolygon?.gisBlockId}
+                  onPolygonSelect={(gisBlockId, templateName, label) => {
+                    if (gisBlockId && templateName && label) {
+                      setSelectedPolygon({ gisBlockId, templateName, label });
+                    } else {
+                      setSelectedPolygon(null);
+                    }
                   }}
-                  onPolygonDelete={(gisBlockId, templateName) => {
-                    void deletePolygon(gisBlockId, templateName);
+                  onPolygonComplete={(rings, templateName) => {
+                    setCanUndo(true);
+                    void openAssignmentDialog({ rings, templateName });
                   }}
                 />
               </div>
@@ -201,16 +304,35 @@ export default function FloorPlansPage() {
       </Card>
 
       <BlockAssignmentDialog
-        open={pendingPolygon !== null}
-        templateName={pendingPolygon?.templateName ?? ""}
+        open={pendingPolygon !== null || pendingReassign !== null}
+        templateName={pendingReassign?.templateName ?? pendingPolygon?.templateName ?? ""}
         availableBlocks={availableBlocks}
         loadingBlocks={loadingBlocks}
-        onAssign={(layoutBlockId, fullCode) => {
-          void savePolygon(layoutBlockId, fullCode);
+        currentLabel={pendingReassign !== null ? (selectedPolygon?.label ?? "") : undefined}
+        onAssign={async (layoutBlockId, fullCode) => {
+          if (pendingReassign !== null) {
+            await reassignPolygon(
+              pendingReassign.gisBlockId,
+              layoutBlockId,
+              fullCode,
+              pendingReassign.templateName
+            );
+            setSelectedPolygon(null);
+            toast.success(t("gis.editor.reassignSuccess").replace("{label}", fullCode));
+          } else {
+            await savePolygon(layoutBlockId, fullCode);
+            setCanUndo(false);
+            toast.success(t("gis.editor.saveSuccess").replace("{label}", fullCode));
+          }
         }}
         onCancel={() => {
-          mapViewRef.current?.cancelPendingPolygon();
-          clearPendingPolygon();
+          if (pendingReassign !== null) {
+            clearPendingReassign();
+          } else {
+            mapViewRef.current?.cancelPendingPolygon();
+            clearPendingPolygon();
+            setCanUndo(false);
+          }
         }}
       />
     </div>

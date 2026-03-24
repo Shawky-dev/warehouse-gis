@@ -24,6 +24,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -246,6 +247,37 @@ public class FloorPlanController {
     }
 
     /**
+     * Reassigns an existing GisBlock to a different LayoutBlock without changing its geometry.
+     */
+    @PatchMapping("/blocks/manual/{gisBlockId}")
+    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).GIS_FLOOR_PLAN_MANAGE)")
+    public ResponseEntity<?> reassignManualBlock(
+            @PathVariable String tenantSlug,
+            @PathVariable UUID gisBlockId,
+            @RequestBody ReassignRequest request,
+            Authentication authentication) {
+        tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
+
+        Optional<GisBlock> opt = gisBlockRepository.findById(gisBlockId);
+        if (opt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        GisBlock gisBlock = opt.get();
+        gisBlock.setLayoutBlockId(request.getLayoutBlockId());
+        gisBlock.setLabel(request.getLabel());
+        gisBlock.setPositionPath(request.getPositionPath());
+        gisBlock.setDepth(request.getDepth());
+        gisBlockRepository.save(gisBlock);
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("id", gisBlock.getId());
+        resp.put("layoutBlockId", gisBlock.getLayoutBlockId());
+        resp.put("label", gisBlock.getLabel());
+        return ResponseEntity.ok(resp);
+    }
+
+    /**
      * Deletes a manually drawn GisBlock polygon by its UUID.
      */
     @DeleteMapping("/blocks/manual/{gisBlockId}")
@@ -259,7 +291,7 @@ public class FloorPlanController {
         return ResponseEntity.noContent().build();
     }
 
-    // ── Request DTO ───────────────────────────────────────────────────────────
+    // ── Request DTOs ──────────────────────────────────────────────────────────
 
     public static class ManualGisBlockRequest {
         private UUID layoutBlockId;
@@ -281,5 +313,21 @@ public class FloorPlanController {
         public void setDepth(int depth) { this.depth = depth; }
         public List<List<List<Double>>> getRings() { return rings; }
         public void setRings(List<List<List<Double>>> rings) { this.rings = rings; }
+    }
+
+    public static class ReassignRequest {
+        private UUID layoutBlockId;
+        private String label;
+        private String positionPath;
+        private int depth;
+
+        public UUID getLayoutBlockId() { return layoutBlockId; }
+        public void setLayoutBlockId(UUID layoutBlockId) { this.layoutBlockId = layoutBlockId; }
+        public String getLabel() { return label; }
+        public void setLabel(String label) { this.label = label; }
+        public String getPositionPath() { return positionPath; }
+        public void setPositionPath(String positionPath) { this.positionPath = positionPath; }
+        public int getDepth() { return depth; }
+        public void setDepth(int depth) { this.depth = depth; }
     }
 }

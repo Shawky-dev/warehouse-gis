@@ -15,6 +15,8 @@ export interface ExistingPolygon {
   templateName: string;
   label: string;
   rings: number[][][];
+  layoutBlockId: string;
+  depth: number;
 }
 
 export interface AvailableBlock {
@@ -38,9 +40,15 @@ export function useEditorState() {
     Record<string, ExistingPolygon[]>
   >({});
   const [pendingPolygon, setPendingPolygon] = useState<PendingPolygon | null>(null);
+  const [pendingReassign, setPendingReassign] = useState<{
+    gisBlockId: string;
+    rings: number[][][];
+    templateName: string;
+  } | null>(null);
   const [availableBlocks, setAvailableBlocks] = useState<AvailableBlock[]>([]);
   const [loadingBlocks, setLoadingBlocks] = useState(false);
   const [hasActiveLayout, setHasActiveLayout] = useState(true);
+  const [totalBlocksByTemplate, setTotalBlocksByTemplate] = useState<Record<string, number>>({});
 
   // Fetch all templates once on mount
   useEffect(() => {
@@ -69,7 +77,13 @@ export function useEditorState() {
           features?: Array<{
             id?: string;
             geometry?: { coordinates?: number[][][] };
-            properties?: { templateName?: string; label?: string; id?: string };
+            properties?: {
+              templateName?: string;
+              label?: string;
+              id?: string;
+              layoutBlockId?: string;
+              depth?: number;
+            };
           }>;
         }>(`/${slug}/gis/layout/geojson?layer=${encodeURIComponent(templateName)}`);
 
@@ -78,6 +92,8 @@ export function useEditorState() {
           templateName: feature.properties?.templateName ?? templateName,
           label: feature.properties?.label ?? "",
           rings: feature.geometry?.coordinates ?? [],
+          layoutBlockId: feature.properties?.layoutBlockId ?? "",
+          depth: feature.properties?.depth ?? 0,
         }));
 
         setExistingPolygonsByTemplate((prev) => ({ ...prev, [templateName]: polygons }));
@@ -88,13 +104,24 @@ export function useEditorState() {
     [slug]
   );
 
-  // Fetch existing polygons for all templates whenever templates load
+  // Fetch existing polygons + background block counts for all templates whenever templates load
   useEffect(() => {
     if (templates.length === 0) return;
     for (const template of templates) {
       void fetchExistingPolygons(template.name);
+      // Fire-and-forget: fetch total block count for progress indicator
+      void (async () => {
+        try {
+          const { data } = await api.get<AvailableBlock[]>(
+            `/${slug}/gis/floorplan/blocks?templateName=${encodeURIComponent(template.name)}`
+          );
+          setTotalBlocksByTemplate((prev) => ({ ...prev, [template.name]: data.length }));
+        } catch {
+          // ignore — no active layout or permission issue
+        }
+      })();
     }
-  }, [templates, fetchExistingPolygons]);
+  }, [templates, fetchExistingPolygons, slug]);
 
   // Open the block assignment dialog for a just-drawn polygon
   const openAssignmentDialog = useCallback(
@@ -120,6 +147,35 @@ export function useEditorState() {
     [slug]
   );
 
+  // Open the reassignment dialog for an already-saved polygon
+  const openReassignDialog = useCallback(
+    async (gisBlockId: string, templateName: string) => {
+      const polygon = Object.values(existingPolygonsByTemplate)
+        .flat()
+        .find((p) => p.gisBlockId === gisBlockId);
+      if (!polygon) return;
+
+      setPendingReassign({ gisBlockId, rings: polygon.rings, templateName });
+      setLoadingBlocks(true);
+      setAvailableBlocks([]);
+      try {
+        const { data } = await api.get<AvailableBlock[]>(
+          `/${slug}/gis/floorplan/blocks?templateName=${encodeURIComponent(templateName)}`
+        );
+        setAvailableBlocks(data);
+        setHasActiveLayout(true);
+      } catch (err) {
+        if (axios.isAxiosError(err) && err.response?.status === 404) {
+          setHasActiveLayout(false);
+        }
+        setAvailableBlocks([]);
+      } finally {
+        setLoadingBlocks(false);
+      }
+    },
+    [slug, existingPolygonsByTemplate]
+  );
+
   // POST the assigned polygon to the backend then refresh GeoJSON for that template
   const savePolygon = useCallback(
     async (layoutBlockId: string, fullCode: string) => {
@@ -140,6 +196,22 @@ export function useEditorState() {
     [slug, pendingPolygon, availableBlocks, fetchExistingPolygons]
   );
 
+  // PATCH an existing polygon to reassign it to a different layout block
+  const reassignPolygon = useCallback(
+    async (gisBlockId: string, layoutBlockId: string, fullCode: string, templateName: string) => {
+      const depth = availableBlocks.find((b) => b.id === layoutBlockId)?.depth ?? 0;
+      await api.patch(`/${slug}/gis/blocks/manual/${gisBlockId}`, {
+        layoutBlockId,
+        label: fullCode,
+        positionPath: fullCode,
+        depth,
+      });
+      setPendingReassign(null);
+      await fetchExistingPolygons(templateName);
+    },
+    [slug, availableBlocks, fetchExistingPolygons]
+  );
+
   // DELETE a polygon then refresh GeoJSON for that template
   const deletePolygon = useCallback(
     async (gisBlockId: string, templateName: string) => {
@@ -151,6 +223,10 @@ export function useEditorState() {
 
   const clearPendingPolygon = useCallback(() => {
     setPendingPolygon(null);
+  }, []);
+
+  const clearPendingReassign = useCallback(() => {
+    setPendingReassign(null);
   }, []);
 
   // Count of saved polygons per template name
@@ -174,13 +250,18 @@ export function useEditorState() {
     setActiveTemplateName,
     existingPolygons,
     polygonCountByTemplate,
+    totalBlocksByTemplate,
     pendingPolygon,
+    pendingReassign,
     availableBlocks,
     loadingBlocks,
     hasActiveLayout,
     openAssignmentDialog,
+    openReassignDialog,
     savePolygon,
+    reassignPolygon,
     deletePolygon,
     clearPendingPolygon,
+    clearPendingReassign,
   };
 }
