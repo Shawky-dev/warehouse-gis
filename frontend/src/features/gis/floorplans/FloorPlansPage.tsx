@@ -1,11 +1,14 @@
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
-import { Map, Upload, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useParams } from "react-router-dom";
+import { Map, Upload, Trash2, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { TENANT_PERMISSIONS } from "@/features/auth/shared/permissions";
 import { useI18n } from "@/i18n";
+import { normalizeTenantSlug } from "@/features/auth/shared/scope";
+import { api } from "@/lib/api";
 import { useFloorPlanApi } from "./useFloorPlanApi";
 import { useEditorState } from "./useEditorState";
 import { WarehouseMapView, type WarehouseMapViewHandle } from "./WarehouseMapView";
@@ -16,6 +19,8 @@ export default function FloorPlansPage() {
   const { t } = useI18n();
   const { hasPermission } = useAuth();
   const canManage = hasPermission(TENANT_PERMISSIONS.GIS_FLOOR_PLAN_MANAGE);
+  const { tenantSlug } = useParams<{ tenantSlug: string }>();
+  const slug = normalizeTenantSlug(tenantSlug ?? "");
 
   const { config, loading, error, svgContent, upload, remove } = useFloorPlanApi();
   const {
@@ -44,6 +49,7 @@ export default function FloorPlansPage() {
 
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [publishing, setPublishing] = useState(false);
 
   // Editor UI state
   const [selectedPolygon, setSelectedPolygon] = useState<{
@@ -52,17 +58,16 @@ export default function FloorPlansPage() {
     label: string;
   } | null>(null);
   const [isDrawMode, setIsDrawMode] = useState(false);
-  const [visibilityByTemplate, setVisibilityByTemplate] = useState<Record<string, boolean>>({});
+  const [visibilityOverrides, setVisibilityOverrides] = useState<Record<string, boolean>>({});
+  const [svgVisible, setSvgVisible] = useState(true);
   const [canUndo, setCanUndo] = useState(false);
-
-  // Initialise visibility when templates first load (don't overwrite user toggles)
-  useEffect(() => {
-    if (templates.length === 0) return;
-    setVisibilityByTemplate((prev) => {
-      if (Object.keys(prev).length > 0) return prev;
-      return Object.fromEntries(templates.map((tpl) => [tpl.name, true]));
-    });
-  }, [templates]);
+  const visibilityByTemplate = useMemo(
+    () =>
+      Object.fromEntries(
+        templates.map((tpl) => [tpl.name, visibilityOverrides[tpl.name] ?? true])
+      ),
+    [templates, visibilityOverrides]
+  );
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -131,6 +136,18 @@ export default function FloorPlansPage() {
     toast.success(t("gis.editor.deleteSuccess"));
   }
 
+  async function handlePublish() {
+    setPublishing(true);
+    try {
+      await api.post(`/${slug}/gis/floorplan/publish`);
+      toast.success(t("gis.floorPlans.publishSuccess"));
+    } catch {
+      toast.error(t("gis.floorPlans.publishError"));
+    } finally {
+      setPublishing(false);
+    }
+  }
+
   function handleReassignSelected() {
     if (!selectedPolygon) return;
     void openReassignDialog(selectedPolygon.gisBlockId, selectedPolygon.templateName);
@@ -143,7 +160,7 @@ export default function FloorPlansPage() {
   }
 
   function handleVisibilityToggle(templateName: string) {
-    setVisibilityByTemplate((prev) => ({ ...prev, [templateName]: !(prev[templateName] ?? true) }));
+    setVisibilityOverrides((prev) => ({ ...prev, [templateName]: !(prev[templateName] ?? true) }));
   }
 
   return (
@@ -194,6 +211,26 @@ export default function FloorPlansPage() {
                 </Button>
               ) : null}
             </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {canManage && config?.hasFloorPlan ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t("gis.floorPlans.publishLabel")}</CardTitle>
+            <CardDescription>{t("gis.floorPlans.publishHint")}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              type="button"
+              size="sm"
+              disabled={publishing}
+              onClick={() => void handlePublish()}
+            >
+              <Send className="mr-2 h-4 w-4" />
+              {publishing ? "Publishing..." : t("gis.floorPlans.publishButton")}
+            </Button>
           </CardContent>
         </Card>
       ) : null}
@@ -261,6 +298,8 @@ export default function FloorPlansPage() {
                     onDrawModeChange={setIsDrawMode}
                     visibilityByTemplate={visibilityByTemplate}
                     onVisibilityToggle={handleVisibilityToggle}
+                    svgVisible={svgVisible}
+                    onSvgVisibilityToggle={() => setSvgVisible((v) => !v)}
                     selectedPolygon={selectedPolygon}
                     onDeleteSelected={handleDeleteSelected}
                     onReassignSelected={handleReassignSelected}
@@ -284,6 +323,7 @@ export default function FloorPlansPage() {
                   isDrawMode={isDrawMode}
                   onDrawModeChange={setIsDrawMode}
                   visibilityByTemplate={visibilityByTemplate}
+                  svgVisible={svgVisible}
                   selectedGisBlockId={selectedPolygon?.gisBlockId}
                   onPolygonSelect={(gisBlockId, templateName, label) => {
                     if (gisBlockId && templateName && label) {

@@ -1,6 +1,6 @@
 import type { ComponentType } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Box, Eye, EyeOff, Layers, MousePointer, Pencil, RotateCcw, Trash2 } from "lucide-react";
+import { Box, Eye, EyeOff, ImageIcon, Layers, MousePointer, Pencil, RotateCcw, Trash2 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
@@ -23,6 +23,8 @@ interface TemplateLayerPanelProps {
   // Layer visibility
   visibilityByTemplate: Record<string, boolean>;
   onVisibilityToggle: (templateName: string) => void;
+  svgVisible: boolean;
+  onSvgVisibilityToggle: () => void;
   // Selected polygon
   selectedPolygon: { gisBlockId: string; templateName: string; label: string } | null;
   onDeleteSelected: () => void;
@@ -43,6 +45,8 @@ export function TemplateLayerPanel({
   onDrawModeChange,
   visibilityByTemplate,
   onVisibilityToggle,
+  svgVisible,
+  onSvgVisibilityToggle,
   selectedPolygon,
   onDeleteSelected,
   onReassignSelected,
@@ -138,6 +142,30 @@ export function TemplateLayerPanel({
       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {t("gis.editor.layerPanelTitle")}
       </p>
+
+      {/* SVG floor plan layer row */}
+      <div
+        className={`flex w-full items-center rounded-sm transition-colors hover:bg-accent/50 ${
+          !svgVisible ? "opacity-40" : ""
+        }`}
+      >
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 px-2 py-1.5">
+          <ImageIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <span className="flex-1 truncate text-sm font-medium">{t("gis.editor.svgLayer")}</span>
+        </div>
+        <button
+          type="button"
+          title={svgVisible ? t("gis.editor.layerVisible") : t("gis.editor.layerHidden")}
+          onClick={onSvgVisibilityToggle}
+          className="mr-1 shrink-0 rounded p-0.5 transition-colors hover:bg-accent/50"
+        >
+          {svgVisible ? (
+            <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+          ) : (
+            <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
+          )}
+        </button>
+      </div>
 
       {/* Template list or no-active-layout empty state */}
       {!hasActiveLayout ? (

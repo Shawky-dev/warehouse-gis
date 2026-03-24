@@ -5,6 +5,7 @@ import com.warehouse.warehouse_platform.tenant.gis.config.WarehouseGisProperties
 import com.warehouse.warehouse_platform.tenant.gis.model.GisBlock;
 import com.warehouse.warehouse_platform.tenant.gis.repository.GisBlockRepository;
 import com.warehouse.warehouse_platform.tenant.gis.service.FloorPlanStorageService;
+import com.warehouse.warehouse_platform.tenant.gis.service.GeoServerProvisioningService;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplate;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplateRepository;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlock;
@@ -53,6 +54,7 @@ public class FloorPlanController {
     private final LayoutBlockRepository layoutBlockRepository;
     private final BlockTemplateRepository blockTemplateRepository;
     private final GisBlockRepository gisBlockRepository;
+    private final GeoServerProvisioningService geoServerProvisioningService;
 
     public FloorPlanController(
             TenantAccessPolicy tenantAccessPolicy,
@@ -61,7 +63,8 @@ public class FloorPlanController {
             WarehouseLayoutRepository warehouseLayoutRepository,
             LayoutBlockRepository layoutBlockRepository,
             BlockTemplateRepository blockTemplateRepository,
-            GisBlockRepository gisBlockRepository) {
+            GisBlockRepository gisBlockRepository,
+            GeoServerProvisioningService geoServerProvisioningService) {
         this.tenantAccessPolicy = tenantAccessPolicy;
         this.storageService = storageService;
         this.gisProperties = gisProperties;
@@ -69,6 +72,7 @@ public class FloorPlanController {
         this.layoutBlockRepository = layoutBlockRepository;
         this.blockTemplateRepository = blockTemplateRepository;
         this.gisBlockRepository = gisBlockRepository;
+        this.geoServerProvisioningService = geoServerProvisioningService;
     }
 
     // ── Existing floor plan endpoints ─────────────────────────────────────────
@@ -128,6 +132,22 @@ public class FloorPlanController {
         tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
         storageService.delete(tenantSlug);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Publishes manually drawn polygons from gis_blocks to GeoServer.
+     * Safe for Phase B (manual mapping) — never touches gis_blocks data.
+     * Idempotent: clears the tenant workspace first, then re-provisions.
+     */
+    @PostMapping("/floorplan/publish")
+    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).GIS_FLOOR_PLAN_MANAGE)")
+    public ResponseEntity<Map<String, Object>> publish(
+            @PathVariable String tenantSlug,
+            Authentication authentication) {
+        tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
+        geoServerProvisioningService.clearTenantWorkspace(tenantSlug);
+        geoServerProvisioningService.provisionTenantWorkspace(tenantSlug);
+        return ResponseEntity.ok(Map.of("published", true));
     }
 
     // ── New endpoints ─────────────────────────────────────────────────────────

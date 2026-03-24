@@ -47,6 +47,7 @@ interface WarehouseMapViewProps {
   onDrawModeChange?: (drawing: boolean) => void;
   visibilityByTemplate?: Record<string, boolean>;
   existingPolygons?: ExistingPolygon[];
+  svgVisible?: boolean;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -69,6 +70,7 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
       onDrawModeChange,
       visibilityByTemplate,
       existingPolygons,
+      svgVisible,
     },
     ref
   ) {
@@ -76,6 +78,7 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
     const viewRef = useRef<MapView | null>(null);
     const sketchRef = useRef<Sketch | null>(null);
     const layersRef = useRef<Map<string, GraphicsLayer>>(new Map());
+    const mediaLayerRef = useRef<MediaLayer | null>(null);
     const lastCreatedGraphicRef = useRef<Graphic | null>(null);
     const selectedGraphicRef = useRef<Graphic | null>(null);
     const activeTemplateNameRef = useRef<string | null>(activeTemplateName ?? null);
@@ -128,11 +131,13 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
           }),
         ],
         title: "Warehouse floor plan",
+        visible: svgVisible ?? true,
       });
+      mediaLayerRef.current = mediaLayer;
 
       // Create one GraphicsLayer per template synchronously before view.when()
       const layers = new Map<string, GraphicsLayer>();
-      if (editorMode && templates && templates.length > 0) {
+      if (templates && templates.length > 0) {
         for (const tpl of templates) {
           layers.set(tpl.name, new GraphicsLayer({ id: `gis-layer-${tpl.name}`, title: tpl.name }));
         }
@@ -181,15 +186,18 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
 
               sketch.on("create", (event) => {
                 if (event.state === "complete") {
-                  lastCreatedGraphicRef.current = event.graphic;
+                  const graphic = event.graphic;
+                  if (!graphic?.geometry) return;
+
+                  lastCreatedGraphicRef.current = graphic;
                   const tplName = activeTemplateNameRef.current ?? "";
                   const color = getTemplateColor(tplName);
                   // Stamp the layer color onto the completed graphic
-                  event.graphic.symbol = new SimpleFillSymbol({
+                  graphic.symbol = new SimpleFillSymbol({
                     color: color.fill,
                     outline: { color: color.stroke, width: 2 },
                   });
-                  const geomJson = event.graphic.geometry.toJSON() as {
+                  const geomJson = graphic.geometry.toJSON() as {
                     rings?: number[][][];
                   };
                   onPolygonCompleteRef.current?.(geomJson.rings ?? [], tplName);
@@ -203,8 +211,8 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
             }
           }
 
-          // Click to select / deselect existing polygons
-          if (editorMode) {
+          // Click to select / deselect existing polygons — active in both editor and viewer
+          if (layers.size > 0) {
             view.on("click", async (clickEvent) => {
               const result = await view.hitTest(clickEvent);
               const hit = result.results
@@ -213,15 +221,21 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
                 .find((g) => g.attributes?.gisBlockId && !g.attributes?.isLabel);
 
               if (hit) {
+                const hitGeometry = hit.geometry;
                 onPolygonSelectRef.current?.(
                   hit.attributes.gisBlockId as string,
                   hit.attributes.templateName as string,
                   hit.attributes.label as string
                 );
-                void view.goTo((hit.geometry as Polygon).extent.expand(3), {
-                  animate: true,
-                  duration: 400,
-                });
+                if (hitGeometry?.type === "polygon") {
+                  const extent = (hitGeometry as Polygon).extent;
+                  if (extent) {
+                    void view.goTo(extent.expand(3), {
+                      animate: true,
+                      duration: 400,
+                    });
+                  }
+                }
               } else {
                 onPolygonSelectRef.current?.(null, null, null);
               }
@@ -241,6 +255,7 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
         cancelled = true;
         sketchRef.current = null;
         selectedGraphicRef.current = null;
+        mediaLayerRef.current = null;
         view.destroy();
         viewRef.current = null;
       };
@@ -269,6 +284,13 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
         layer.visible = visibilityByTemplate[name] ?? true;
       }
     }, [visibilityByTemplate]);
+
+    // ── Effect: toggle SVG floor plan visibility ──────────────────────────────
+    useEffect(() => {
+      if (mediaLayerRef.current) {
+        mediaLayerRef.current.visible = svgVisible ?? true;
+      }
+    }, [svgVisible]);
 
     // ── Effect: highlight the selected polygon ────────────────────────────────
     useEffect(() => {
@@ -308,7 +330,7 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
 
     // ── Effect: sync existing polygons into their graphics layers ────────────
     useEffect(() => {
-      if (!editorMode || layersRef.current.size === 0) return;
+      if (layersRef.current.size === 0) return;
 
       for (const layer of layersRef.current.values()) {
         layer.graphics.removeAll();
