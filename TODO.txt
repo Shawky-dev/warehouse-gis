@@ -1,0 +1,5 @@
+TODO:
+    1.fix sav Polygon Patch 403 CORS err : PATCH
+	https://indomitable-gilbert-nongelatinous.ngrok-free.dev/api/acme/gis/blocks/manual/595d563b-ba97-4baa-9c8c-da0e46a4f1cc
+    Status: 403
+    Responses : Invalid CORS request
