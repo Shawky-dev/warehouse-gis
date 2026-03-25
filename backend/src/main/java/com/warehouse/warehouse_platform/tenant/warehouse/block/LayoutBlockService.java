@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -101,6 +102,11 @@ public class LayoutBlockService {
         saved.setFullCode(code);
         saved = saveBlock(saved);
 
+        // Recalculate codes for siblings whose positions were shifted up to make room.
+        Set<UUID> shiftedSiblings = new HashSet<>(loadSiblingIds(layoutId, parentId));
+        shiftedSiblings.remove(saved.getId());
+        recalculateScanCodes(layoutId, shiftedSiblings);
+
         BlockResult result = toResult(saved, template);
         tenantAuditService.record("LAYOUT_BLOCK_ADD", "LAYOUT_BLOCK", result.id().toString(), null, result);
         return result;
@@ -152,6 +158,13 @@ public class LayoutBlockService {
             createdBlocks.add(toResult(saved, template));
         }
 
+        // Recalculate codes for siblings whose positions were shifted up to make room.
+        Set<UUID> newBlockIds = createdBlocks.stream()
+                .map(BlockResult::id).collect(Collectors.toSet());
+        Set<UUID> shiftedSiblings = new HashSet<>(loadSiblingIds(layoutId, parentId));
+        shiftedSiblings.removeAll(newBlockIds);
+        recalculateScanCodes(layoutId, shiftedSiblings);
+
         BatchBlockResult result = new BatchBlockResult(createdBlocks, createdBlocks.size(), createdBlocks.size());
         tenantAuditService.record("LAYOUT_BLOCK_BATCH_ADD", "LAYOUT_BLOCK", layoutId.toString(), null, result);
         return result;
@@ -200,9 +213,20 @@ public class LayoutBlockService {
 
         block.setParentId(newParentId);
         block.setPosition(resolvedNew);
-        LayoutBlock saved = saveBlock(block);
+        saveBlock(block);
 
-        BlockResult after = toResult(saved, loadTemplate(saved.getBlockTemplateId()));
+        // Recalculate: moved block + its subtree, and any siblings whose positions
+        // were shifted at either the old or new parent.
+        Set<UUID> affected = new HashSet<>();
+        affected.add(blockId);
+        affected.addAll(loadSiblingIds(layoutId, oldParentId));
+        if (!Objects.equals(oldParentId, newParentId)) {
+            affected.addAll(loadSiblingIds(layoutId, newParentId));
+        }
+        recalculateScanCodes(layoutId, affected);
+
+        LayoutBlock refreshed = loadBlock(blockId);
+        BlockResult after = toResult(refreshed, loadTemplate(refreshed.getBlockTemplateId()));
         tenantAuditService.record("LAYOUT_BLOCK_MOVE", "LAYOUT_BLOCK", blockId.toString(), before, after);
         return after;
     }
@@ -220,8 +244,10 @@ public class LayoutBlockService {
         BlockResult before = toResult(block, loadTemplate(block.getBlockTemplateId()));
         block.setSide(retainCompatibleSide(block.getSide(), template));
         block.setBlockTemplateId(newTemplateId);
-        LayoutBlock saved = saveBlock(block);
-        BlockResult after = toResult(saved, template);
+        saveBlock(block);
+        recalculateScanCodes(layoutId, Set.of(blockId));
+        LayoutBlock refreshed = loadBlock(blockId);
+        BlockResult after = toResult(refreshed, template);
         tenantAuditService.record("LAYOUT_BLOCK_REASSIGN", "LAYOUT_BLOCK", blockId.toString(), before, after);
         return after;
     }
@@ -280,6 +306,10 @@ public class LayoutBlockService {
         // Close the gap in the sibling list
         shiftPositions(layoutId, parentId, position + 1, -1, null);
 
+        // Recalculate codes for siblings whose positions were shifted down to fill the gap.
+        Set<UUID> shiftedSiblings = new HashSet<>(loadSiblingIds(layoutId, parentId));
+        recalculateScanCodes(layoutId, shiftedSiblings);
+
         tenantAuditService.record("LAYOUT_BLOCK_REMOVE", "LAYOUT_BLOCK", blockId.toString(), before, null);
     }
 
@@ -336,6 +366,12 @@ public class LayoutBlockService {
 
         // Assign unique scan/full codes to all newly created blocks
         assignScanCodes(layoutId, allNewBlocks);
+
+        // Recalculate codes for pre-existing siblings whose positions were shifted up.
+        Set<UUID> newBlockIds = allNewBlocks.stream().map(LayoutBlock::getId).collect(Collectors.toSet());
+        Set<UUID> shiftedSiblings = new HashSet<>(loadSiblingIds(layoutId, targetParentId));
+        shiftedSiblings.removeAll(newBlockIds);
+        recalculateScanCodes(layoutId, shiftedSiblings);
 
         // Rebuild results with scan codes set
         List<BlockResult> finalRoots = createdRoots.stream()
@@ -472,6 +508,76 @@ public class LayoutBlockService {
             block.setFullCode(code);
             saveBlock(block);
         }
+    }
+
+    /**
+     * Recalculates scan/full codes for every block rooted at each id in
+     * {@code affectedRootIds} (inclusive) and for the entire subtree beneath it.
+     * <p>
+     * Two-pass strategy:
+     * <ol>
+     *   <li>Clear all stale codes to null so that the collision check in
+     *       {@link #generateScanCode} cannot be confused by another block's stale
+     *       value matching the code we are about to assign.</li>
+     *   <li>Regenerate and persist the correct codes against the clean state.</li>
+     * </ol>
+     * {@code scan_code} is nullable, so clearing to null is safe within the
+     * enclosing transaction.
+     */
+    private void recalculateScanCodes(UUID layoutId, Collection<UUID> affectedRootIds) {
+        if (affectedRootIds.isEmpty()) return;
+
+        List<LayoutBlock> allBlocks = layoutBlockRepository.findByLayoutIdOrderByParentIdAscPositionAsc(layoutId);
+        Map<UUID, LayoutBlock> blockById = allBlocks.stream()
+                .collect(Collectors.toMap(LayoutBlock::getId, b -> b));
+        Map<UUID, List<LayoutBlock>> childrenByParentId = buildChildrenByParentId(allBlocks);
+
+        Set<UUID> allTemplateIds = allBlocks.stream()
+                .map(LayoutBlock::getBlockTemplateId).collect(Collectors.toSet());
+        Map<UUID, BlockTemplate> templateById = new HashMap<>();
+        blockTemplateRepository.findAllById(allTemplateIds).forEach(t -> templateById.put(t.getId(), t));
+
+        Set<UUID> toUpdate = new HashSet<>();
+        for (UUID rootId : affectedRootIds) {
+            expandSubtreeIds(childrenByParentId, rootId, toUpdate);
+        }
+
+        // Pass 1: clear stale codes.
+        for (UUID id : toUpdate) {
+            LayoutBlock block = blockById.get(id);
+            if (block == null) continue;
+            block.setScanCode(null);
+            block.setFullCode(null);
+            layoutBlockRepository.saveAndFlush(block);
+        }
+
+        // Pass 2: regenerate.
+        for (UUID id : toUpdate) {
+            LayoutBlock block = blockById.get(id);
+            if (block == null) continue;
+            List<LayoutBlock> ancestors = buildAncestorChainFromMap(block, blockById);
+            String code = generateScanCode(block, ancestors, templateById);
+            block.setScanCode(code);
+            block.setFullCode(code);
+            saveBlock(block);
+        }
+    }
+
+    /** Recursively collects {@code rootId} and all its descendants into {@code result}. */
+    private void expandSubtreeIds(Map<UUID, List<LayoutBlock>> childrenByParentId,
+            UUID rootId, Set<UUID> result) {
+        if (!result.add(rootId)) return; // cycle guard / dedup
+        for (LayoutBlock child : childrenByParentId.getOrDefault(rootId, List.of())) {
+            expandSubtreeIds(childrenByParentId, child.getId(), result);
+        }
+    }
+
+    /** Returns the IDs of all blocks that share the given parent (root or non-root). */
+    private List<UUID> loadSiblingIds(UUID layoutId, UUID parentId) {
+        List<LayoutBlock> siblings = (parentId == null)
+                ? layoutBlockRepository.findByLayoutIdAndParentIdIsNullOrderByPositionAsc(layoutId)
+                : layoutBlockRepository.findByLayoutIdAndParentIdOrderByPositionAsc(layoutId, parentId);
+        return siblings.stream().map(LayoutBlock::getId).toList();
     }
 
     // -------------------------------------------------------------------------

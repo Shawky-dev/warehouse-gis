@@ -323,13 +323,18 @@ class LayoutBlockServiceTest {
                                                 BlockTemplate.SideConfig.LR, null)));
                 when(layoutBlockRepository.save(any())).thenAnswer(invocation -> {
                         LayoutBlock saved = invocation.getArgument(0);
-                        saved.setId(UUID.fromString(
-                                        "70000000-0000-0000-0000-00000000000" + sequence.incrementAndGet()));
+                        // Only assign a new ID (and track) for genuinely new blocks; existing blocks
+                        // re-saved during scan-code recalculation already have an ID.
+                        if (saved.getId() == null) {
+                                saved.setId(UUID.fromString(String.format(
+                                                "70000000-0000-0000-0000-%012d", sequence.incrementAndGet())));
+                                savedBlocks.add(saved);
+                        }
                         saved.setCreatedAt(Instant.now());
                         saved.setUpdatedAt(Instant.now());
-                        savedBlocks.add(saved);
                         return saved;
                 });
+                when(layoutBlockRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
                 LayoutBlockService.BatchBlockResult result = service.copySubtree(LAYOUT_ID, sourceRootId, null, 1, 2);
 
@@ -544,6 +549,347 @@ class LayoutBlockServiceTest {
                 WarehouseManagementException ex = assertThrows(WarehouseManagementException.class,
                                 () -> service.updateLocationKind(LAYOUT_ID, blockId, null));
                 assertEquals("BAD_REQUEST", ex.getCode());
+        }
+
+        // -------------------------------------------------------------------------
+        // moveBlock — scan code recalculation
+        // -------------------------------------------------------------------------
+
+        /**
+         * Common mock setup used by scan-code-recalculation tests.
+         * Every test that triggers recalculateScanCodes needs:
+         *   - findByLayoutIdOrderByParentIdAscPositionAsc to return the current tree
+         *   - findAllById (templates) to return templates
+         *   - existsByScanCodeAndIdNot to return false (no collisions)
+         *   - saveAndFlush to work (used by the two-pass clear step)
+         */
+        private void stubRecalculation(List<LayoutBlock> allBlocks, BlockTemplate... templates) {
+                when(layoutBlockRepository.findByLayoutIdOrderByParentIdAscPositionAsc(LAYOUT_ID))
+                                .thenReturn(allBlocks);
+                when(blockTemplateRepository.findAllById(any()))
+                                .thenReturn(List.of(templates));
+                when(layoutBlockRepository.existsByScanCodeAndIdNot(anyString(), any())).thenReturn(false);
+                when(layoutBlockRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+        }
+
+        @Test
+        void moveBlock_shouldUpdateScanCodeWhenReparented() {
+                UUID parentId = UUID.fromString("1100aaaa-0000-0000-0000-000000000000");
+                UUID blockId = UUID.fromString("1100bbbb-0000-0000-0000-000000000000");
+
+                // parent at root position 0 (ALPHA → "A"), block is child at position 0 (NUMERIC → "01")
+                LayoutBlock parent = block(parentId, LAYOUT_ID, null, 0);
+                parent.setBlockTemplateId(TEMPLATE_ALPHA_ID);
+                LayoutBlock movingBlock = block(blockId, LAYOUT_ID, parentId, 0);
+                movingBlock.setScanCode("A-01"); // stale after move
+
+                when(layoutRepository.existsById(LAYOUT_ID)).thenReturn(true);
+                when(layoutBlockRepository.findById(blockId)).thenReturn(Optional.of(movingBlock));
+                // newParentId = null → moving to root
+                when(layoutBlockRepository.findByLayoutIdOrderByParentIdAscPositionAsc(LAYOUT_ID))
+                                .thenReturn(List.of(parent, movingBlock));
+                when(layoutBlockRepository.findMaxRootPosition(LAYOUT_ID)).thenReturn(0);
+                // sibling queries for old parent and new (root) parent
+                when(layoutBlockRepository.findByLayoutIdAndParentIdOrderByPositionAsc(LAYOUT_ID, parentId))
+                                .thenReturn(List.of());
+                when(layoutBlockRepository.findByLayoutIdAndParentIdIsNullOrderByPositionAsc(LAYOUT_ID))
+                                .thenReturn(List.of(parent, movingBlock));
+                stubRecalculation(List.of(parent, movingBlock),
+                                template(TEMPLATE_ID, BlockTemplate.IdentifierFormat.NUMERIC,
+                                                BlockTemplate.SideConfig.NONE, null),
+                                template(TEMPLATE_ALPHA_ID, BlockTemplate.IdentifierFormat.ALPHA,
+                                                BlockTemplate.SideConfig.NONE, null));
+                when(layoutBlockRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+                when(layoutBlockRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+                when(blockTemplateRepository.findById(TEMPLATE_ID)).thenReturn(Optional.of(template(
+                                TEMPLATE_ID, BlockTemplate.IdentifierFormat.NUMERIC,
+                                BlockTemplate.SideConfig.NONE, null)));
+
+                LayoutBlockService.BlockResult result = service.moveBlock(LAYOUT_ID, blockId, null, 1);
+
+                // After reparenting to root at position 1, code should be "02" (no parent prefix)
+                assertEquals("02", result.scanCode());
+        }
+
+        @Test
+        void moveBlock_shouldUpdateShiftedSiblingsAtOldParent() {
+                UUID parentId = UUID.fromString("2200aaaa-0000-0000-0000-000000000000");
+                UUID blockId = UUID.fromString("2200bbbb-0000-0000-0000-000000000000");
+                UUID siblingId = UUID.fromString("2200cccc-0000-0000-0000-000000000000");
+
+                LayoutBlock parent = block(parentId, LAYOUT_ID, null, 0);
+                LayoutBlock movingBlock = block(blockId, LAYOUT_ID, parentId, 0);
+                movingBlock.setScanCode("01-01");
+                // sibling was at position 1, after move it shifts to 0
+                LayoutBlock sibling = block(siblingId, LAYOUT_ID, parentId, 0); // position already updated
+                sibling.setScanCode("01-02"); // stale code
+
+                BlockTemplate numericTemplate = template(TEMPLATE_ID, BlockTemplate.IdentifierFormat.NUMERIC,
+                                BlockTemplate.SideConfig.NONE, null);
+
+                when(layoutRepository.existsById(LAYOUT_ID)).thenReturn(true);
+                when(layoutBlockRepository.findById(blockId)).thenReturn(Optional.of(movingBlock));
+                when(layoutBlockRepository.findByLayoutIdOrderByParentIdAscPositionAsc(LAYOUT_ID))
+                                .thenReturn(List.of(parent, sibling));
+                when(layoutBlockRepository.findMaxRootPosition(LAYOUT_ID)).thenReturn(0);
+                when(layoutBlockRepository.findMaxChildPosition(LAYOUT_ID, parentId)).thenReturn(1);
+                // old parent siblings
+                when(layoutBlockRepository.findByLayoutIdAndParentIdOrderByPositionAsc(LAYOUT_ID, parentId))
+                                .thenReturn(List.of(sibling));
+                // new parent (root) siblings
+                when(layoutBlockRepository.findByLayoutIdAndParentIdIsNullOrderByPositionAsc(LAYOUT_ID))
+                                .thenReturn(List.of(parent));
+                stubRecalculation(List.of(parent, sibling), numericTemplate);
+                when(layoutBlockRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+                when(layoutBlockRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+                when(blockTemplateRepository.findById(TEMPLATE_ID)).thenReturn(Optional.of(numericTemplate));
+                when(layoutBlockRepository.findById(siblingId)).thenReturn(Optional.of(sibling));
+
+                service.moveBlock(LAYOUT_ID, blockId, null, 1);
+
+                // sibling shifted to position 0 under parent (position 0, NUMERIC → "01"),
+                // with parent also at position 0 (NUMERIC → "01"), so full code = "01-01"
+                assertEquals("01-01", sibling.getScanCode());
+        }
+
+        @Test
+        void moveBlock_shouldUpdateDescendantCodesAfterMove() {
+                UUID blockId = UUID.fromString("3300bbbb-0000-0000-0000-000000000000");
+                UUID childId = UUID.fromString("3300cccc-0000-0000-0000-000000000000");
+
+                // block at root position 0 with a child at position 0
+                LayoutBlock movingBlock = block(blockId, LAYOUT_ID, null, 1); // moving to position 0
+                movingBlock.setScanCode("02");
+                LayoutBlock child = block(childId, LAYOUT_ID, blockId, 0);
+                child.setScanCode("02-01"); // stale after parent moves
+
+                BlockTemplate numericTemplate = template(TEMPLATE_ID, BlockTemplate.IdentifierFormat.NUMERIC,
+                                BlockTemplate.SideConfig.NONE, null);
+
+                when(layoutRepository.existsById(LAYOUT_ID)).thenReturn(true);
+                when(layoutBlockRepository.findById(blockId)).thenReturn(Optional.of(movingBlock));
+                when(layoutBlockRepository.findByLayoutIdOrderByParentIdAscPositionAsc(LAYOUT_ID))
+                                .thenReturn(List.of(movingBlock, child));
+                when(layoutBlockRepository.findMaxRootPosition(LAYOUT_ID)).thenReturn(1);
+                when(layoutBlockRepository.findByLayoutIdAndParentIdIsNullOrderByPositionAsc(LAYOUT_ID))
+                                .thenReturn(List.of(movingBlock));
+                stubRecalculation(List.of(movingBlock, child), numericTemplate);
+                when(layoutBlockRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+                when(layoutBlockRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+                when(blockTemplateRepository.findById(TEMPLATE_ID)).thenReturn(Optional.of(numericTemplate));
+
+                service.moveBlock(LAYOUT_ID, blockId, null, 0);
+
+                // block moves to position 0 → "01"; child is still position 0 under block → "01-01"
+                assertEquals("01", movingBlock.getScanCode());
+                assertEquals("01-01", child.getScanCode());
+        }
+
+        // -------------------------------------------------------------------------
+        // reassignTemplate — scan code recalculation
+        // -------------------------------------------------------------------------
+
+        @Test
+        void reassignTemplate_shouldRegenerateScanCodeAfterFormatChange() {
+                UUID blockId = UUID.fromString("4400bbbb-0000-0000-0000-000000000000");
+                UUID newTemplateId = UUID.fromString("4400cccc-0000-0000-0000-000000000000");
+
+                // Block at position 0 with NUMERIC template → scanCode "01"
+                LayoutBlock b = block(blockId, LAYOUT_ID, null, 0);
+                b.setScanCode("01");
+
+                BlockTemplate alphaTemplate = template(newTemplateId, BlockTemplate.IdentifierFormat.ALPHA,
+                                BlockTemplate.SideConfig.NONE, null);
+
+                when(layoutRepository.existsById(LAYOUT_ID)).thenReturn(true);
+                when(blockTemplateRepository.findById(TEMPLATE_ID)).thenReturn(Optional.of(template(
+                                TEMPLATE_ID, BlockTemplate.IdentifierFormat.NUMERIC,
+                                BlockTemplate.SideConfig.NONE, null)));
+                when(blockTemplateRepository.findById(newTemplateId)).thenReturn(Optional.of(alphaTemplate));
+                when(layoutBlockRepository.findById(blockId)).thenReturn(Optional.of(b));
+                when(layoutBlockRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+                stubRecalculation(List.of(b), alphaTemplate);
+
+                LayoutBlockService.BlockResult result = service.reassignTemplate(LAYOUT_ID, blockId, newTemplateId);
+
+                // Position 0 with ALPHA format → "A"
+                assertEquals("A", result.scanCode());
+        }
+
+        @Test
+        void reassignTemplate_shouldRegenerateDescendantCodesAfterFormatChange() {
+                UUID blockId = UUID.fromString("5500bbbb-0000-0000-0000-000000000000");
+                UUID childId = UUID.fromString("5500cccc-0000-0000-0000-000000000000");
+                UUID newTemplateId = UUID.fromString("5500dddd-0000-0000-0000-000000000000");
+
+                // Block at position 0 with NUMERIC template; child at position 0 with NUMERIC
+                LayoutBlock b = block(blockId, LAYOUT_ID, null, 0);
+                b.setScanCode("01");
+                LayoutBlock child = block(childId, LAYOUT_ID, blockId, 0);
+                child.setScanCode("01-01"); // prefix segment will change when block swaps to ALPHA
+
+                BlockTemplate numericTemplate = template(TEMPLATE_ID, BlockTemplate.IdentifierFormat.NUMERIC,
+                                BlockTemplate.SideConfig.NONE, null);
+                BlockTemplate alphaTemplate = template(newTemplateId, BlockTemplate.IdentifierFormat.ALPHA,
+                                BlockTemplate.SideConfig.NONE, null);
+
+                when(layoutRepository.existsById(LAYOUT_ID)).thenReturn(true);
+                when(blockTemplateRepository.findById(TEMPLATE_ID)).thenReturn(Optional.of(numericTemplate));
+                when(blockTemplateRepository.findById(newTemplateId)).thenReturn(Optional.of(alphaTemplate));
+                when(layoutBlockRepository.findById(blockId)).thenReturn(Optional.of(b));
+                when(layoutBlockRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+                stubRecalculation(List.of(b, child), numericTemplate, alphaTemplate);
+
+                service.reassignTemplate(LAYOUT_ID, blockId, newTemplateId);
+
+                // Block → "A", child → "A-01"
+                assertEquals("A", b.getScanCode());
+                assertEquals("A-01", child.getScanCode());
+        }
+
+        // -------------------------------------------------------------------------
+        // addBlock — sibling shift recalculation
+        // -------------------------------------------------------------------------
+
+        @Test
+        void addBlock_shouldUpdateSiblingCodesAfterInsert() {
+                UUID existingId = UUID.fromString("6600aaaa-0000-0000-0000-000000000000");
+                // Existing block was at position 0; after insert at position 0 it shifts to position 1
+                LayoutBlock existing = block(existingId, LAYOUT_ID, null, 1);
+                existing.setScanCode("01"); // stale — should become "02"
+
+                BlockTemplate numericTemplate = template(TEMPLATE_ID, BlockTemplate.IdentifierFormat.NUMERIC,
+                                BlockTemplate.SideConfig.NONE, null);
+
+                when(layoutRepository.existsById(LAYOUT_ID)).thenReturn(true);
+                when(blockTemplateRepository.findById(TEMPLATE_ID)).thenReturn(Optional.of(numericTemplate));
+                when(layoutBlockRepository.findMaxRootPosition(LAYOUT_ID)).thenReturn(null);
+                when(layoutBlockRepository.existsByScanCodeAndIdNot(anyString(), any())).thenReturn(false);
+                when(layoutBlockRepository.save(any())).thenAnswer(inv -> {
+                        LayoutBlock b = inv.getArgument(0);
+                        if (b.getId() == null) b.setId(UUID.fromString("6600bbbb-0000-0000-0000-000000000000"));
+                        b.setCreatedAt(Instant.now());
+                        b.setUpdatedAt(Instant.now());
+                        return b;
+                });
+                // After insert, sibling query returns existing block (now at position 1)
+                when(layoutBlockRepository.findByLayoutIdAndParentIdIsNullOrderByPositionAsc(LAYOUT_ID))
+                                .thenReturn(List.of(existing));
+                stubRecalculation(List.of(existing), numericTemplate);
+
+                service.addBlock(LAYOUT_ID, TEMPLATE_ID, null, 0, null);
+
+                // existing was shifted to position 1 → should now have code "02"
+                assertEquals("02", existing.getScanCode());
+        }
+
+        @Test
+        void addBlocks_shouldUpdateSiblingCodesAfterBatchInsert() {
+                UUID existingId = UUID.fromString("7700aaaa-0000-0000-0000-000000000000");
+                // Existing block was at position 0; after inserting 2 blocks at position 0 it shifts to position 2
+                LayoutBlock existing = block(existingId, LAYOUT_ID, null, 2);
+                existing.setScanCode("01"); // stale — should become "03"
+
+                BlockTemplate numericTemplate = template(TEMPLATE_ID, BlockTemplate.IdentifierFormat.NUMERIC,
+                                BlockTemplate.SideConfig.NONE, null);
+
+                when(layoutRepository.existsById(LAYOUT_ID)).thenReturn(true);
+                when(blockTemplateRepository.findById(TEMPLATE_ID)).thenReturn(Optional.of(numericTemplate));
+                when(layoutBlockRepository.findMaxRootPosition(LAYOUT_ID)).thenReturn(null);
+                when(layoutBlockRepository.existsByScanCodeAndIdNot(anyString(), any())).thenReturn(false);
+                AtomicInteger seq = new AtomicInteger();
+                when(layoutBlockRepository.save(any())).thenAnswer(inv -> {
+                        LayoutBlock b = inv.getArgument(0);
+                        if (b.getId() == null)
+                                b.setId(UUID.fromString("77000000-0000-0000-0000-00000000000" + seq.incrementAndGet()));
+                        b.setCreatedAt(Instant.now());
+                        b.setUpdatedAt(Instant.now());
+                        return b;
+                });
+                when(layoutBlockRepository.findByLayoutIdAndParentIdIsNullOrderByPositionAsc(LAYOUT_ID))
+                                .thenReturn(List.of(existing));
+                stubRecalculation(List.of(existing), numericTemplate);
+
+                service.addBlocks(LAYOUT_ID, TEMPLATE_ID, null, 0, 2, null);
+
+                // existing shifted to position 2 → "03"
+                assertEquals("03", existing.getScanCode());
+        }
+
+        // -------------------------------------------------------------------------
+        // removeBlock — sibling shift recalculation
+        // -------------------------------------------------------------------------
+
+        @Test
+        void removeBlock_shouldUpdateSiblingCodesAfterDelete() {
+                UUID blockId = UUID.fromString("8800aaaa-0000-0000-0000-000000000000");
+                UUID sibling1Id = UUID.fromString("8800bbbb-0000-0000-0000-000000000000");
+                UUID sibling2Id = UUID.fromString("8800cccc-0000-0000-0000-000000000000");
+
+                LayoutBlock toRemove = block(blockId, LAYOUT_ID, null, 0);
+                // After deletion siblings shift: position 1→0, 2→1
+                LayoutBlock sibling1 = block(sibling1Id, LAYOUT_ID, null, 0);
+                sibling1.setScanCode("02"); // stale — should become "01"
+                LayoutBlock sibling2 = block(sibling2Id, LAYOUT_ID, null, 1);
+                sibling2.setScanCode("03"); // stale — should become "02"
+
+                BlockTemplate numericTemplate = template(TEMPLATE_ID, BlockTemplate.IdentifierFormat.NUMERIC,
+                                BlockTemplate.SideConfig.NONE, null);
+
+                when(layoutRepository.existsById(LAYOUT_ID)).thenReturn(true);
+                when(blockTemplateRepository.findById(TEMPLATE_ID)).thenReturn(Optional.of(numericTemplate));
+                when(layoutBlockRepository.findById(blockId)).thenReturn(Optional.of(toRemove));
+                when(layoutBlockRepository.findByLayoutIdAndParentIdIsNullOrderByPositionAsc(LAYOUT_ID))
+                                .thenReturn(List.of(sibling1, sibling2));
+                stubRecalculation(List.of(sibling1, sibling2), numericTemplate);
+
+                service.removeBlock(LAYOUT_ID, blockId);
+
+                assertEquals("01", sibling1.getScanCode());
+                assertEquals("02", sibling2.getScanCode());
+        }
+
+        // -------------------------------------------------------------------------
+        // copySubtree — sibling shift recalculation
+        // -------------------------------------------------------------------------
+
+        @Test
+        void copySubtree_shouldUpdateShiftedSiblingCodesAfterCopy() {
+                UUID sourceRootId = UUID.fromString("9900aaaa-0000-0000-0000-000000000000");
+                UUID existingSiblingId = UUID.fromString("9900bbbb-0000-0000-0000-000000000000");
+
+                // Source block at position 0 to be copied; existing sibling at position 1
+                // After copying 1 copy at position 0, existing sibling shifts to position 2
+                LayoutBlock sourceRoot = block(sourceRootId, LAYOUT_ID, null, 0);
+                LayoutBlock existingSibling = block(existingSiblingId, LAYOUT_ID, null, 2);
+                existingSibling.setScanCode("02"); // stale — should become "03"
+
+                BlockTemplate numericTemplate = template(TEMPLATE_ID, BlockTemplate.IdentifierFormat.NUMERIC,
+                                BlockTemplate.SideConfig.NONE, null);
+                AtomicInteger seq = new AtomicInteger();
+
+                when(layoutRepository.existsById(LAYOUT_ID)).thenReturn(true);
+                when(layoutBlockRepository.findById(sourceRootId)).thenReturn(Optional.of(sourceRoot));
+                when(layoutBlockRepository.findByLayoutIdOrderByParentIdAscPositionAsc(LAYOUT_ID))
+                                .thenReturn(List.of(sourceRoot, existingSibling));
+                when(blockTemplateRepository.findAllById(any())).thenReturn(List.of(numericTemplate));
+                when(layoutBlockRepository.existsByScanCodeAndIdNot(anyString(), any())).thenReturn(false);
+                when(layoutBlockRepository.findByLayoutIdAndParentIdIsNullOrderByPositionAsc(LAYOUT_ID))
+                                .thenReturn(List.of(existingSibling));
+                when(layoutBlockRepository.save(any())).thenAnswer(inv -> {
+                        LayoutBlock b = inv.getArgument(0);
+                        if (b.getId() == null)
+                                b.setId(UUID.fromString("99000000-0000-0000-0000-00000000000" + seq.incrementAndGet()));
+                        b.setCreatedAt(Instant.now());
+                        b.setUpdatedAt(Instant.now());
+                        return b;
+                });
+                when(layoutBlockRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+
+                service.copySubtree(LAYOUT_ID, sourceRootId, null, 0, 1);
+
+                // existing sibling shifted to position 2 → "03"
+                assertEquals("03", existingSibling.getScanCode());
         }
 
         // -------------------------------------------------------------------------

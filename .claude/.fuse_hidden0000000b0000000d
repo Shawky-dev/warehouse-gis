@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /mnt/data/arch/Documents/coding/freelance/warehouse-gis-webapp -type f \\\\\\(-name *.py -o -name manage.py -o -name settings.py \\\\\\))",
+      "Bash(find /mnt/data/arch/Documents/coding/freelance/warehouse-gis-webapp/backend/src -type f -name *.java)",
+      "Bash(grep -r \"PostGIS\\\\|geom\\\\|geometry\\\\|geoserver\\\\|GeoServer\" /mnt/data/arch/Documents/coding/freelance/warehouse-gis-webapp --include=*.sql --include=*.java --include=*.yaml --include=*.yml)",
+      "Bash(grep -E '\\\\.sql$')",
+      "Bash(xargs cat:*)",
+      "Bash(mvn -B -DskipTests clean compile)",
+      "Bash(find /mnt/data/arch/Documents/coding/freelance/warehouse-gis-webapp/backend/src/test -type f -name *GeoServer* -o -name *Gis*)",
+      "Bash(find /mnt/data/arch/Documents/coding/freelance/warehouse-gis-webapp/frontend/src -type f -name *.ts* -path *gis* -o -path *map*)",
+      "Bash(grep -r \"geoserver\\\\|wfs\\\\|wms\\\\|geojson\" /mnt/data/arch/Documents/coding/freelance/warehouse-gis-webapp/frontend/src --include=*.ts --include=*.tsx -i)",
+      "WebSearch",
+      "WebFetch(domain:docs.geoserver.org)",
+      "WebFetch(domain:docs.ogc.org)",
+      "WebFetch(domain:github.com)",
+      "Bash(grep -r \"sortOrder\\\\|order\\\\|ORDER\" /mnt/data/arch/Documents/coding/freelance/warehouse-gis-webapp/backend/src/main/resources/db/migration/tenant/V3* --include=\"*.sql\")",
+      "WebFetch(domain:pro.arcgis.com)",
+      "WebFetch(domain:www.mappedin.com)",
+      "Bash(grep -E \"\\\\.\\(sql|xml|yaml|yml\\)$\")",
+      "Bash(mvn test:*)",
+      "Bash(mvn compile:*)",
+      "Bash(grep -r \"SVG_NS\\\\|buildFloorPlanGraphics\\\\|svgFloorPlan\" /mnt/data/arch/Documents/coding/freelance/warehouse-gis-webapp/frontend/src --include=*.ts --include=*.tsx)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(d.get\\(''''version'''',''''not found''''\\)\\)\")",
+      "Bash(npx tsc:*)",
+      "Bash(wc -l /mnt/data/arch/Documents/coding/freelance/warehouse-gis-webapp/frontend/src/i18n/messages/*.ts)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(list\\(d.get\\(''''dependencies'''',{}\\).keys\\(\\)\\)\\)\")",
+      "Bash(npm install:*)"
+    ]
+  }
+}
