@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -116,4 +117,7 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, UU
 
         /** All movements for a given source document (receipt/dispatch/count session), newest first. */
         List<StockMovement> findBySourceDocumentIdOrderByCreatedAtDesc(UUID sourceDocumentId);
+
+        /** Returns true if any movement row references one of the given location IDs. */
+        boolean existsByLocationIdIn(Collection<UUID> locationIds);
 }

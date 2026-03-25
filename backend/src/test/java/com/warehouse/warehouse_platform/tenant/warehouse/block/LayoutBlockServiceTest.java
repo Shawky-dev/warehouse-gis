@@ -1,6 +1,7 @@
 package com.warehouse.warehouse_platform.tenant.warehouse.block;
 
 import com.warehouse.warehouse_platform.tenant.audit.TenantAuditService;
+import com.warehouse.warehouse_platform.tenant.warehouse.common.LayoutMutationGuard;
 import com.warehouse.warehouse_platform.tenant.warehouse.common.WarehouseManagementException;
 import com.warehouse.warehouse_platform.tenant.warehouse.layout.WarehouseLayoutRepository;
 import com.warehouse.warehouse_platform.tenant.warehouse.locationkind.WarehouseLocationKind;
@@ -29,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -47,6 +49,8 @@ class LayoutBlockServiceTest {
         private TenantAuditService tenantAuditService;
         @Mock
         private WarehouseLocationKindService warehouseLocationKindService;
+        @Mock
+        private LayoutMutationGuard mutationGuard;
 
         private LayoutBlockService service;
 
@@ -61,7 +65,7 @@ class LayoutBlockServiceTest {
         void setUp() {
                 service = new LayoutBlockService(
                                 layoutBlockRepository, blockTemplateRepository, layoutRepository, tenantAuditService,
-                                warehouseLocationKindService);
+                                warehouseLocationKindService, mutationGuard);
                 when(warehouseLocationKindService.getDefaultLocationKind())
                                 .thenReturn(locationKind(STORAGE_KIND_ID, "Storage"));
                 when(warehouseLocationKindService.getRequired(STAGING_KIND_ID))
@@ -890,6 +894,91 @@ class LayoutBlockServiceTest {
 
                 // existing sibling shifted to position 2 → "03"
                 assertEquals("03", existingSibling.getScanCode());
+        }
+
+        // -------------------------------------------------------------------------
+        // LayoutMutationGuard — removeBlock
+        // -------------------------------------------------------------------------
+
+        @Test
+        void removeBlock_shouldPropagateConflict_whenGuardThrows() {
+                UUID blockId = UUID.fromString("aa000001-0000-0000-0000-000000000000");
+                LayoutBlock toRemove = block(blockId, LAYOUT_ID, null, 0);
+
+                when(layoutRepository.existsById(LAYOUT_ID)).thenReturn(true);
+                when(blockTemplateRepository.findById(TEMPLATE_ID)).thenReturn(Optional.of(template(
+                                TEMPLATE_ID, BlockTemplate.IdentifierFormat.NUMERIC, BlockTemplate.SideConfig.NONE,
+                                null)));
+                when(layoutBlockRepository.findById(blockId)).thenReturn(Optional.of(toRemove));
+                doThrow(WarehouseManagementException.conflict("Cannot delete block: referenced by stock movements"))
+                                .when(mutationGuard).checkRemoveBlock(any());
+
+                WarehouseManagementException ex = assertThrows(WarehouseManagementException.class,
+                                () -> service.removeBlock(LAYOUT_ID, blockId));
+                assertEquals("CONFLICT", ex.getCode());
+                assertTrue(ex.getMessage().contains("stock movements"));
+                verify(layoutBlockRepository).findById(blockId);
+        }
+
+        // -------------------------------------------------------------------------
+        // LayoutMutationGuard — addBlock / addBlocks / copySubtree (leaf-to-parent)
+        // -------------------------------------------------------------------------
+
+        @Test
+        void addBlock_shouldPropagateConflict_whenParentHoldsStock() {
+                UUID parentId = UUID.fromString("bb000001-0000-0000-0000-000000000000");
+                LayoutBlock parent = block(parentId, LAYOUT_ID, null, 0);
+
+                when(layoutRepository.existsById(LAYOUT_ID)).thenReturn(true);
+                when(blockTemplateRepository.findById(TEMPLATE_ID)).thenReturn(Optional.of(template(
+                                TEMPLATE_ID, BlockTemplate.IdentifierFormat.NUMERIC, BlockTemplate.SideConfig.NONE,
+                                null)));
+                when(layoutBlockRepository.findById(parentId)).thenReturn(Optional.of(parent));
+                doThrow(WarehouseManagementException.conflict("Cannot add children to a block that holds live stock"))
+                                .when(mutationGuard).checkAddChildToBlock(parentId);
+
+                WarehouseManagementException ex = assertThrows(WarehouseManagementException.class,
+                                () -> service.addBlock(LAYOUT_ID, TEMPLATE_ID, parentId, 0, null));
+                assertEquals("CONFLICT", ex.getCode());
+                assertTrue(ex.getMessage().contains("live stock"));
+        }
+
+        @Test
+        void addBlocks_shouldPropagateConflict_whenParentHoldsStock() {
+                UUID parentId = UUID.fromString("cc000001-0000-0000-0000-000000000000");
+                LayoutBlock parent = block(parentId, LAYOUT_ID, null, 0);
+
+                when(layoutRepository.existsById(LAYOUT_ID)).thenReturn(true);
+                when(blockTemplateRepository.findById(TEMPLATE_ID)).thenReturn(Optional.of(template(
+                                TEMPLATE_ID, BlockTemplate.IdentifierFormat.NUMERIC, BlockTemplate.SideConfig.NONE,
+                                null)));
+                when(layoutBlockRepository.findById(parentId)).thenReturn(Optional.of(parent));
+                doThrow(WarehouseManagementException.conflict("Cannot add children to a block that holds live stock"))
+                                .when(mutationGuard).checkAddChildToBlock(parentId);
+
+                WarehouseManagementException ex = assertThrows(WarehouseManagementException.class,
+                                () -> service.addBlocks(LAYOUT_ID, TEMPLATE_ID, parentId, 0, 2, null));
+                assertEquals("CONFLICT", ex.getCode());
+        }
+
+        @Test
+        void copySubtree_shouldPropagateConflict_whenTargetParentHoldsStock() {
+                UUID sourceId = UUID.fromString("dd000001-0000-0000-0000-000000000000");
+                UUID targetParentId = UUID.fromString("dd000002-0000-0000-0000-000000000000");
+                LayoutBlock source = block(sourceId, LAYOUT_ID, null, 0);
+                LayoutBlock targetParent = block(targetParentId, LAYOUT_ID, null, 1);
+
+                when(layoutRepository.existsById(LAYOUT_ID)).thenReturn(true);
+                when(layoutBlockRepository.findById(sourceId)).thenReturn(Optional.of(source));
+                when(layoutBlockRepository.findById(targetParentId)).thenReturn(Optional.of(targetParent));
+                when(layoutBlockRepository.findByLayoutIdOrderByParentIdAscPositionAsc(LAYOUT_ID))
+                                .thenReturn(List.of(source, targetParent));
+                doThrow(WarehouseManagementException.conflict("Cannot add children to a block that holds live stock"))
+                                .when(mutationGuard).checkAddChildToBlock(targetParentId);
+
+                WarehouseManagementException ex = assertThrows(WarehouseManagementException.class,
+                                () -> service.copySubtree(LAYOUT_ID, sourceId, targetParentId, 0, 1));
+                assertEquals("CONFLICT", ex.getCode());
         }
 
         // -------------------------------------------------------------------------

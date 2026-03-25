@@ -3,8 +3,10 @@ package com.warehouse.warehouse_platform.tenant.warehouse.layout;
 import com.warehouse.warehouse_platform.tenant.audit.TenantAuditService;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplate;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplateRepository;
+import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlock;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlockService;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlockRepository;
+import com.warehouse.warehouse_platform.tenant.warehouse.common.LayoutMutationGuard;
 import com.warehouse.warehouse_platform.tenant.warehouse.common.WarehouseManagementException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -26,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -45,13 +49,15 @@ class WarehouseLayoutServiceTest {
     private LayoutBlockService layoutBlockService;
     @Mock
     private TenantAuditService tenantAuditService;
+    @Mock
+    private LayoutMutationGuard mutationGuard;
 
     private WarehouseLayoutService service;
 
     @BeforeEach
     void setUp() {
         service = new WarehouseLayoutService(layoutRepository, layoutBlockRepository, blockTemplateRepository,
-                layoutBlockService, tenantAuditService);
+                layoutBlockService, tenantAuditService, mutationGuard);
     }
 
     // -------------------------------------------------------------------------
@@ -273,6 +279,61 @@ class WarehouseLayoutServiceTest {
         verify(layoutRepository).delete(l);
         verify(tenantAuditService).record(eq("WAREHOUSE_LAYOUT_DELETE"), eq("WAREHOUSE_LAYOUT"),
                 eq(id.toString()), any(), eq(null));
+    }
+
+    // -------------------------------------------------------------------------
+    // activateLayout — LayoutMutationGuard
+    // -------------------------------------------------------------------------
+
+    @Test
+    void activateLayout_shouldPropagateConflict_whenCurrentLayoutHasStock() {
+        UUID currentActiveId = UUID.fromString("aa110000-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        UUID newId = UUID.fromString("bb220000-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+
+        WarehouseLayout currentActive = layout(currentActiveId, "Old", true);
+        WarehouseLayout toActivate = layout(newId, "New", false);
+
+        LayoutBlock blockInCurrentLayout = LayoutBlock.builder()
+                .id(UUID.fromString("cc330000-cccc-cccc-cccc-cccccccccccc"))
+                .layoutId(currentActiveId)
+                .blockTemplateId(UUID.randomUUID())
+                .position(0)
+                .createdAt(Instant.parse("2026-01-01T00:00:00Z"))
+                .updatedAt(Instant.parse("2026-01-01T00:00:00Z"))
+                .build();
+
+        when(layoutRepository.findById(newId)).thenReturn(Optional.of(toActivate));
+        when(layoutRepository.findByIsActiveTrue()).thenReturn(Optional.of(currentActive));
+        when(layoutBlockRepository.findByLayoutIdOrderByParentIdAscPositionAsc(currentActiveId))
+                .thenReturn(List.of(blockInCurrentLayout));
+        doThrow(WarehouseManagementException.conflict("Cannot switch layouts: the current active layout has live inventory"))
+                .when(mutationGuard).checkActivateLayout(currentActiveId);
+
+        WarehouseManagementException ex = assertThrows(WarehouseManagementException.class,
+                () -> service.activateLayout(newId));
+        assertEquals("CONFLICT", ex.getCode());
+        assertTrue(ex.getMessage().contains("live inventory"));
+        verify(layoutRepository, never()).save(any());
+    }
+
+    @Test
+    void activateLayout_shouldPropagateConflict_whenCurrentLayoutHasOpenCountSession() {
+        UUID currentActiveId = UUID.fromString("dd440000-dddd-dddd-dddd-dddddddddddd");
+        UUID newId = UUID.fromString("ee550000-eeee-eeee-eeee-eeeeeeeeeeee");
+
+        WarehouseLayout currentActive = layout(currentActiveId, "Old", true);
+        WarehouseLayout toActivate = layout(newId, "New", false);
+
+        when(layoutRepository.findById(newId)).thenReturn(Optional.of(toActivate));
+        when(layoutRepository.findByIsActiveTrue()).thenReturn(Optional.of(currentActive));
+        doThrow(WarehouseManagementException.conflict("Cannot switch layouts: open count sessions reference locations in the current layout"))
+                .when(mutationGuard).checkActivateLayout(currentActiveId);
+
+        WarehouseManagementException ex = assertThrows(WarehouseManagementException.class,
+                () -> service.activateLayout(newId));
+        assertEquals("CONFLICT", ex.getCode());
+        assertTrue(ex.getMessage().contains("count sessions"));
+        verify(layoutRepository, never()).save(any());
     }
 
     // -------------------------------------------------------------------------

@@ -5,6 +5,7 @@ import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplate;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplateRepository;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlockService;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.LayoutBlockRepository;
+import com.warehouse.warehouse_platform.tenant.warehouse.common.LayoutMutationGuard;
 import com.warehouse.warehouse_platform.tenant.warehouse.common.WarehouseManagementException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -30,18 +31,21 @@ public class WarehouseLayoutService {
     private final BlockTemplateRepository blockTemplateRepository;
     private final LayoutBlockService layoutBlockService;
     private final TenantAuditService tenantAuditService;
+    private final LayoutMutationGuard mutationGuard;
 
     public WarehouseLayoutService(
             WarehouseLayoutRepository layoutRepository,
             LayoutBlockRepository layoutBlockRepository,
             BlockTemplateRepository blockTemplateRepository,
             LayoutBlockService layoutBlockService,
-            TenantAuditService tenantAuditService) {
+            TenantAuditService tenantAuditService,
+            LayoutMutationGuard mutationGuard) {
         this.layoutRepository = layoutRepository;
         this.layoutBlockRepository = layoutBlockRepository;
         this.blockTemplateRepository = blockTemplateRepository;
         this.layoutBlockService = layoutBlockService;
         this.tenantAuditService = tenantAuditService;
+        this.mutationGuard = mutationGuard;
     }
 
     @Transactional(readOnly = true)
@@ -156,8 +160,10 @@ public class WarehouseLayoutService {
             return;
         }
 
-        // Deactivate the currently active layout, if any
-        layoutRepository.findByIsActiveTrue().ifPresent(current -> {
+        // Check for inventory/count-session blockers before switching, then deactivate current layout
+        java.util.Optional<WarehouseLayout> currentActive = layoutRepository.findByIsActiveTrue();
+        mutationGuard.checkActivateLayout(currentActive.map(WarehouseLayout::getId).orElse(null));
+        currentActive.ifPresent(current -> {
             current.setIsActive(false);
             saveLayout(current);
         });

@@ -1,6 +1,7 @@
 package com.warehouse.warehouse_platform.tenant.warehouse.block;
 
 import com.warehouse.warehouse_platform.tenant.audit.TenantAuditService;
+import com.warehouse.warehouse_platform.tenant.warehouse.common.LayoutMutationGuard;
 import com.warehouse.warehouse_platform.tenant.warehouse.common.WarehouseManagementException;
 import com.warehouse.warehouse_platform.tenant.warehouse.layout.WarehouseLayoutRepository;
 import com.warehouse.warehouse_platform.tenant.warehouse.locationkind.WarehouseLocationKind;
@@ -29,18 +30,21 @@ public class LayoutBlockService {
     private final WarehouseLayoutRepository layoutRepository;
     private final TenantAuditService tenantAuditService;
     private final WarehouseLocationKindService warehouseLocationKindService;
+    private final LayoutMutationGuard mutationGuard;
 
     public LayoutBlockService(
             LayoutBlockRepository layoutBlockRepository,
             BlockTemplateRepository blockTemplateRepository,
             WarehouseLayoutRepository layoutRepository,
             TenantAuditService tenantAuditService,
-            WarehouseLocationKindService warehouseLocationKindService) {
+            WarehouseLocationKindService warehouseLocationKindService,
+            LayoutMutationGuard mutationGuard) {
         this.layoutBlockRepository = layoutBlockRepository;
         this.blockTemplateRepository = blockTemplateRepository;
         this.layoutRepository = layoutRepository;
         this.tenantAuditService = tenantAuditService;
         this.warehouseLocationKindService = warehouseLocationKindService;
+        this.mutationGuard = mutationGuard;
     }
 
     /**
@@ -76,6 +80,7 @@ public class LayoutBlockService {
             LayoutBlock parent = loadBlock(parentId);
             assertBelongsToLayout(parent, layoutId);
         }
+        mutationGuard.checkAddChildToBlock(parentId);
 
         int resolvedPosition = resolvePosition(layoutId, parentId, null, position);
         WarehouseLocationKind defaultLocationKind = warehouseLocationKindService.getDefaultLocationKind();
@@ -131,6 +136,7 @@ public class LayoutBlockService {
             LayoutBlock parent = loadBlock(parentId);
             assertBelongsToLayout(parent, layoutId);
         }
+        mutationGuard.checkAddChildToBlock(parentId);
 
         int resolvedPosition = resolvePosition(layoutId, parentId, null, position);
         shiftPositions(layoutId, parentId, resolvedPosition, count, null);
@@ -301,6 +307,12 @@ public class LayoutBlockService {
         UUID parentId = block.getParentId();
         int position = block.getPosition();
 
+        List<LayoutBlock> allBlocks = layoutBlockRepository.findByLayoutIdOrderByParentIdAscPositionAsc(layoutId);
+        Map<UUID, List<LayoutBlock>> childrenByParentId = buildChildrenByParentId(allBlocks);
+        Set<UUID> subtreeIds = new HashSet<>();
+        expandSubtreeIds(childrenByParentId, blockId, subtreeIds);
+        mutationGuard.checkRemoveBlock(subtreeIds);
+
         layoutBlockRepository.delete(block);
 
         // Close the gap in the sibling list
@@ -333,6 +345,7 @@ public class LayoutBlockService {
             assertBelongsToLayout(targetParent, layoutId);
             assertNotDescendant(layoutId, sourceBlockId, targetParentId);
         }
+        mutationGuard.checkAddChildToBlock(targetParentId);
 
         List<LayoutBlock> allBlocks = layoutBlockRepository.findByLayoutIdOrderByParentIdAscPositionAsc(layoutId);
         Map<UUID, List<LayoutBlock>> childrenByParentId = buildChildrenByParentId(allBlocks);
