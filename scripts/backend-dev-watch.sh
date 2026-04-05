@@ -16,6 +16,7 @@ POLL_INTERVAL="${BACKEND_WATCH_INTERVAL_SECONDS:-1}"
 : "${SECURITY_AUTH_REFRESH_COOKIE_DOMAIN:=}"
 : "${SECURITY_JWT_PRIVATE_KEY:=file:src/test/resources/keys/jwt-private.pem}"
 : "${SECURITY_JWT_PUBLIC_KEY:=file:src/test/resources/keys/jwt-public.pem}"
+: "${GEOSERVER_URL:=http://localhost:8600/geoserver}"
 
 export SPRING_PROFILES_ACTIVE
 export SPRING_DATASOURCE_URL
@@ -29,6 +30,7 @@ export SECURITY_AUTH_REFRESH_COOKIE_SECURE
 export SECURITY_AUTH_REFRESH_COOKIE_DOMAIN
 export SECURITY_JWT_PRIVATE_KEY
 export SECURITY_JWT_PUBLIC_KEY
+export GEOSERVER_URL
 
 if [ "${PWD##*/}" != "backend" ]; then
   if [ -d "./backend" ]; then
