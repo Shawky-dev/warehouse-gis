@@ -69,6 +69,8 @@ export const TENANT_PERMISSIONS = {
   COUNTING_VOID: "tenant.counting.void",
   GIS_FLOOR_PLAN_VIEW: "gis.floorplan.view",
   GIS_FLOOR_PLAN_MANAGE: "gis.floorplan.manage",
+  GIS_ZONES_VIEW: "gis.zones.view",
+  GIS_ZONES_MANAGE: "gis.zones.manage",
 } as const;
 
 export type LandlordPermission = (typeof LANDLORD_PERMISSIONS)[keyof typeof LANDLORD_PERMISSIONS];

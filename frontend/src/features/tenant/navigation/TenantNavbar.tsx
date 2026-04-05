@@ -17,6 +17,7 @@ import {
   PackageMinus,
   Map,
   Globe,
+  Layers,
   SlidersHorizontal,
   List,
   ScanBarcode,
@@ -91,6 +92,7 @@ export function TenantNavbar() {
   const canViewAudit = hasPermission(TENANT_PERMISSIONS.AUDIT_VIEW);
   const canViewInventory = hasPermission(TENANT_PERMISSIONS.INVENTORY_VIEW);
   const canViewGisFloorPlans = hasPermission(TENANT_PERMISSIONS.GIS_FLOOR_PLAN_VIEW);
+  const canViewGisZones = hasPermission(TENANT_PERMISSIONS.GIS_ZONES_VIEW);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const { navigateFromResult } = useScanNavigation(normalizedSlug);
   const canViewReceipts = hasPermission(TENANT_PERMISSIONS.RECEIPTS_VIEW);
@@ -179,6 +181,15 @@ export function TenantNavbar() {
                   label: t("tenant.nav.gisMap"),
                   icon: Globe,
                 },
+                ...(canViewGisZones
+                  ? [
+                    {
+                      to: PATHS.TENANT.gisZones(normalizedSlug),
+                      label: t("tenant.nav.gisZones"),
+                      icon: Layers,
+                    },
+                  ]
+                  : []),
               ],
             },
           ]
@@ -284,6 +295,7 @@ export function TenantNavbar() {
       canViewDispatches,
       canViewCounting,
       canViewGisFloorPlans,
+      canViewGisZones,
       canViewWarehouse,
       normalizedSlug,
       t,

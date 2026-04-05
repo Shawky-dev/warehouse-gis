@@ -25,6 +25,7 @@ public class InventoryLedgerExceptionHandler {
                 .body(new ZoneViolationResponse(
                         exception.getCode(),
                         exception.getMessage(),
+                        exception.getViolationAction(),
                         exception.getViolatedZone(),
                         exception.getSuggestedZones()));
     }
@@ -49,6 +50,7 @@ public class InventoryLedgerExceptionHandler {
     public record ZoneViolationResponse(
             String error,
             String message,
+            String violationAction,
             GisZoneViolationException.ZoneSummary violatedZone,
             java.util.List<GisZoneViolationException.ZoneSummary> suggestedZones) {
     }

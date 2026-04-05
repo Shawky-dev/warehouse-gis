@@ -43,6 +43,7 @@ export const PATHS = {
     COUNT_SESSIONS_PATTERN: "/:tenantSlug/count-sessions",
     GIS_FLOOR_PLANS_PATTERN: "/:tenantSlug/gis/floor-plans",
     GIS_MAP_PATTERN: "/:tenantSlug/gis/map",
+    GIS_ZONES_PATTERN: "/:tenantSlug/gis/zones",
     root: (tenantSlug: string) => `/${tenantSlug}`,
     authLogin: (tenantSlug: string) => `/${tenantSlug}/auth/login`,
     products: (tenantSlug: string) => `/${tenantSlug}/products`,
@@ -66,5 +67,6 @@ export const PATHS = {
     countSessions: (tenantSlug: string) => `/${tenantSlug}/count-sessions`,
     gisFloorPlans: (tenantSlug: string) => `/${tenantSlug}/gis/floor-plans`,
     gisMap: (tenantSlug: string) => `/${tenantSlug}/gis/map`,
+    gisZones: (tenantSlug: string) => `/${tenantSlug}/gis/zones`,
   },
 };

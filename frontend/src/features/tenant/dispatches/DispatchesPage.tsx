@@ -18,6 +18,9 @@ import {
 import { getDocumentMovements, getLocationLookups, getProductLookups, getStock } from "@/features/tenant/api/inventoryApi";
 import type { MovementResult, ProductLookupItem, LocationLookupItem } from "@/features/tenant/types/inventory";
 import type { DispatchDetail, DispatchListItem, DispatchStatus } from "@/features/tenant/types/dispatches";
+import { isZoneViolationError } from "@/features/gis/zones/zonesApi";
+import type { ZoneViolationError } from "@/features/gis/zones/zonesApi";
+import { ZoneViolationBanner } from "@/shared/components/ZoneViolationBanner";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
@@ -87,6 +90,7 @@ export default function DispatchesPage() {
     const [selectedDispatchId, setSelectedDispatchId] = useState<string | null>(null);
     const [detailLoading, setDetailLoading] = useState(false);
     const [detailError, setDetailError] = useState<string | null>(null);
+    const [zoneViolationError, setZoneViolationError] = useState<ZoneViolationError | null>(null);
     const [detail, setDetail] = useState<DispatchDetail | null>(null);
 
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -275,6 +279,7 @@ export default function DispatchesPage() {
         if (!selectedDispatchId) {
             setDetail(null);
             setDetailError(null);
+            setZoneViolationError(null);
             return;
         }
         void loadDispatchDetail(selectedDispatchId);
@@ -433,6 +438,23 @@ export default function DispatchesPage() {
         try {
             const updated = await postDispatch(slug, detail.id);
             setIsPostConfirmOpen(false);
+            setZoneViolationError(null);
+            setDetail(updated);
+            await loadDispatches(0);
+        } catch (error) {
+            if (isZoneViolationError(error)) {
+                setZoneViolationError(error.response.data);
+            } else {
+                setDetailError(extractDispatchErrorMessage(error, t("dispatches.actionFailed")));
+            }
+        }
+    }
+
+    async function handlePostDispatchOverride() {
+        if (!detail) return;
+        try {
+            const updated = await postDispatch(slug, detail.id, true);
+            setZoneViolationError(null);
             setDetail(updated);
             await loadDispatches(0);
         } catch (error) {
@@ -511,6 +533,7 @@ export default function DispatchesPage() {
                 </div>
 
                 {detailError ? <p className="text-sm text-destructive">{detailError}</p> : null}
+                <ZoneViolationBanner error={zoneViolationError} onOverride={handlePostDispatchOverride} />
 
                 <Card>
                     <CardHeader>

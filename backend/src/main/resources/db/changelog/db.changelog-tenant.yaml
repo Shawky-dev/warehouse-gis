@@ -223,3 +223,17 @@ databaseChangeLog:
         - sqlFile:
             path: db/migration/tenant/V32__seed_gis_floor_plan_permissions.sql
             relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-gis-zone-fields-33
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V33__add_zone_fields_and_buffer_zones.sql
+            relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-gis-zone-redesign-34
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V34__redesign_zone_tables.sql
+            relativeToChangelogFile: false

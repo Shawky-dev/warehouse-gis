@@ -20,6 +20,9 @@ import { getDocumentMovements, getLocationLookups, getProductLookups } from "@/f
 import type { MovementResult, ProductLookupItem, LocationLookupItem } from "@/features/tenant/types/inventory";
 import type { SupplierResult } from "@/features/tenant/types/f0";
 import type { ReceiptDetail, ReceiptLine, ReceiptListItem, ReceiptStatus } from "@/features/tenant/types/receipts";
+import { isZoneViolationError } from "@/features/gis/zones/zonesApi";
+import type { ZoneViolationError } from "@/features/gis/zones/zonesApi";
+import { ZoneViolationBanner } from "@/shared/components/ZoneViolationBanner";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
@@ -95,6 +98,7 @@ export default function ReceiptsPage() {
     const [invalidReceiptId, setInvalidReceiptId] = useState<string | null>(null);
     const [detailLoading, setDetailLoading] = useState(false);
     const [detailError, setDetailError] = useState<string | null>(null);
+    const [zoneViolationError, setZoneViolationError] = useState<ZoneViolationError | null>(null);
     const [detail, setDetail] = useState<ReceiptDetail | null>(null);
 
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -223,6 +227,7 @@ export default function ReceiptsPage() {
         if (!selectedReceiptId) {
             setDetail(null);
             setDetailError(null);
+            setZoneViolationError(null);
             return;
         }
         void loadReceiptDetail(selectedReceiptId);
@@ -400,6 +405,24 @@ export default function ReceiptsPage() {
         try {
             const updated = await postReceipt(slug, detail.id);
             setIsPostConfirmOpen(false);
+            setZoneViolationError(null);
+            setDetail(updated);
+            await loadReceipts(0);
+        } catch (error) {
+            setIsPostConfirmOpen(false);
+            if (isZoneViolationError(error)) {
+                setZoneViolationError(error.response.data);
+            } else {
+                setDetailError(extractReceiptErrorMessage(error, t("receipts.actionFailed")));
+            }
+        }
+    }
+
+    async function handlePostReceiptOverride() {
+        if (!detail) return;
+        try {
+            const updated = await postReceipt(slug, detail.id, true);
+            setZoneViolationError(null);
             setDetail(updated);
             await loadReceipts(0);
         } catch (error) {
@@ -478,6 +501,7 @@ export default function ReceiptsPage() {
                 </div>
 
                 {detailError ? <p className="text-sm text-destructive">{detailError}</p> : null}
+                <ZoneViolationBanner error={zoneViolationError} onOverride={handlePostReceiptOverride} />
 
                 <Card>
                     <CardHeader>

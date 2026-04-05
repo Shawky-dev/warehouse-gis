@@ -11,7 +11,7 @@ import EsriMap from "@arcgis/core/Map.js";
 import SimpleFillSymbol from "@arcgis/core/symbols/SimpleFillSymbol.js";
 import TextSymbol from "@arcgis/core/symbols/TextSymbol.js";
 import MapView from "@arcgis/core/views/MapView.js";
-import Sketch from "@arcgis/core/widgets/Sketch.js";
+import SketchViewModel from "@arcgis/core/widgets/Sketch/SketchViewModel.js";
 import { getTemplateColor } from "./templateColors";
 import type { ExistingPolygon, EditorTemplate } from "./useEditorState";
 
@@ -76,7 +76,7 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
   ) {
     const containerRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<MapView | null>(null);
-    const sketchRef = useRef<Sketch | null>(null);
+    const sketchRef = useRef<SketchViewModel | null>(null);
     const layersRef = useRef<Map<string, GraphicsLayer>>(new Map());
     const mediaLayerRef = useRef<MediaLayer | null>(null);
     const lastCreatedGraphicRef = useRef<Graphic | null>(null);
@@ -178,10 +178,9 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
               : undefined;
 
             if (initialLayer) {
-              const sketch = new Sketch({
+              const sketch = new SketchViewModel({
                 layer: initialLayer,
                 view,
-                availableCreateTools: ["polygon", "rectangle"],
               });
 
               sketch.on("create", (event) => {
@@ -206,7 +205,6 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
                 }
               });
 
-              view.ui.add(sketch, "top-right");
               sketchRef.current = sketch;
             }
           }

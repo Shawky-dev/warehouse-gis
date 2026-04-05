@@ -26,7 +26,7 @@ public class GeoServerProvisioningService {
 
   private static final String DATASTORE_NAME = "warehouse_postgis";
   private static final String LAYER_GROUP_NAME = "floorplan";
-  private static final String BUFFER_ZONES_LAYER = "buffer_zones";
+  private static final String ZONES_LAYER = "gis_zones";
 
   private final RestTemplate geoServerRestTemplate;
   private final GeoServerProperties props;
@@ -72,11 +72,11 @@ public class GeoServerProvisioningService {
     layerEntries.sort(Comparator.comparingInt(LayerEntry::depth));
     List<String> orderedSlugs = new ArrayList<>(layerEntries.stream().map(LayerEntry::slug).toList());
 
-    // Publish buffer zones table as an overlay on top of all floor plan layers.
-    publishTableLayer(workspaceName, tenantSlug, BUFFER_ZONES_LAYER, "gis_buffer_zones");
-    createOrReplaceBufferZoneStyle(workspaceName);
-    assignDefaultStyle(workspaceName, BUFFER_ZONES_LAYER);
-    orderedSlugs.add(BUFFER_ZONES_LAYER);
+    // Publish zones table as an overlay on top of all floor plan layers.
+    publishTableLayer(workspaceName, tenantSlug, ZONES_LAYER, "gis_zones");
+    createOrReplaceZoneStyle(workspaceName);
+    assignDefaultStyle(workspaceName, ZONES_LAYER);
+    orderedSlugs.add(ZONES_LAYER);
 
     createOrReplaceLayerGroup(workspaceName, orderedSlugs);
   }
@@ -419,9 +419,9 @@ public class GeoServerProvisioningService {
         """.formatted(layerSlug, stroke, strokeWidth, maxScaleDenominator, fontSize, fontWeight, anchorPointY);
   }
 
-  // ─── Buffer zone SLD (red semi-transparent crosshatch fill) ──────────────
+  // ─── Zone SLD (semi-transparent fill with name label) ───────────────────
 
-  private void createOrReplaceBufferZoneStyle(String workspaceName) {
+  private void createOrReplaceZoneStyle(String workspaceName) {
     String sld = """
         <?xml version="1.0" encoding="UTF-8"?>
         <StyledLayerDescriptor version="1.0.0"
@@ -430,17 +430,17 @@ public class GeoServerProvisioningService {
           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
           xsi:schemaLocation="http://www.opengis.net/sld StyledLayerDescriptor.xsd">
           <NamedLayer>
-            <Name>buffer_zones</Name>
+            <Name>gis_zones</Name>
             <UserStyle>
               <FeatureTypeStyle>
                 <Rule>
                   <PolygonSymbolizer>
                     <Fill>
-                      <CssParameter name="fill">#d32f2f</CssParameter>
-                      <CssParameter name="fill-opacity">0.20</CssParameter>
+                      <CssParameter name="fill">#1565c0</CssParameter>
+                      <CssParameter name="fill-opacity">0.15</CssParameter>
                     </Fill>
                     <Stroke>
-                      <CssParameter name="stroke">#b71c1c</CssParameter>
+                      <CssParameter name="stroke">#0d47a1</CssParameter>
                       <CssParameter name="stroke-width">1.5</CssParameter>
                       <CssParameter name="stroke-dasharray">6 3</CssParameter>
                     </Stroke>
@@ -448,7 +448,7 @@ public class GeoServerProvisioningService {
                 </Rule>
                 <Rule>
                   <TextSymbolizer>
-                    <Label><ogc:PropertyName>label</ogc:PropertyName></Label>
+                    <Label><ogc:PropertyName>name</ogc:PropertyName></Label>
                     <Font>
                       <CssParameter name="font-size">10</CssParameter>
                       <CssParameter name="font-weight">bold</CssParameter>
@@ -461,7 +461,7 @@ public class GeoServerProvisioningService {
                         </AnchorPoint>
                       </PointPlacement>
                     </LabelPlacement>
-                    <Fill><CssParameter name="fill">#b71c1c</CssParameter></Fill>
+                    <Fill><CssParameter name="fill">#0d47a1</CssParameter></Fill>
                     <VendorOption name="conflictResolution">true</VendorOption>
                   </TextSymbolizer>
                 </Rule>
@@ -471,25 +471,25 @@ public class GeoServerProvisioningService {
         </StyledLayerDescriptor>
         """;
 
-    String url = props.url() + "/rest/workspaces/" + workspaceName + "/styles?name=" + BUFFER_ZONES_LAYER;
+    String url = props.url() + "/rest/workspaces/" + workspaceName + "/styles?name=" + ZONES_LAYER;
     try {
       RequestEntity<String> req = RequestEntity
           .post(URI.create(url))
           .header("Content-Type", "application/vnd.ogc.sld+xml")
           .body(sld);
       geoServerRestTemplate.exchange(req, Void.class);
-      log.debug("GeoServer buffer zone SLD created: {}/{}", workspaceName, BUFFER_ZONES_LAYER);
+      log.debug("GeoServer zone SLD created: {}/{}", workspaceName, ZONES_LAYER);
     } catch (HttpClientErrorException e) {
       if (e.getStatusCode() == HttpStatusCode.valueOf(409)) {
-        String putUrl = props.url() + "/rest/workspaces/" + workspaceName + "/styles/" + BUFFER_ZONES_LAYER;
+        String putUrl = props.url() + "/rest/workspaces/" + workspaceName + "/styles/" + ZONES_LAYER;
         RequestEntity<String> putReq = RequestEntity
             .put(URI.create(putUrl))
             .header("Content-Type", "application/vnd.ogc.sld+xml")
             .body(sld);
         geoServerRestTemplate.exchange(putReq, Void.class);
-        log.debug("GeoServer buffer zone SLD updated: {}/{}", workspaceName, BUFFER_ZONES_LAYER);
+        log.debug("GeoServer zone SLD updated: {}/{}", workspaceName, ZONES_LAYER);
       } else {
-        log.warn("GeoServer buffer zone SLD creation failed [{}]: {}", e.getStatusCode(), e.getMessage());
+        log.warn("GeoServer zone SLD creation failed [{}]: {}", e.getStatusCode(), e.getMessage());
       }
     }
   }

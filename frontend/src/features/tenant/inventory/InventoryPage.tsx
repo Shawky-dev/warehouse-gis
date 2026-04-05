@@ -28,6 +28,9 @@ import type {
   StockEntry,
   ProductLookupItem,
 } from "@/features/tenant/types/inventory";
+import { isZoneViolationError } from "@/features/gis/zones/zonesApi";
+import type { ZoneViolationError } from "@/features/gis/zones/zonesApi";
+import { ZoneViolationBanner } from "@/shared/components/ZoneViolationBanner";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
@@ -144,6 +147,13 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
   const [opSubmitting, setOpSubmitting] = useState(false);
   const [opSuccess, setOpSuccess] = useState<string | null>(null);
   const [opError, setOpError] = useState<string | null>(null);
+  const [opZoneViolation, setOpZoneViolation] = useState<ZoneViolationError | null>(null);
+  // Snapshot of the last submitted form payload — used to retry with override
+  const [lastOpPayload, setLastOpPayload] = useState<
+    | { kind: "receive"; payload: Parameters<typeof receiveStock>[1] }
+    | { kind: "transfer"; payload: Parameters<typeof transferStock>[1] }
+    | null
+  >(null);
 
   const [movementFilters, setMovementFilters] = useState<{
     productId: string;
@@ -504,6 +514,9 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
     setOpForm(DEFAULT_OPERATION_FORM);
     setOpSuccess(null);
     setOpError(null);
+    setOpZoneViolation(null);
+    setLastOpPayload(null);
+    setOpError(null);
   }
 
   function switchOperation(nextOperation: Operation) {
@@ -541,27 +554,33 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
     setOpSubmitting(true);
     setOpError(null);
     setOpSuccess(null);
+    setOpZoneViolation(null);
+    setLastOpPayload(null);
 
     try {
       if (operation === "receive") {
-        await receiveStock(slug, {
+        const payload = {
           locationId: opForm.locationId,
           productId: opForm.productId,
           qty: opForm.qty,
           lotNumber: selectedOpProduct?.trackLot ? opForm.lotNumber || null : null,
           expiryDate: selectedOpProduct?.trackExpiry ? opForm.expiryDate || null : null,
           notes: opForm.notes || null,
-        });
+        };
+        setLastOpPayload({ kind: "receive", payload });
+        await receiveStock(slug, payload);
         setOpSuccess(t("inventory.ops.successReceive"));
       } else if (operation === "transfer") {
-        await transferStock(slug, {
+        const payload = {
           fromLocationId: opForm.fromLocationId,
           toLocationId: opForm.toLocationId,
           productId: opForm.productId,
           qty: opForm.qty,
           lotNumber: selectedOpProduct?.trackLot ? opForm.lotNumber || null : null,
           notes: opForm.notes || null,
-        });
+        };
+        setLastOpPayload({ kind: "transfer", payload });
+        await transferStock(slug, payload);
         setOpSuccess(t("inventory.ops.successTransfer"));
       } else {
         const normalizedQty = Number.parseFloat(opForm.qty || "0");
@@ -585,7 +604,11 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
         }
       }
     } catch (error) {
-      setOpError(extractInventoryErrorMessage(error, t("inventory.ops.failed")));
+      if (isZoneViolationError(error)) {
+        setOpZoneViolation(error.response.data);
+      } else {
+        setOpError(extractInventoryErrorMessage(error, t("inventory.ops.failed")));
+      }
     } finally {
       setOpSubmitting(false);
     }
@@ -1057,6 +1080,30 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
 
                 {opError ? <p className="text-sm text-destructive md:col-span-2">{opError}</p> : null}
                 {opSuccess ? <p className="text-sm text-green-700 md:col-span-2">{opSuccess}</p> : null}
+                {opZoneViolation ? (
+                  <div className="md:col-span-2">
+                    <ZoneViolationBanner
+                      error={opZoneViolation}
+                      onOverride={async () => {
+                        if (!lastOpPayload) return;
+                        try {
+                          setOpZoneViolation(null);
+                          if (lastOpPayload.kind === "receive") {
+                            await receiveStock(slug, lastOpPayload.payload, true);
+                          } else {
+                            await transferStock(slug, lastOpPayload.payload, true);
+                          }
+                          setOpSuccess(t(lastOpPayload.kind === "receive" ? "inventory.ops.successReceive" : "inventory.ops.successTransfer"));
+                          setOpForm(DEFAULT_OPERATION_FORM);
+                          setLastOpPayload(null);
+                          if (canView) void loadStock(stockFilters);
+                        } catch (err) {
+                          setOpError(extractInventoryErrorMessage(err, t("inventory.ops.failed")));
+                        }
+                      }}
+                    />
+                  </div>
+                ) : null}
 
                 <div className="flex flex-wrap gap-2 md:col-span-2">
                   <Button type="submit" disabled={opSubmitting || !hasSelectableLocations}>

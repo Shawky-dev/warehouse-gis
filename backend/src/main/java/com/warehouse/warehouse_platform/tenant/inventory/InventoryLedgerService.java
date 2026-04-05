@@ -78,7 +78,6 @@ public class InventoryLedgerService {
         Product product = loadProduct(productId);
         UUID categoryId = product.getCategory() != null ? product.getCategory().getId() : null;
         gisZoneValidationService.assertLocationAllowsProduct(locationId, categoryId);
-        gisZoneValidationService.assertNotInBufferZone(locationId);
         String normalizedLotNumber = normalizeOptional(lotNumber);
 
         StockMovement movement = StockMovement.builder()
@@ -144,7 +143,6 @@ public class InventoryLedgerService {
         Product product = loadProduct(productId);
         UUID categoryId = product.getCategory() != null ? product.getCategory().getId() : null;
         gisZoneValidationService.assertLocationAllowsProduct(toLocationId, categoryId);
-        gisZoneValidationService.assertNotInBufferZone(toLocationId);
         String normalizedLotNumber = normalizeOptional(lotNumber);
         String normalizedReasonCode = normalizeOptional(reasonCode);
         assertSufficientStock(fromLocationId, product, normalizedLotNumber, qty);

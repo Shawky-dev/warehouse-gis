@@ -68,14 +68,22 @@ public class SchemaBasedMultiTenantConnectionProvider implements MultiTenantConn
     public Connection getConnection(String tenantIdentifier) throws SQLException {
         String schema = resolveSchema(tenantIdentifier);
         Connection connection = getAnyConnection();
-        connection.setSchema(schema);
+        // Use raw SQL so we can include 'public' alongside the tenant schema;
+        // connection.setSchema() only sets the single schema, dropping 'public'
+        // from the search_path and making PostGIS functions (ST_Contains etc.)
+        // unreachable.
+        try (var stmt = connection.createStatement()) {
+            stmt.execute("SET search_path TO " + schema + ", public");
+        }
         log.debug("Get connection for tenant {} using schema {}", tenantIdentifier, schema);
         return connection;
     }
 
     @Override
     public void releaseConnection(String tenantIdentifier, Connection connection) throws SQLException {
-        connection.setSchema(bootstrapSchema);
+        try (var stmt = connection.createStatement()) {
+            stmt.execute("SET search_path TO " + bootstrapSchema + ", public");
+        }
         releaseAnyConnection(connection);
         log.debug("Release connection for tenant {}", tenantIdentifier);
     }
@@ -101,7 +109,8 @@ public class SchemaBasedMultiTenantConnectionProvider implements MultiTenantConn
     }
 
     private String resolveSchema(String tenantIdentifier) {
-        if (tenantIdentifier == null || tenantIdentifier.isBlank() || BOOTSTRAP_TENANT.equalsIgnoreCase(tenantIdentifier)) {
+        if (tenantIdentifier == null || tenantIdentifier.isBlank()
+                || BOOTSTRAP_TENANT.equalsIgnoreCase(tenantIdentifier)) {
             return bootstrapSchema;
         }
 
@@ -139,7 +148,8 @@ public class SchemaBasedMultiTenantConnectionProvider implements MultiTenantConn
         }
 
         tenantSchemas.entrySet().stream()
-                .sorted(Map.Entry.comparingByValue((a, b) -> Long.compare(a.lastAccessEpochMillis, b.lastAccessEpochMillis)))
+                .sorted(Map.Entry
+                        .comparingByValue((a, b) -> Long.compare(a.lastAccessEpochMillis, b.lastAccessEpochMillis)))
                 .limit(overflow)
                 .map(Map.Entry::getKey)
                 .toList()

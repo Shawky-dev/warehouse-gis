@@ -107,20 +107,22 @@ export async function getMovementsByProduct(
 
 export async function receiveStock(
   tenantSlug: string,
-  payload: ReceiveRequest
+  payload: ReceiveRequest,
+  override = false
 ): Promise<MovementResult> {
   const res = await api.post<MovementResult>(`${basePath(tenantSlug)}/receive`, payload, {
-    headers: headers(tenantSlug),
+    headers: { ...headers(tenantSlug), ...(override ? { "X-Zone-Override": "true" } : {}) },
   });
   return res.data;
 }
 
 export async function transferStock(
   tenantSlug: string,
-  payload: TransferRequest
+  payload: TransferRequest,
+  override = false
 ): Promise<TransferResult> {
   const res = await api.post<TransferResult>(`${basePath(tenantSlug)}/transfer`, payload, {
-    headers: headers(tenantSlug),
+    headers: { ...headers(tenantSlug), ...(override ? { "X-Zone-Override": "true" } : {}) },
   });
   return res.data;
 }

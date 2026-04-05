@@ -75,9 +75,9 @@ export async function removeLine(tenantSlug: string, dispatchId: string, lineId:
     });
 }
 
-export async function postDispatch(tenantSlug: string, id: string): Promise<DispatchDetail> {
+export async function postDispatch(tenantSlug: string, id: string, override = false): Promise<DispatchDetail> {
     const res = await api.post<DispatchDetail>(`${basePath(tenantSlug)}/${id}/post`, undefined, {
-        headers: headers(tenantSlug),
+        headers: { ...headers(tenantSlug), ...(override ? { "X-Zone-Override": "true" } : {}) },
     });
     return res.data;
 }

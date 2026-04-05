@@ -14,6 +14,7 @@ import DispatchesPage from "@/features/tenant/dispatches/DispatchesPage";
 import CountSessionsPage from "@/features/tenant/counting/CountSessionsPage";
 import FloorPlansPage from "@/features/gis/floorplans/FloorPlansPage";
 import WarehouseMapPage from "@/features/gis/viewer/WarehouseMapPage";
+import ZoneManagementPage from "@/features/gis/zones/ZoneManagementPage";
 import { RequirePermission } from "@/features/auth/guards/RequirePermission";
 import { RequireAnyPermission } from "@/features/auth/guards/RequireAnyPermission";
 import { TENANT_PERMISSIONS } from "@/features/auth/shared/permissions";
@@ -171,6 +172,14 @@ export const tenantRoutes = [
     element: (
       <RequirePermission permission={TENANT_PERMISSIONS.GIS_FLOOR_PLAN_VIEW}>
         <WarehouseMapPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: PATHS.TENANT.GIS_ZONES_PATTERN,
+    element: (
+      <RequirePermission permission={TENANT_PERMISSIONS.GIS_ZONES_VIEW}>
+        <ZoneManagementPage />
       </RequirePermission>
     ),
   },
