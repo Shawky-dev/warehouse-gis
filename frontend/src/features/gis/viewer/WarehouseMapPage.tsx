@@ -10,6 +10,7 @@ import { useFloorPlanApi } from "../floorplans/useFloorPlanApi";
 import { useEditorState } from "../floorplans/useEditorState";
 import { WarehouseMapView } from "../floorplans/WarehouseMapView";
 import { ViewerLayerPanel } from "./ViewerLayerPanel";
+import { LocationInspectPanel } from "./LocationInspectPanel";
 
 export default function WarehouseMapPage() {
   const { t } = useI18n();
@@ -24,6 +25,8 @@ export default function WarehouseMapPage() {
     gisBlockId: string;
     templateName: string;
     label: string;
+    layoutBlockId: string;
+    positionPath: string;
   } | null>(null);
   const [visibilityOverrides, setVisibilityOverrides] = useState<Record<string, boolean>>({});
   const [svgVisible, setSvgVisible] = useState(true);
@@ -115,13 +118,33 @@ export default function WarehouseMapPage() {
                   selectedGisBlockId={selectedPolygon?.gisBlockId}
                   onPolygonSelect={(gisBlockId, templateName, label) => {
                     if (gisBlockId && templateName && label) {
-                      setSelectedPolygon({ gisBlockId, templateName, label });
+                      const ep = existingPolygons.find((p) => p.gisBlockId === gisBlockId);
+                      setSelectedPolygon({
+                        gisBlockId,
+                        templateName,
+                        label,
+                        layoutBlockId: ep?.layoutBlockId ?? "",
+                        positionPath: ep?.positionPath ?? "",
+                      });
                     } else {
                       setSelectedPolygon(null);
                     }
                   }}
                 />
               </div>
+              {selectedPolygon && (
+                <div className="w-72 shrink-0">
+                  <LocationInspectPanel
+                    key={selectedPolygon.gisBlockId}
+                    slug={slug}
+                    layoutBlockId={selectedPolygon.layoutBlockId}
+                    templateName={selectedPolygon.templateName}
+                    label={selectedPolygon.label}
+                    positionPath={selectedPolygon.positionPath}
+                    onClose={() => setSelectedPolygon(null)}
+                  />
+                </div>
+              )}
             </div>
           ) : null}
         </CardContent>

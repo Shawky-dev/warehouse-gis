@@ -1094,5 +1094,12 @@ export const arMessages: Record<keyof typeof enMessages, string> = {
   "gis.viewer.goToFloorPlans": "الذهاب إلى مخططات الطابق",
   "gis.viewer.selectedTitle": "الكتلة المحددة",
   "gis.viewer.layerPanelTitle": "الطبقات",
+  "gis.viewer.inspect.stockTitle": "المخزون",
+  "gis.viewer.inspect.loading": "جارٍ تحميل المخزون…",
+  "gis.viewer.inspect.empty": "لا يوجد مخزون في هذا الموقع.",
+  "gis.viewer.inspect.lot": "دفعة",
+  "gis.viewer.inspect.product": "منتج",
+  "gis.viewer.inspect.products": "منتجات",
+  "gis.viewer.inspect.units": "وحدة إجمالاً",
   "tenant.nav.gisMap": "خريطة المستودع",
 };

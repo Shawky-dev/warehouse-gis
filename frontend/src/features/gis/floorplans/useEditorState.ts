@@ -14,6 +14,7 @@ export interface ExistingPolygon {
   gisBlockId: string;
   templateName: string;
   label: string;
+  positionPath: string;
   rings: number[][][];
   layoutBlockId: string;
   depth: number;
@@ -80,6 +81,7 @@ export function useEditorState() {
             properties?: {
               templateName?: string;
               label?: string;
+              positionPath?: string;
               id?: string;
               layoutBlockId?: string;
               depth?: number;
@@ -91,6 +93,7 @@ export function useEditorState() {
           gisBlockId: feature.id ?? feature.properties?.id ?? "",
           templateName: feature.properties?.templateName ?? templateName,
           label: feature.properties?.label ?? "",
+          positionPath: feature.properties?.positionPath ?? "",
           rings: feature.geometry?.coordinates ?? [],
           layoutBlockId: feature.properties?.layoutBlockId ?? "",
           depth: feature.properties?.depth ?? 0,

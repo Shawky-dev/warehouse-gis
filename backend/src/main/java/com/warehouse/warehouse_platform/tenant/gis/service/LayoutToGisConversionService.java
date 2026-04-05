@@ -211,6 +211,7 @@ public class LayoutToGisConversionService {
             sb.append("\"templateName\":\"").append(jsonEscape(templateName)).append("\"");
             sb.append(",\"label\":\"").append(jsonEscape(block.getLabel())).append("\"");
             sb.append(",\"positionPath\":\"").append(jsonEscape(block.getPositionPath())).append("\"");
+            sb.append(",\"layoutBlockId\":\"").append(block.getLayoutBlockId()).append("\"");
             sb.append(",\"depth\":").append(block.getDepth());
             sb.append("}}");
         }
