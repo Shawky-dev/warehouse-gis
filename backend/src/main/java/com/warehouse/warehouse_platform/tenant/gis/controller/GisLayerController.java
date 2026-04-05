@@ -61,8 +61,10 @@ public class GisLayerController {
     // ── Leaf location GeoJSON ─────────────────────────────────────────────────
 
     /**
-     * Returns a GeoJSON FeatureCollection of all drawn leaf-level location polygons.
-     * A leaf is a gis_blocks row whose layoutBlockId has no children in layout_blocks.
+     * Returns a GeoJSON FeatureCollection of all drawn leaf-level location
+     * polygons.
+     * A leaf is a gis_blocks row whose layoutBlockId has no children in
+     * layout_blocks.
      * Properties: locationId (= layoutBlockId), label, positionPath
      */
     @GetMapping(value = "/locations/geojson", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -97,7 +99,8 @@ public class GisLayerController {
 
     /**
      * Updates zone_type and allowed_category_ids on a Zone gis_blocks row.
-     * Body: { "zoneType": "REFRIGERATED", "allowedCategoryIds": ["uuid1", "uuid2"] }
+     * Body: { "zoneType": "REFRIGERATED", "allowedCategoryIds": ["uuid1", "uuid2"]
+     * }
      */
     @PatchMapping("/zones/{gisBlockId}")
     @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).GIS_ZONES_MANAGE)")
@@ -138,7 +141,8 @@ public class GisLayerController {
     private String buildZoneFeatureCollection(List<GisBlock> zones) {
         StringBuilder sb = new StringBuilder("{\"type\":\"FeatureCollection\",\"features\":[");
         for (int i = 0; i < zones.size(); i++) {
-            if (i > 0) sb.append(",");
+            if (i > 0)
+                sb.append(",");
             GisBlock z = zones.get(i);
             sb.append("{\"type\":\"Feature\"");
             sb.append(",\"id\":\"").append(z.getId()).append("\"");
@@ -160,7 +164,8 @@ public class GisLayerController {
     private String buildLocationFeatureCollection(List<GisBlock> leaves) {
         StringBuilder sb = new StringBuilder("{\"type\":\"FeatureCollection\",\"features\":[");
         for (int i = 0; i < leaves.size(); i++) {
-            if (i > 0) sb.append(",");
+            if (i > 0)
+                sb.append(",");
             GisBlock b = leaves.get(i);
             sb.append("{\"type\":\"Feature\"");
             sb.append(",\"id\":\"").append(b.getId()).append("\"");
@@ -178,7 +183,8 @@ public class GisLayerController {
     private String buildBufferZoneFeatureCollection(List<GisBufferZone> zones) {
         StringBuilder sb = new StringBuilder("{\"type\":\"FeatureCollection\",\"features\":[");
         for (int i = 0; i < zones.size(); i++) {
-            if (i > 0) sb.append(",");
+            if (i > 0)
+                sb.append(",");
             GisBufferZone bz = zones.get(i);
             sb.append("{\"type\":\"Feature\"");
             sb.append(",\"id\":\"").append(bz.getId()).append("\"");
@@ -196,11 +202,13 @@ public class GisLayerController {
     }
 
     private static String polygonToGeoJson(Polygon polygon) {
-        if (polygon == null) return "null";
+        if (polygon == null)
+            return "null";
         StringBuilder sb = new StringBuilder("{\"type\":\"Polygon\",\"coordinates\":[[");
         Coordinate[] coords = polygon.getCoordinates();
         for (int i = 0; i < coords.length; i++) {
-            if (i > 0) sb.append(",");
+            if (i > 0)
+                sb.append(",");
             sb.append("[").append(coords[i].x).append(",").append(coords[i].y).append("]");
         }
         sb.append("]]}");
@@ -208,10 +216,12 @@ public class GisLayerController {
     }
 
     private static String uuidArrayToJson(UUID[] ids) {
-        if (ids == null || ids.length == 0) return "[]";
+        if (ids == null || ids.length == 0)
+            return "[]";
         StringBuilder sb = new StringBuilder("[");
         for (int i = 0; i < ids.length; i++) {
-            if (i > 0) sb.append(",");
+            if (i > 0)
+                sb.append(",");
             sb.append("\"").append(ids[i]).append("\"");
         }
         sb.append("]");
@@ -219,7 +229,8 @@ public class GisLayerController {
     }
 
     private static String jsonEscape(String s) {
-        if (s == null) return "";
+        if (s == null)
+            return "";
         return s.replace("\\", "\\\\")
                 .replace("\"", "\\\"")
                 .replace("\n", "\\n")

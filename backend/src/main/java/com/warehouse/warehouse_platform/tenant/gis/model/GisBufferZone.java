@@ -45,7 +45,8 @@ public class GisBufferZone {
 
     @PrePersist
     public void prePersist() {
-        if (id == null) id = UUID.randomUUID();
+        if (id == null)
+            id = UUID.randomUUID();
         createdAt = Instant.now();
     }
 }
