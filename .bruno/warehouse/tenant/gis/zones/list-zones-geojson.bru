@@ -1,0 +1,49 @@
+meta {
+  name: list-zones-geojson
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{URL}}/{{TENANT_SLUG}}/gis/zones/geojson
+  body: none
+  auth: bearer
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Returns a GeoJSON FeatureCollection of all Zone polygons drawn on this tenant's floor plan.
+
+  Required permission: gis.zones.view (ADMIN, MANAGER)
+
+  Response: GeoJSON FeatureCollection
+  {
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "id": "<gisBlockId>",
+        "geometry": { "type": "Polygon", "coordinates": [[[lon, lat], ...]] },
+        "properties": {
+          "gisBlockId": "<uuid>",
+          "layoutBlockId": "<uuid>",
+          "label": "Zone A",
+          "zoneType": "REFRIGERATED",
+          "allowedCategoryIds": ["<uuid>", "<uuid>"]
+        }
+      }
+    ]
+  }
+}

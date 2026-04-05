@@ -1,5 +1,6 @@
 package com.warehouse.warehouse_platform.tenant.inventory;
 
+import com.warehouse.warehouse_platform.tenant.gis.GisZoneViolationException;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -18,6 +19,16 @@ public class InventoryLedgerExceptionHandler {
                 .body(new ErrorResponse(exception.getCode(), exception.getMessage()));
     }
 
+    @ExceptionHandler(GisZoneViolationException.class)
+    public ResponseEntity<ZoneViolationResponse> handleZoneViolation(GisZoneViolationException exception) {
+        return ResponseEntity.status(Objects.requireNonNull(exception.getStatus()))
+                .body(new ZoneViolationResponse(
+                        exception.getCode(),
+                        exception.getMessage(),
+                        exception.getViolatedZone(),
+                        exception.getSuggestedZones()));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleMethodArgumentNotValid(MethodArgumentNotValidException exception) {
         FieldError fieldError = exception.getBindingResult().getFieldError();
@@ -33,5 +44,12 @@ public class InventoryLedgerExceptionHandler {
     }
 
     public record ErrorResponse(String code, String message) {
+    }
+
+    public record ZoneViolationResponse(
+            String error,
+            String message,
+            GisZoneViolationException.ZoneSummary violatedZone,
+            java.util.List<GisZoneViolationException.ZoneSummary> suggestedZones) {
     }
 }

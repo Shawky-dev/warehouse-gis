@@ -1,5 +1,6 @@
 package com.warehouse.warehouse_platform.tenant.inventory;
 
+import com.warehouse.warehouse_platform.tenant.gis.service.GisZoneValidationService;
 import com.warehouse.warehouse_platform.tenant.product.Product;
 import com.warehouse.warehouse_platform.tenant.product.ProductRepository;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplate;
@@ -44,18 +45,21 @@ public class InventoryLedgerService {
     private final ProductRepository productRepository;
     private final WarehouseLayoutRepository warehouseLayoutRepository;
     private final BlockTemplateRepository blockTemplateRepository;
+    private final GisZoneValidationService gisZoneValidationService;
 
     public InventoryLedgerService(
             StockMovementRepository movementRepository,
             LayoutBlockRepository layoutBlockRepository,
             ProductRepository productRepository,
             WarehouseLayoutRepository warehouseLayoutRepository,
-            BlockTemplateRepository blockTemplateRepository) {
+            BlockTemplateRepository blockTemplateRepository,
+            GisZoneValidationService gisZoneValidationService) {
         this.movementRepository = movementRepository;
         this.layoutBlockRepository = layoutBlockRepository;
         this.productRepository = productRepository;
         this.warehouseLayoutRepository = warehouseLayoutRepository;
         this.blockTemplateRepository = blockTemplateRepository;
+        this.gisZoneValidationService = gisZoneValidationService;
     }
 
     @Transactional
@@ -72,6 +76,9 @@ public class InventoryLedgerService {
         validateQtyPositive(qty, "receive qty must be positive");
         assertSelectableLocation(locationId);
         Product product = loadProduct(productId);
+        UUID categoryId = product.getCategory() != null ? product.getCategory().getId() : null;
+        gisZoneValidationService.assertLocationAllowsProduct(locationId, categoryId);
+        gisZoneValidationService.assertNotInBufferZone(locationId);
         String normalizedLotNumber = normalizeOptional(lotNumber);
 
         StockMovement movement = StockMovement.builder()
@@ -135,6 +142,9 @@ public class InventoryLedgerService {
         assertSelectableLocation(fromLocationId);
         assertSelectableLocation(toLocationId);
         Product product = loadProduct(productId);
+        UUID categoryId = product.getCategory() != null ? product.getCategory().getId() : null;
+        gisZoneValidationService.assertLocationAllowsProduct(toLocationId, categoryId);
+        gisZoneValidationService.assertNotInBufferZone(toLocationId);
         String normalizedLotNumber = normalizeOptional(lotNumber);
         String normalizedReasonCode = normalizeOptional(reasonCode);
         assertSufficientStock(fromLocationId, product, normalizedLotNumber, qty);

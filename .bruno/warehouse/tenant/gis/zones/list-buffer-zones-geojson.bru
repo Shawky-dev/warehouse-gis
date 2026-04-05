@@ -1,0 +1,49 @@
+meta {
+  name: list-buffer-zones-geojson
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{URL}}/{{TENANT_SLUG}}/gis/buffer-zones/geojson
+  body: none
+  auth: bearer
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Returns a GeoJSON FeatureCollection of all buffer zone polygons from gis_buffer_zones.
+  Buffer zones are imported from ArcGIS Pro analysis (hazmatous / flammable material exclusion areas).
+
+  Required permission: gis.zones.view (ADMIN, MANAGER)
+
+  Response: GeoJSON FeatureCollection
+  {
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "id": "<uuid>",
+        "geometry": { "type": "Polygon", "coordinates": [[[lon, lat], ...]] },
+        "properties": {
+          "id": "<uuid>",
+          "label": "Flammables Buffer",
+          "materialType": "FLAMMABLE",
+          "bufferDistanceM": 5.00
+        }
+      }
+    ]
+  }
+}

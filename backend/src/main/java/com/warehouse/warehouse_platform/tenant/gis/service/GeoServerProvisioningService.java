@@ -26,6 +26,7 @@ public class GeoServerProvisioningService {
 
   private static final String DATASTORE_NAME = "warehouse_postgis";
   private static final String LAYER_GROUP_NAME = "floorplan";
+  private static final String BUFFER_ZONES_LAYER = "buffer_zones";
 
   private final RestTemplate geoServerRestTemplate;
   private final GeoServerProperties props;
@@ -69,7 +70,14 @@ public class GeoServerProvisioningService {
     // Order layers by depth ascending: lowest depth (biggest areas) renders first
     // so it sits at the bottom of the WMS composite image.
     layerEntries.sort(Comparator.comparingInt(LayerEntry::depth));
-    List<String> orderedSlugs = layerEntries.stream().map(LayerEntry::slug).toList();
+    List<String> orderedSlugs = new ArrayList<>(layerEntries.stream().map(LayerEntry::slug).toList());
+
+    // Publish buffer zones table as an overlay on top of all floor plan layers.
+    publishTableLayer(workspaceName, tenantSlug, BUFFER_ZONES_LAYER, "gis_buffer_zones");
+    createOrReplaceBufferZoneStyle(workspaceName);
+    assignDefaultStyle(workspaceName, BUFFER_ZONES_LAYER);
+    orderedSlugs.add(BUFFER_ZONES_LAYER);
+
     createOrReplaceLayerGroup(workspaceName, orderedSlugs);
   }
 
@@ -222,6 +230,37 @@ public class GeoServerProvisioningService {
           }
         }
         """.formatted(layerSlug, layerSlug, templateName, layerSlug, sql);
+  }
+
+  // ─── Table-based feature type (full table, no SQL view filter) ───────────
+
+  private void publishTableLayer(String workspaceName, String tenantSlug, String layerName, String tableName) {
+    String url = props.url() + "/rest/workspaces/" + workspaceName
+        + "/datastores/" + DATASTORE_NAME + "/featuretypes";
+    String body = """
+        {
+          "featureType": {
+            "name": "%s",
+            "nativeName": "%s",
+            "title": "%s",
+            "srs": "EPSG:4326",
+            "enabled": true
+          }
+        }
+        """.formatted(layerName, tableName, tableName.replace("_", " "));
+    try {
+      geoServerRestTemplate.postForEntity(url, body, Void.class);
+      log.debug("GeoServer table layer published: {}/{}/{}", workspaceName, DATASTORE_NAME, layerName);
+    } catch (RestClientResponseException e) {
+      if (isAlreadyExistsResponse(e)) {
+        log.debug("GeoServer table layer already exists, skipping: {}/{}", workspaceName, layerName);
+      } else {
+        log.warn("GeoServer table layer publish failed for [{}] [{}]: {}", layerName, e.getStatusCode(),
+            e.getMessage());
+        throw GeoServerProvisioningException.serverError(
+            "Failed to publish GeoServer table layer '%s': %s".formatted(layerName, e.getMessage()));
+      }
+    }
   }
 
   // ─── SLD style provisioning ───────────────────────────────────────────────
@@ -378,6 +417,81 @@ public class GeoServerProvisioningService {
           </NamedLayer>
         </StyledLayerDescriptor>
         """.formatted(layerSlug, stroke, strokeWidth, maxScaleDenominator, fontSize, fontWeight, anchorPointY);
+  }
+
+  // ─── Buffer zone SLD (red semi-transparent crosshatch fill) ──────────────
+
+  private void createOrReplaceBufferZoneStyle(String workspaceName) {
+    String sld = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <StyledLayerDescriptor version="1.0.0"
+          xmlns="http://www.opengis.net/sld"
+          xmlns:ogc="http://www.opengis.net/ogc"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://www.opengis.net/sld StyledLayerDescriptor.xsd">
+          <NamedLayer>
+            <Name>buffer_zones</Name>
+            <UserStyle>
+              <FeatureTypeStyle>
+                <Rule>
+                  <PolygonSymbolizer>
+                    <Fill>
+                      <CssParameter name="fill">#d32f2f</CssParameter>
+                      <CssParameter name="fill-opacity">0.20</CssParameter>
+                    </Fill>
+                    <Stroke>
+                      <CssParameter name="stroke">#b71c1c</CssParameter>
+                      <CssParameter name="stroke-width">1.5</CssParameter>
+                      <CssParameter name="stroke-dasharray">6 3</CssParameter>
+                    </Stroke>
+                  </PolygonSymbolizer>
+                </Rule>
+                <Rule>
+                  <TextSymbolizer>
+                    <Label><ogc:PropertyName>label</ogc:PropertyName></Label>
+                    <Font>
+                      <CssParameter name="font-size">10</CssParameter>
+                      <CssParameter name="font-weight">bold</CssParameter>
+                    </Font>
+                    <LabelPlacement>
+                      <PointPlacement>
+                        <AnchorPoint>
+                          <AnchorPointX>0.5</AnchorPointX>
+                          <AnchorPointY>0.5</AnchorPointY>
+                        </AnchorPoint>
+                      </PointPlacement>
+                    </LabelPlacement>
+                    <Fill><CssParameter name="fill">#b71c1c</CssParameter></Fill>
+                    <VendorOption name="conflictResolution">true</VendorOption>
+                  </TextSymbolizer>
+                </Rule>
+              </FeatureTypeStyle>
+            </UserStyle>
+          </NamedLayer>
+        </StyledLayerDescriptor>
+        """;
+
+    String url = props.url() + "/rest/workspaces/" + workspaceName + "/styles?name=" + BUFFER_ZONES_LAYER;
+    try {
+      RequestEntity<String> req = RequestEntity
+          .post(URI.create(url))
+          .header("Content-Type", "application/vnd.ogc.sld+xml")
+          .body(sld);
+      geoServerRestTemplate.exchange(req, Void.class);
+      log.debug("GeoServer buffer zone SLD created: {}/{}", workspaceName, BUFFER_ZONES_LAYER);
+    } catch (HttpClientErrorException e) {
+      if (e.getStatusCode() == HttpStatusCode.valueOf(409)) {
+        String putUrl = props.url() + "/rest/workspaces/" + workspaceName + "/styles/" + BUFFER_ZONES_LAYER;
+        RequestEntity<String> putReq = RequestEntity
+            .put(URI.create(putUrl))
+            .header("Content-Type", "application/vnd.ogc.sld+xml")
+            .body(sld);
+        geoServerRestTemplate.exchange(putReq, Void.class);
+        log.debug("GeoServer buffer zone SLD updated: {}/{}", workspaceName, BUFFER_ZONES_LAYER);
+      } else {
+        log.warn("GeoServer buffer zone SLD creation failed [{}]: {}", e.getStatusCode(), e.getMessage());
+      }
+    }
   }
 
   // ─── WMS layer group (floor plan composite) ───────────────────────────────

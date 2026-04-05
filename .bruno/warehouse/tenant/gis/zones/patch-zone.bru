@@ -1,0 +1,66 @@
+meta {
+  name: patch-zone
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{URL}}/{{TENANT_SLUG}}/gis/zones/{{GIS_BLOCK_ID}}
+  body: json
+  auth: bearer
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+vars:pre-request {
+  GIS_BLOCK_ID: 00000000-0000-0000-0000-000000000000
+}
+
+body:json {
+  {
+    "zoneType": "REFRIGERATED",
+    "allowedCategoryIds": []
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Updates the zone_type and allowed_category_ids of a Zone gis_blocks row.
+  Only works on rows where template_name = 'Zone'; returns 400 otherwise.
+
+  Required permission: gis.zones.manage (ADMIN, MANAGER)
+
+  Path param:
+    GIS_BLOCK_ID — the UUID of the gis_blocks row (not the layoutBlockId)
+
+  Body:
+  {
+    "zoneType": "REFRIGERATED",        // string or null
+    "allowedCategoryIds": ["<uuid>"]   // list of ProductCategory UUIDs; empty = no restriction
+  }
+
+  Common zoneType values (not enforced as enum server-side):
+    REFRIGERATED, DRY_STORAGE, HAZMAT, RECEIVING_DOCK, GENERAL
+
+  Response 200:
+  {
+    "gisBlockId": "<uuid>",
+    "layoutBlockId": "<uuid>",
+    "label": "Zone A",
+    "zoneType": "REFRIGERATED",
+    "allowedCategoryIds": ["<uuid>"]
+  }
+
+  Error 400: if gisBlockId does not belong to a Zone block
+  Error 404: if gisBlockId does not exist
+}

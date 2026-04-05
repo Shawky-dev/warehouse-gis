@@ -50,6 +50,12 @@ public class GisBlock {
     @Column(name = "centroid_geom", columnDefinition = "GEOMETRY(Point, 4326)")
     private Point centroidGeom;
 
+    @Column(name = "zone_type", length = 50)
+    private String zoneType;
+
+    @Column(name = "allowed_category_ids", columnDefinition = "uuid[]")
+    private UUID[] allowedCategoryIds;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

@@ -62,6 +62,8 @@ public final class TenantPermissions {
     public static final String GIS_FLOOR_PLAN_MANAGE = "gis.floorplan.manage";
     public static final String GIS_LAYOUT_REGENERATE = "gis.layout.regenerate";
     public static final String GIS_LAYOUT_VIEW = "gis.layout.view";
+    public static final String GIS_ZONES_VIEW = "gis.zones.view";
+    public static final String GIS_ZONES_MANAGE = "gis.zones.manage";
 
     private TenantPermissions() {
     }
