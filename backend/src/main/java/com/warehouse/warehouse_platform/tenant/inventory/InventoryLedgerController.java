@@ -125,7 +125,8 @@ public class InventoryLedgerController {
                         @RequestParam(defaultValue = "50") @Min(1) @Max(200) int size,
                         Authentication authentication) {
                 tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
-                return ResponseEntity.ok(inventoryLedgerService.getMovements(productId, locationId, sourceDocumentId, movementType, page, size));
+                return ResponseEntity.ok(inventoryLedgerService.getMovements(productId, locationId, sourceDocumentId,
+                                movementType, page, size));
         }
 
         @GetMapping("/movements/by-location/{locationId}")
@@ -161,6 +162,7 @@ public class InventoryLedgerController {
         public ResponseEntity<InventoryLedgerService.MovementResult> receive(
                         @PathVariable String tenantSlug,
                         @Valid @RequestBody ReceiveRequest request,
+                        @org.springframework.web.bind.annotation.RequestHeader(value = "X-Zone-Override", defaultValue = "false") boolean zoneOverride,
                         Authentication authentication) {
                 tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
                 String actor = authentication.getName();
@@ -173,7 +175,8 @@ public class InventoryLedgerController {
                                 request.notes(),
                                 null,
                                 null,
-                                actor));
+                                actor,
+                                zoneOverride));
         }
 
         @PostMapping("/transfer")
@@ -181,6 +184,7 @@ public class InventoryLedgerController {
         public ResponseEntity<InventoryLedgerService.TransferResult> transfer(
                         @PathVariable String tenantSlug,
                         @Valid @RequestBody TransferRequest request,
+                        @org.springframework.web.bind.annotation.RequestHeader(value = "X-Zone-Override", defaultValue = "false") boolean zoneOverride,
                         Authentication authentication) {
                 tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
                 String actor = authentication.getName();
@@ -192,7 +196,8 @@ public class InventoryLedgerController {
                                 request.lotNumber(),
                                 request.notes(),
                                 null,
-                                actor));
+                                actor,
+                                zoneOverride));
         }
 
         @PostMapping("/adjust")

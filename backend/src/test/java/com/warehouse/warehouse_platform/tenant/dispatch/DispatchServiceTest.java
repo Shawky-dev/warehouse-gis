@@ -190,7 +190,8 @@ class DispatchServiceTest {
                 "Void dispatch NO_REF (" + DISPATCH_ID + ")",
                 DISPATCH_ID,
                 "VOID_DISPATCH",
-                "actor");
+                "actor",
+                false);
         verify(inventoryLedgerService).receive(
                 LOCATION_ID,
                 PRODUCT_ID,
@@ -200,7 +201,8 @@ class DispatchServiceTest {
                 "Void dispatch NO_REF (" + DISPATCH_ID + ")",
                 DISPATCH_ID,
                 "VOID_DISPATCH",
-                "actor");
+                "actor",
+                false);
     }
 
     @Test
@@ -213,7 +215,7 @@ class DispatchServiceTest {
 
         assertEquals("CONFLICT", ex.getCode());
         assertEquals("Only posted dispatches can be voided", ex.getMessage());
-        verify(inventoryLedgerService, never()).receive(any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(inventoryLedgerService, never()).receive(any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     private DispatchDocument draftDispatch() {

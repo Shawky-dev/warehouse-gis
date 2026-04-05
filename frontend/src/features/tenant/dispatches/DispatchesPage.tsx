@@ -442,6 +442,7 @@ export default function DispatchesPage() {
             setDetail(updated);
             await loadDispatches(0);
         } catch (error) {
+            setIsPostConfirmOpen(false);
             if (isZoneViolationError(error)) {
                 setZoneViolationError(error.response.data);
             } else {

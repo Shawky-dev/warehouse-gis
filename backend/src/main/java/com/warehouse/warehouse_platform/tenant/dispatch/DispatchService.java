@@ -256,7 +256,8 @@ public class DispatchService {
                             line.getNotes()),
                     dispatchId,
                     VOID_REASON_CODE,
-                    normalizedActor);
+                    normalizedActor,
+                    false);
         }
 
         dispatch.setStatus(DispatchStatus.VOID);

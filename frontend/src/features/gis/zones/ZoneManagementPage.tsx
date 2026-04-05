@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Layers, PlusCircle, Upload, Shield, AlertTriangle, HelpCircle } from "lucide-react";
+import { Layers, PlusCircle, Upload, Shield, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Button } from "@/shared/components/ui/button";
 import { Badge } from "@/shared/components/ui/badge";
@@ -28,7 +28,6 @@ import type {
 const ACTION_ICON = {
     BLOCK: Shield,
     WARN: AlertTriangle,
-    CONFIRM: HelpCircle,
 } as const;
 
 export default function ZoneManagementPage() {

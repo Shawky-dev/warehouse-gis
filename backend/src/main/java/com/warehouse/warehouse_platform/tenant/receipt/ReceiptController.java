@@ -148,9 +148,10 @@ public class ReceiptController {
     public ResponseEntity<ReceiptService.ReceiptDetailResult> postReceipt(
             @PathVariable String tenantSlug,
             @PathVariable UUID receiptId,
+            @org.springframework.web.bind.annotation.RequestHeader(value = "X-Zone-Override", defaultValue = "false") boolean zoneOverride,
             Authentication authentication) {
         tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
-        return ResponseEntity.ok(receiptService.postReceipt(receiptId, authentication.getName()));
+        return ResponseEntity.ok(receiptService.postReceipt(receiptId, authentication.getName(), zoneOverride));
     }
 
     @GetMapping("/{receiptId}/movements")

@@ -42,7 +42,7 @@ public class GisZone {
     @Column(columnDefinition = "GEOMETRY(Polygon, 4326)", nullable = false)
     private Polygon geometry;
 
-    /** BLOCK | WARN | CONFIRM */
+    /** BLOCK | WARN */
     @Column(name = "violation_action", nullable = false, length = 20)
     private String violationAction;
 

@@ -74,7 +74,7 @@ class InventoryLedgerServiceTest {
         InventoryLedgerException ex = assertThrows(
                 InventoryLedgerException.class,
                 () -> service.receive(ROOT_LOCATION_ID, PRODUCT_ID, BigDecimal.ONE, null, null, null, null, null,
-                        "actor"));
+                        "actor", false));
 
         assertEquals("BAD_REQUEST", ex.getCode());
         assertEquals("Location is not selectable for inventory operations in the active layout", ex.getMessage());
@@ -110,7 +110,8 @@ class InventoryLedgerServiceTest {
                 null,
                 null,
                 null,
-                "actor");
+                "actor",
+                false);
 
         assertEquals("Shelf · 2", result.locationLabel());
         assertEquals("SKU-1", result.productSku());
@@ -124,7 +125,7 @@ class InventoryLedgerServiceTest {
         InventoryLedgerException ex = assertThrows(
                 InventoryLedgerException.class,
                 () -> service.transfer(LEAF_LOCATION_ID, OTHER_LEAF_LOCATION_ID, PRODUCT_ID, BigDecimal.ONE, null, null,
-                        null, "actor"));
+                        null, "actor", false));
 
         assertEquals("BAD_REQUEST", ex.getCode());
         assertEquals("Inventory operations require an active warehouse layout", ex.getMessage());
@@ -171,7 +172,8 @@ class InventoryLedgerServiceTest {
                         "LOT-B",
                         null,
                         null,
-                        "actor"));
+                        "actor",
+                        false));
 
         assertEquals("BAD_REQUEST", ex.getCode());
         assertTrue(ex.getMessage().contains("Insufficient stock"));
@@ -296,7 +298,8 @@ class InventoryLedgerServiceTest {
                 null,
                 sourceDocumentId,
                 null,
-                "actor");
+                "actor",
+                false);
 
         assertEquals(sourceDocumentId, result.sourceDocumentId());
     }

@@ -20,7 +20,7 @@ export interface ZoneRecord {
     id: string;
     name: string;
     description: string | null;
-    violationAction: "BLOCK" | "WARN" | "CONFIRM";
+    violationAction: "BLOCK" | "WARN";
     source: "MANUAL" | "ARCGIS_IMPORT";
     categoryRules: CategoryRule[];
     createdAt: string;
@@ -32,7 +32,7 @@ export interface ZoneRequest {
     description?: string | null;
     /** GeoJSON coordinates: [[[lon, lat], ...]] */
     coordinates?: number[][][];
-    violationAction: "BLOCK" | "WARN" | "CONFIRM";
+    violationAction: "BLOCK" | "WARN";
     source?: string;
     categoryRules: CategoryRule[];
 }
@@ -43,7 +43,7 @@ export interface ZoneFeatureProps {
     id: string;
     name: string;
     description: string | null;
-    violationAction: "BLOCK" | "WARN" | "CONFIRM";
+    violationAction: "BLOCK" | "WARN";
     source: "MANUAL" | "ARCGIS_IMPORT";
     categoryRules: CategoryRule[];
 }
@@ -69,7 +69,7 @@ export interface GeoJsonFeatureCollection<P> {
 export interface ZoneViolationError {
     error: "ZONE_VIOLATION";
     message: string;
-    violationAction: "BLOCK" | "WARN" | "CONFIRM";
+    violationAction: "BLOCK" | "WARN";
     violatedZone?: { id: string; name: string; violationAction: string };
     suggestedZones?: { id: string; name: string; violationAction: string }[];
 }

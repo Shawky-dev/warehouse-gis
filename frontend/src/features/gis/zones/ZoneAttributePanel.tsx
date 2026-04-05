@@ -45,7 +45,7 @@ export function ZoneAttributePanel({
     const [allCategories, setAllCategories] = useState<CategoryResult[]>([]);
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
-    const [violationAction, setViolationAction] = useState<"BLOCK" | "WARN" | "CONFIRM">("BLOCK");
+    const [violationAction, setViolationAction] = useState<"BLOCK" | "WARN">("BLOCK");
     const [categoryRules, setCategoryRules] = useState<Record<string, RuleType>>({});
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
@@ -210,7 +210,7 @@ export function ZoneAttributePanel({
                 <label className="text-xs font-medium">{t("gis.zones.violationAction")}</label>
                 <Select
                     value={violationAction}
-                    onValueChange={(v) => setViolationAction(v as "BLOCK" | "WARN" | "CONFIRM")}
+                    onValueChange={(v) => setViolationAction(v as "BLOCK" | "WARN")}
                     disabled={!canManage}
                 >
                     <SelectTrigger className="h-8 w-full text-xs">
@@ -219,7 +219,6 @@ export function ZoneAttributePanel({
                     <SelectContent>
                         <SelectItem value="BLOCK">{t("gis.zones.action.BLOCK")}</SelectItem>
                         <SelectItem value="WARN">{t("gis.zones.action.WARN")}</SelectItem>
-                        <SelectItem value="CONFIRM">{t("gis.zones.action.CONFIRM")}</SelectItem>
                     </SelectContent>
                 </Select>
                 <p className="text-[10px] text-muted-foreground">

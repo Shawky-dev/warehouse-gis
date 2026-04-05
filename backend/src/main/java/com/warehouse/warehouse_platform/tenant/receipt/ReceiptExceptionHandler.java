@@ -1,5 +1,6 @@
 package com.warehouse.warehouse_platform.tenant.receipt;
 
+import com.warehouse.warehouse_platform.tenant.gis.GisZoneViolationException;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -7,9 +8,22 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.util.Objects;
+
 @RestControllerAdvice(assignableTypes = ReceiptController.class)
 @SuppressWarnings("null")
 public class ReceiptExceptionHandler {
+
+    @ExceptionHandler(GisZoneViolationException.class)
+    public ResponseEntity<ZoneViolationResponse> handleZoneViolation(GisZoneViolationException exception) {
+        return ResponseEntity.status(Objects.requireNonNull(exception.getStatus()))
+                .body(new ZoneViolationResponse(
+                        exception.getCode(),
+                        exception.getMessage(),
+                        exception.getViolationAction(),
+                        exception.getViolatedZone(),
+                        exception.getSuggestedZones()));
+    }
 
     @ExceptionHandler(ReceiptManagementException.class)
     public ResponseEntity<ErrorResponse> handleReceiptException(ReceiptManagementException exception) {
@@ -35,5 +49,13 @@ public class ReceiptExceptionHandler {
     }
 
     public record ErrorResponse(String code, String message) {
+    }
+
+    public record ZoneViolationResponse(
+            String error,
+            String message,
+            String violationAction,
+            GisZoneViolationException.ZoneSummary violatedZone,
+            java.util.List<GisZoneViolationException.ZoneSummary> suggestedZones) {
     }
 }

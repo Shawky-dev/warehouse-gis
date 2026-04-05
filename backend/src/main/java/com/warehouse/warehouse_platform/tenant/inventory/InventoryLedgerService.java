@@ -72,12 +72,13 @@ public class InventoryLedgerService {
             String notes,
             UUID sourceDocumentId,
             String reasonCode,
-            String actor) {
+            String actor,
+            boolean zoneOverride) {
         validateQtyPositive(qty, "receive qty must be positive");
         assertSelectableLocation(locationId);
         Product product = loadProduct(productId);
         UUID categoryId = product.getCategory() != null ? product.getCategory().getId() : null;
-        gisZoneValidationService.assertLocationAllowsProduct(locationId, categoryId);
+        gisZoneValidationService.assertLocationAllowsProduct(locationId, categoryId, zoneOverride);
         String normalizedLotNumber = normalizeOptional(lotNumber);
 
         StockMovement movement = StockMovement.builder()
@@ -131,7 +132,8 @@ public class InventoryLedgerService {
             String lotNumber,
             String notes,
             String reasonCode,
-            String actor) {
+            String actor,
+            boolean zoneOverride) {
         validateQtyPositive(qty, "transfer qty must be positive");
 
         if (fromLocationId.equals(toLocationId)) {
@@ -142,7 +144,7 @@ public class InventoryLedgerService {
         assertSelectableLocation(toLocationId);
         Product product = loadProduct(productId);
         UUID categoryId = product.getCategory() != null ? product.getCategory().getId() : null;
-        gisZoneValidationService.assertLocationAllowsProduct(toLocationId, categoryId);
+        gisZoneValidationService.assertLocationAllowsProduct(toLocationId, categoryId, zoneOverride);
         String normalizedLotNumber = normalizeOptional(lotNumber);
         String normalizedReasonCode = normalizeOptional(reasonCode);
         assertSufficientStock(fromLocationId, product, normalizedLotNumber, qty);

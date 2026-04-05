@@ -8,8 +8,6 @@ import com.warehouse.warehouse_platform.tenant.gis.repository.GisZoneCategoryRul
 import com.warehouse.warehouse_platform.tenant.gis.repository.GisZoneRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.List;
 import java.util.Optional;
@@ -42,14 +40,14 @@ public class GisZoneValidationService {
      * <li>For each containing zone, if the category has a PROHIBITED rule →
      * violation</li>
      * <li>Violation action BLOCK → always throws</li>
-     * <li>Violation action WARN|CONFIRM → throws unless the current HTTP request
+     * <li>Violation action WARN → throws unless the current HTTP request
      * carries the {@code X-Zone-Override: true} header</li>
      * </ul>
      *
      * @throws GisZoneViolationException (HTTP 409) on unoverridable violation
      */
     @Transactional(readOnly = true)
-    public void assertLocationAllowsProduct(UUID locationId, UUID categoryId) {
+    public void assertLocationAllowsProduct(UUID locationId, UUID categoryId, boolean override) {
         if (categoryId == null)
             return;
 
@@ -65,12 +63,12 @@ public class GisZoneValidationService {
                     categoryId);
             if (rule.isPresent() && "PROHIBITED".equals(rule.get().getRuleType())) {
                 String action = zone.getViolationAction();
-                if ("BLOCK".equals(action) || !isZoneOverrideRequested()) {
+                if ("BLOCK".equals(action) || !override) {
                     List<GisZone> suggested = findSuggestedZones(categoryId, zones.stream()
                             .map(GisZone::getId).toList());
                     throw GisZoneViolationException.categoryProhibited(zone, suggested);
                 }
-                // WARN or CONFIRM with override header present — allow through
+                // WARN with override=true — allow through
             }
         }
     }
@@ -86,17 +84,5 @@ public class GisZoneValidationService {
                 .distinct()
                 .limit(3)
                 .toList();
-    }
-
-    private boolean isZoneOverrideRequested() {
-        try {
-            ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-            if (attrs == null)
-                return false;
-            String value = attrs.getRequest().getHeader("X-Zone-Override");
-            return "true".equalsIgnoreCase(value);
-        } catch (Exception e) {
-            return false;
-        }
     }
 }

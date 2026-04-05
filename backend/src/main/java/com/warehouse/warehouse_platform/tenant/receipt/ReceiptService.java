@@ -172,7 +172,7 @@ public class ReceiptService {
     }
 
     @Transactional
-    public ReceiptDetailResult postReceipt(UUID receiptId, String actor) {
+    public ReceiptDetailResult postReceipt(UUID receiptId, String actor, boolean zoneOverride) {
         String normalizedActor = requireActor(actor);
         ReceiptDocument receipt = loadReceipt(receiptId);
         if (receipt.getStatus() != ReceiptStatus.DRAFT) {
@@ -194,7 +194,8 @@ public class ReceiptService {
                     buildDocumentLineNote("Receipt", receipt.getReference(), receiptId, line.getNotes()),
                     receiptId,
                     null,
-                    normalizedActor);
+                    normalizedActor,
+                    zoneOverride);
         }
 
         receipt.setStatus(ReceiptStatus.POSTED);

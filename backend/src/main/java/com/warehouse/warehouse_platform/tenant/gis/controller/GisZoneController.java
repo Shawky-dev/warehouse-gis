@@ -314,7 +314,7 @@ public class GisZoneController {
             @NotBlank @Size(max = 200) String name,
             String description,
             List<List<List<Double>>> coordinates,
-            @NotBlank @Pattern(regexp = "BLOCK|WARN|CONFIRM") String violationAction,
+            @NotBlank @Pattern(regexp = "BLOCK|WARN") String violationAction,
             String source,
             List<CategoryRuleRequest> categoryRules) {
     }

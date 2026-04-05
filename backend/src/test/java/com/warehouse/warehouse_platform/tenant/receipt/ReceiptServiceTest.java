@@ -157,7 +157,7 @@ class ReceiptServiceTest {
         when(productRepository.findAllById(any())).thenReturn(List.of(activeProduct(true, false)));
         when(layoutBlockRepository.findAllById(any())).thenReturn(List.of(storageLeaf()));
 
-        service.postReceipt(RECEIPT_ID, "actor");
+        service.postReceipt(RECEIPT_ID, "actor", false);
 
         verify(inventoryLedgerService, times(2)).receive(
                 eq(LOCATION_ID),
@@ -168,7 +168,8 @@ class ReceiptServiceTest {
                 any(),
                 eq(RECEIPT_ID),
                 eq(null),
-                eq("actor"));
+                eq("actor"),
+                eq(false));
     }
 
     @Test
@@ -178,7 +179,7 @@ class ReceiptServiceTest {
 
         ReceiptManagementException ex = assertThrows(
                 ReceiptManagementException.class,
-                () -> service.postReceipt(RECEIPT_ID, "actor"));
+                () -> service.postReceipt(RECEIPT_ID, "actor", false));
 
         assertEquals("BAD_REQUEST", ex.getCode());
         assertEquals("Receipt must contain at least one line before posting", ex.getMessage());
@@ -190,7 +191,7 @@ class ReceiptServiceTest {
 
         ReceiptManagementException ex = assertThrows(
                 ReceiptManagementException.class,
-                () -> service.postReceipt(RECEIPT_ID, "actor"));
+                () -> service.postReceipt(RECEIPT_ID, "actor", false));
 
         assertEquals("CONFLICT", ex.getCode());
         assertEquals("Only draft receipts can be posted", ex.getMessage());
