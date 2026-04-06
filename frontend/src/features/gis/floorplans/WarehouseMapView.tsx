@@ -11,7 +11,7 @@ import EsriMap from "@arcgis/core/Map.js";
 import SimpleFillSymbol from "@arcgis/core/symbols/SimpleFillSymbol.js";
 import TextSymbol from "@arcgis/core/symbols/TextSymbol.js";
 import MapView from "@arcgis/core/views/MapView.js";
-import SketchViewModel from "@arcgis/core/widgets/Sketch/SketchViewModel.js";
+import { ArcgisSketchOverlay } from "../ArcgisSketchOverlay";
 import { getTemplateColor } from "./templateColors";
 import type { ExistingPolygon, EditorTemplate } from "./useEditorState";
 
@@ -76,7 +76,6 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
   ) {
     const containerRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<MapView | null>(null);
-    const sketchRef = useRef<SketchViewModel | null>(null);
     const layersRef = useRef<Map<string, GraphicsLayer>>(new Map());
     const mediaLayerRef = useRef<MediaLayer | null>(null);
     const lastCreatedGraphicRef = useRef<Graphic | null>(null);
@@ -87,6 +86,8 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
     const onPolygonCompleteRef = useRef(onPolygonComplete);
     const onPolygonSelectRef = useRef(onPolygonSelect);
     const onDrawModeChangeRef = useRef(onDrawModeChange);
+    const [sketchLayer, setSketchLayer] = useState<GraphicsLayer | null>(null);
+    const [sketchView, setSketchView] = useState<MapView | null>(null);
     const [renderError, setRenderError] = useState<string | null>(null);
 
     // Keep callback and active-template refs in sync with latest props
@@ -159,6 +160,7 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
         popupEnabled: false,
       });
       viewRef.current = view;
+      setSketchView(view);
 
       let cancelled = false;
 
@@ -168,46 +170,6 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
           await view.when();
           if (cancelled) return;
           await view.goTo(warehouseExtent.expand(1.02), { animate: false });
-
-          // Sketch widget — wired to the currently active template's layer
-          if (editorMode && layers.size > 0) {
-            const initialLayerName =
-              activeTemplateNameRef.current ?? templates?.[0]?.name;
-            const initialLayer = initialLayerName
-              ? layers.get(initialLayerName)
-              : undefined;
-
-            if (initialLayer) {
-              const sketch = new SketchViewModel({
-                layer: initialLayer,
-                view,
-              });
-
-              sketch.on("create", (event) => {
-                if (event.state === "complete") {
-                  const graphic = event.graphic;
-                  if (!graphic?.geometry) return;
-
-                  lastCreatedGraphicRef.current = graphic;
-                  const tplName = activeTemplateNameRef.current ?? "";
-                  const color = getTemplateColor(tplName);
-                  // Stamp the layer color onto the completed graphic
-                  graphic.symbol = new SimpleFillSymbol({
-                    color: color.fill,
-                    outline: { color: color.stroke, width: 2 },
-                  });
-                  const geomJson = graphic.geometry.toJSON() as {
-                    rings?: number[][][];
-                  };
-                  onPolygonCompleteRef.current?.(geomJson.rings ?? [], tplName);
-                  // Auto-switch to select mode after drawing
-                  onDrawModeChangeRef.current?.(false);
-                }
-              });
-
-              sketchRef.current = sketch;
-            }
-          }
 
           // Click to select / deselect existing polygons — active in both editor and viewer
           if (layers.size > 0) {
@@ -251,7 +213,8 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
 
       return () => {
         cancelled = true;
-        sketchRef.current = null;
+        setSketchView(null);
+        setSketchLayer(null);
         selectedGraphicRef.current = null;
         mediaLayerRef.current = null;
         view.destroy();
@@ -262,18 +225,14 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
 
     // ── Effect: switch Sketch's target layer when the active template changes ─
     useEffect(() => {
-      if (!sketchRef.current || !activeTemplateName) return;
-      const layer = layersRef.current.get(activeTemplateName);
-      if (layer) sketchRef.current.layer = layer;
-    }, [activeTemplateName]);
-
-    // ── Effect: cancel sketch when switching to select mode ───────────────────
-    useEffect(() => {
-      if (!sketchRef.current) return;
-      if (!isDrawMode) {
-        sketchRef.current.cancel();
+      if (!editorMode) {
+        setSketchLayer(null);
+        return;
       }
-    }, [isDrawMode]);
+
+      const nextLayerName = activeTemplateName ?? templates?.[0]?.name ?? null;
+      setSketchLayer(nextLayerName ? layersRef.current.get(nextLayerName) ?? null : null);
+    }, [activeTemplateName, editorMode, templates]);
 
     // ── Effect: toggle layer visibility ──────────────────────────────────────
     useEffect(() => {
@@ -422,6 +381,28 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
           className="w-full overflow-hidden rounded-md border"
           style={{ height: "600px" }}
         />
+        {editorMode ? (
+          <ArcgisSketchOverlay
+            active={Boolean(isDrawMode && sketchView && sketchLayer)}
+            className="absolute right-4 top-4 z-10 rounded-md border bg-background/95 shadow-sm"
+            layer={sketchLayer}
+            view={sketchView}
+            onCreateComplete={(graphic) => {
+              if (!graphic.geometry) return;
+
+              lastCreatedGraphicRef.current = graphic;
+              const tplName = activeTemplateNameRef.current ?? "";
+              const color = getTemplateColor(tplName);
+              graphic.symbol = new SimpleFillSymbol({
+                color: color.fill,
+                outline: { color: color.stroke, width: 2 },
+              });
+              const geomJson = graphic.geometry.toJSON() as { rings?: number[][][] };
+              onPolygonCompleteRef.current?.(geomJson.rings ?? [], tplName);
+              onDrawModeChangeRef.current?.(false);
+            }}
+          />
+        ) : null}
         {renderError ? (
           <div className="absolute inset-x-4 top-4 rounded-md border bg-background/95 px-3 py-2 text-sm text-destructive shadow-sm">
             {renderError}

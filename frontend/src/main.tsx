@@ -1,5 +1,6 @@
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
+import "@arcgis/map-components/components/arcgis-sketch";
 import App from "./app/App";
 import "./index.css";
 

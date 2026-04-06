@@ -11,6 +11,7 @@ import EsriMap from "@arcgis/core/Map.js";
 import SimpleFillSymbol from "@arcgis/core/symbols/SimpleFillSymbol.js";
 import TextSymbol from "@arcgis/core/symbols/TextSymbol.js";
 import MapView from "@arcgis/core/views/MapView.js";
+import { ArcgisSketchOverlay } from "../ArcgisSketchOverlay";
 import { getZoneColor } from "./zoneTypeColors";
 import type {
     GeoJsonFeatureCollection,
@@ -67,6 +68,8 @@ export function ZoneMapView({
     const selectedZoneIdRef = useRef<string | null | undefined>(selectedZoneId);
     const onZoneSelectRef = useRef(onZoneSelect);
     const onDeselectRef = useRef(onDeselect);
+    const [sketchLayer, setSketchLayer] = useState<GraphicsLayer | null>(null);
+    const [sketchView, setSketchView] = useState<MapView | null>(null);
     const [renderError, setRenderError] = useState<string | null>(null);
 
     useEffect(() => { onZoneSelectRef.current = onZoneSelect; }, [onZoneSelect]);
@@ -119,6 +122,7 @@ export function ZoneMapView({
             popupEnabled: false,
         });
         viewRef.current = view;
+        setSketchView(view);
 
         let cancelled = false;
 
@@ -168,6 +172,8 @@ export function ZoneMapView({
 
         return () => {
             cancelled = true;
+            setSketchLayer(null);
+            setSketchView(null);
             zoneLayerRef.current = null;
             locationLayerRef.current = null;
             selectedGraphicRef.current = null;
@@ -179,47 +185,13 @@ export function ZoneMapView({
     // ── Sketch (draw mode) ────────────────────────────────────────────────────
     useEffect(() => {
         if (!drawPending || !viewRef.current || !zoneLayerRef.current) return;
-        let cancelled = false;
-        let sketchWidget: import("@arcgis/core/widgets/Sketch/SketchViewModel.js").default | null = null;
-        let tempLayer: GraphicsLayer | null = null;
-
-        void (async () => {
-            const SketchModule = await import("@arcgis/core/widgets/Sketch/SketchViewModel.js");
-            if (cancelled || !viewRef.current) return;
-
-            tempLayer = new GraphicsLayer({ id: "sketch-temp" });
-            viewRef.current.map?.add(tempLayer);
-
-            sketchWidget = new SketchModule.default({
-                view: viewRef.current,
-                layer: tempLayer,
-            });
-            sketchWidget.create("polygon");
-
-            sketchWidget.on("create", (event) => {
-                if (event.state === "complete" && !cancelled && event.graphic) {
-                    const ring = (event.graphic.geometry as Polygon).rings;
-                    onDrawComplete?.(ring);
-                    cleanup();
-                } else if (event.state === "cancel" && !cancelled) {
-                    onDrawCancel?.();
-                    cleanup();
-                }
-            });
-        })();
-
-        function cleanup() {
-            if (sketchWidget && viewRef.current) {
-                sketchWidget.destroy();
-            }
-            if (tempLayer && viewRef.current) {
-                viewRef.current.map?.remove(tempLayer);
-            }
-        }
+        const tempLayer = new GraphicsLayer({ id: "sketch-temp" });
+        viewRef.current.map?.add(tempLayer);
+        setSketchLayer(tempLayer);
 
         return () => {
-            cancelled = true;
-            cleanup();
+            setSketchLayer(null);
+            viewRef.current?.map?.remove(tempLayer);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [drawPending]);
@@ -335,6 +307,17 @@ export function ZoneMapView({
     return (
         <div className="relative h-full w-full">
             <div ref={containerRef} className="h-full w-full overflow-hidden" />
+            <ArcgisSketchOverlay
+                active={Boolean(drawPending && sketchView && sketchLayer)}
+                className="absolute right-4 top-4 z-10 rounded-md border bg-background/95 shadow-sm"
+                layer={sketchLayer}
+                view={sketchView}
+                onCancel={onDrawCancel}
+                onCreateComplete={(graphic) => {
+                    const ring = (graphic.geometry as Polygon).rings;
+                    onDrawComplete?.(ring);
+                }}
+            />
             {renderError ? (
                 <div className="absolute inset-x-4 top-4 rounded-md border bg-background/95 px-3 py-2 text-sm text-destructive shadow-sm">
                     {renderError}

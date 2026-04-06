@@ -14,7 +14,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@arcgis/core": "^5.0.13",
+    "@arcgis/core": "^5.0.15",
+    "@arcgis/map-components": "^5.0.15",
     "@base-ui/react": "^1.2.0",
     "@fontsource-variable/noto-sans-arabic": "^5.2.10",
     "@fontsource-variable/outfit": "^5.2.8",
