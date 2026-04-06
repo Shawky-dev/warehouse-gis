@@ -13,7 +13,8 @@ import {
   softDeleteCategory,
   updateCategory,
 } from "@/features/tenant/api/f0Api";
-import type { CategoryResult } from "@/features/tenant/types/f0";
+import { listZoneTypes } from "@/features/tenant/api/zoneTypeApi";
+import type { CategoryResult, ZoneTypeResult } from "@/features/tenant/types/f0";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Input } from "@/shared/components/ui/input";
@@ -73,8 +74,13 @@ export default function TenantCategoriesPage() {
   const [editingCategory, setEditingCategory] = useState<CategoryResult | null>(null);
   const [formName, setFormName] = useState("");
   const [formDescription, setFormDescription] = useState("");
+  const [formCode, setFormCode] = useState("");
+  const [formDisplayName, setFormDisplayName] = useState("");
+  const [formRequiredZoneTypeId, setFormRequiredZoneTypeId] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  const [zoneTypes, setZoneTypes] = useState<ZoneTypeResult[]>([]);
 
   const [hardDeleteTarget, setHardDeleteTarget] = useState<CategoryResult | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -108,6 +114,10 @@ export default function TenantCategoriesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadCategories]);
 
+  useEffect(() => {
+    void listZoneTypes(slug, { active: true }).then((r) => setZoneTypes(r));
+  }, [slug]);
+
   const applyFilters = () => {
     setSearch(pendingSearch);
     setActiveFilter(pendingActive);
@@ -118,6 +128,9 @@ export default function TenantCategoriesPage() {
     setEditingCategory(null);
     setFormName("");
     setFormDescription("");
+    setFormCode("");
+    setFormDisplayName("");
+    setFormRequiredZoneTypeId("");
     setFormError(null);
     setIsFormOpen(true);
   };
@@ -126,6 +139,9 @@ export default function TenantCategoriesPage() {
     setEditingCategory(category);
     setFormName(category.name);
     setFormDescription(category.description ?? "");
+    setFormCode(category.code ?? "");
+    setFormDisplayName(category.displayName ?? "");
+    setFormRequiredZoneTypeId(category.requiredZoneTypeId ?? "");
     setFormError(null);
     setIsFormOpen(true);
   };
@@ -141,6 +157,9 @@ export default function TenantCategoriesPage() {
       const payload = {
         name: formName.trim(),
         description: formDescription.trim() || null,
+        code: formCode.trim() || null,
+        displayName: formDisplayName.trim() || null,
+        requiredZoneTypeId: formRequiredZoneTypeId || null,
       };
       if (editingCategory) {
         await updateCategory(slug, editingCategory.id, payload);
@@ -247,6 +266,7 @@ export default function TenantCategoriesPage() {
                   <tr className="border-b text-start">
                     <th className="py-2 pe-4 text-start font-medium">{t("categories.tableName")}</th>
                     <th className="py-2 pe-4 text-start font-medium">{t("categories.tableDescription")}</th>
+                    <th className="py-2 pe-4 text-start font-medium">Zone Type</th>
                     <th className="py-2 pe-4 text-start font-medium">{t("categories.tableStatus")}</th>
                     <th className="py-2 text-start font-medium">{t("categories.tableActions")}</th>
                   </tr>
@@ -256,6 +276,13 @@ export default function TenantCategoriesPage() {
                     <tr key={category.id} className="border-b last:border-0">
                       <td className="py-2 pe-4 font-medium">{category.name}</td>
                       <td className="py-2 pe-4 text-muted-foreground">{category.description ?? "—"}</td>
+                      <td className="py-2 pe-4">
+                        {category.requiredZoneTypeCode ? (
+                          <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs font-mono text-blue-700">
+                            {category.requiredZoneTypeCode}
+                          </span>
+                        ) : "—"}
+                      </td>
                       <td className="py-2 pe-4">
                         <span
                           className={
@@ -372,6 +399,37 @@ export default function TenantCategoriesPage() {
                 value={formDescription}
                 onChange={(e) => setFormDescription(e.target.value)}
               />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="category-code">{t("categories.codeLabel")}</Label>
+              <Input
+                id="category-code"
+                value={formCode}
+                onChange={(e) => setFormCode(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">{t("categories.codeHint")}</p>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="category-display-name">{t("categories.displayNameLabel")}</Label>
+              <Input
+                id="category-display-name"
+                value={formDisplayName}
+                onChange={(e) => setFormDisplayName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="category-zone-type">{t("categories.requiredZoneTypeLabel")}</Label>
+              <select
+                id="category-zone-type"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={formRequiredZoneTypeId}
+                onChange={(e) => setFormRequiredZoneTypeId(e.target.value)}
+              >
+                <option value="">{t("categories.requiredZoneTypePlaceholder")}</option>
+                {zoneTypes.map((zt) => (
+                  <option key={zt.id} value={zt.id}>{zt.code} — {zt.displayName}</option>
+                ))}
+              </select>
             </div>
             {formError ? <p className="text-xs text-destructive">{formError}</p> : null}
           </div>

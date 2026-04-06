@@ -16,7 +16,8 @@ import {
   softDeleteProduct,
   updateProduct,
 } from "@/features/tenant/api/f0Api";
-import type { CategoryResult, ProductResult, SupplierResult, UomResult } from "@/features/tenant/types/f0";
+import { listHazardTypes } from "@/features/tenant/api/hazardTypeApi";
+import type { CategoryResult, HazardTypeResult, ProductResult, SupplierResult, UomResult } from "@/features/tenant/types/f0";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Input } from "@/shared/components/ui/input";
@@ -72,6 +73,7 @@ export default function TenantProductsPage() {
   const [allUoms, setAllUoms] = useState<UomResult[]>([]);
   const [allSuppliers, setAllSuppliers] = useState<SupplierResult[]>([]);
   const [allCategories, setAllCategories] = useState<CategoryResult[]>([]);
+  const [allHazardTypes, setAllHazardTypes] = useState<HazardTypeResult[]>([]);
 
   const [pendingSearch, setPendingSearch] = useState("");
   const [pendingActive, setPendingActive] = useState<FilterActive>("all");
@@ -91,6 +93,7 @@ export default function TenantProductsPage() {
   const [formDescription, setFormDescription] = useState("");
   const [formBaseUomId, setFormBaseUomId] = useState("");
   const [formCategoryId, setFormCategoryId] = useState("");
+  const [formHazardTypeId, setFormHazardTypeId] = useState("");
   const [formTrackLot, setFormTrackLot] = useState(false);
   const [formTrackExpiry, setFormTrackExpiry] = useState(false);
   const [formSupplierIds, setFormSupplierIds] = useState<string[]>([]);
@@ -103,14 +106,16 @@ export default function TenantProductsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const loadLookups = useCallback(async (applyFirstUom = false) => {
     try {
-      const [uomsResult, suppliersResult, categoriesResult] = await Promise.all([
+      const [uomsResult, suppliersResult, categoriesResult, hazardTypesResult] = await Promise.all([
         listUoms(slug, { size: 100, active: true }),
         listSuppliers(slug, { size: 100, active: true }),
         listCategories(slug, { size: 100, active: true }),
+        listHazardTypes(slug, { active: true }),
       ]);
       setAllUoms(uomsResult.content);
       setAllSuppliers(suppliersResult.content);
       setAllCategories(categoriesResult.content);
+      setAllHazardTypes(hazardTypesResult);
       if (applyFirstUom && uomsResult.content.length > 0) {
         setFormBaseUomId((prev) => prev || uomsResult.content[0].id);
       }
@@ -168,6 +173,7 @@ export default function TenantProductsPage() {
     setFormDescription("");
     setFormBaseUomId(allUoms[0]?.id ?? "");
     setFormCategoryId("");
+    setFormHazardTypeId("");
     setFormTrackLot(false);
     setFormTrackExpiry(false);
     setFormSupplierIds([]);
@@ -185,6 +191,7 @@ export default function TenantProductsPage() {
     setFormDescription(product.description ?? "");
     setFormBaseUomId(product.baseUomId);
     setFormCategoryId(product.categoryId ?? "");
+    setFormHazardTypeId(product.hazardTypeId ?? "");
     setFormTrackLot(product.trackLot);
     setFormTrackExpiry(product.trackExpiry);
     const ids = product.suppliers.map((s) => s.supplierId);
@@ -226,6 +233,7 @@ export default function TenantProductsPage() {
         description: formDescription.trim() || null,
         baseUomId: formBaseUomId,
         categoryId: formCategoryId || null,
+        hazardTypeId: formHazardTypeId || null,
         trackLot: formTrackLot,
         trackExpiry: formTrackExpiry,
         supplierIds: formSupplierIds,
@@ -554,6 +562,22 @@ export default function TenantProductsPage() {
                 {allCategories.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="product-hazard-type">{t("products.hazardTypeLabel")}</Label>
+              <select
+                id="product-hazard-type"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={formHazardTypeId}
+                onChange={(e) => setFormHazardTypeId(e.target.value)}
+              >
+                <option value="">{t("products.hazardTypePlaceholder")}</option>
+                {allHazardTypes.map((ht) => (
+                  <option key={ht.id} value={ht.id}>
+                    {ht.code} — {ht.displayName}
                   </option>
                 ))}
               </select>

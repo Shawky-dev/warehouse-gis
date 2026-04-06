@@ -265,7 +265,16 @@ public class GisZoneController {
     private List<List<List<Double>>> extractRings(Object geometry) {
         if (geometry instanceof java.util.Map<?, ?> geoMap) {
             Object coords = geoMap.get("coordinates");
-            return (List<List<List<Double>>>) coords;
+            // Jackson deserialises whole-number coordinates as Integer when the geometry
+            // field is typed as Object. Normalise every number to Double explicitly.
+            List<List<List<Number>>> raw = (List<List<List<Number>>>) coords;
+            return raw.stream()
+                    .map(ring -> ring.stream()
+                            .map(pt -> pt.stream()
+                                    .map(Number::doubleValue)
+                                    .collect(java.util.stream.Collectors.toList()))
+                            .collect(java.util.stream.Collectors.toList()))
+                    .collect(java.util.stream.Collectors.toList());
         }
         throw GisException.badRequest("Cannot parse geometry from import feature");
     }

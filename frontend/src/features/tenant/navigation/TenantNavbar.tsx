@@ -21,6 +21,8 @@ import {
   SlidersHorizontal,
   List,
   ScanBarcode,
+  ShieldAlert,
+  Hexagon,
 } from "lucide-react";
 import { CameraScanner } from "@/shared/components/CameraScanner";
 import { useScanNavigation } from "@/features/tenant/scan/useScanNavigation";
@@ -93,6 +95,9 @@ export function TenantNavbar() {
   const canViewInventory = hasPermission(TENANT_PERMISSIONS.INVENTORY_VIEW);
   const canViewGisFloorPlans = hasPermission(TENANT_PERMISSIONS.GIS_FLOOR_PLAN_VIEW);
   const canViewGisZones = hasPermission(TENANT_PERMISSIONS.GIS_ZONES_VIEW);
+  const canViewHazardTypes = hasPermission(TENANT_PERMISSIONS.HAZARD_TYPES_VIEW);
+  const canViewZoneTypes = hasPermission(TENANT_PERMISSIONS.ZONE_TYPES_VIEW);
+  const canViewHazardBuffers = hasPermission(TENANT_PERMISSIONS.GIS_HAZARD_BUFFERS_VIEW);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const { navigateFromResult } = useScanNavigation(normalizedSlug);
   const canViewReceipts = hasPermission(TENANT_PERMISSIONS.RECEIPTS_VIEW);
@@ -156,6 +161,12 @@ export function TenantNavbar() {
             ...(canViewCategories
               ? [{ to: PATHS.TENANT.categories(normalizedSlug), label: t("tenant.nav.categories"), icon: Tag }]
               : []),
+            ...(canViewHazardTypes
+              ? [{ to: PATHS.TENANT.hazardTypes(normalizedSlug), label: t("tenant.nav.hazardTypes"), icon: ShieldAlert }]
+              : []),
+            ...(canViewZoneTypes
+              ? [{ to: PATHS.TENANT.zoneTypes(normalizedSlug), label: t("tenant.nav.zoneTypes"), icon: Hexagon }]
+              : []),
           ],
         },
         {
@@ -187,6 +198,15 @@ export function TenantNavbar() {
                       to: PATHS.TENANT.gisZones(normalizedSlug),
                       label: t("tenant.nav.gisZones"),
                       icon: Layers,
+                    },
+                  ]
+                  : []),
+                ...(canViewHazardBuffers
+                  ? [
+                    {
+                      to: PATHS.TENANT.gisHazardBuffers(normalizedSlug),
+                      label: t("tenant.nav.gisHazardBuffers"),
+                      icon: ShieldAlert,
                     },
                   ]
                   : []),
@@ -296,6 +316,9 @@ export function TenantNavbar() {
       canViewCounting,
       canViewGisFloorPlans,
       canViewGisZones,
+      canViewHazardTypes,
+      canViewZoneTypes,
+      canViewHazardBuffers,
       canViewWarehouse,
       normalizedSlug,
       t,

@@ -7,6 +7,8 @@ import TenantUomsPage from "@/features/tenant/uom/TenantUomsPage";
 import TenantSuppliersPage from "@/features/tenant/supplier/TenantSuppliersPage";
 import TenantAuditLogsPage from "@/features/tenant/audit/TenantAuditLogsPage";
 import TenantCategoriesPage from "@/features/tenant/category/TenantCategoriesPage";
+import TenantHazardTypesPage from "@/features/tenant/hazardtype/TenantHazardTypesPage";
+import TenantZoneTypesPage from "@/features/tenant/zonetype/TenantZoneTypesPage";
 import WarehouseLayoutsPage from "@/features/tenant/warehouse/WarehouseLayoutsPage";
 import InventoryPage from "@/features/tenant/inventory/InventoryPage";
 import ReceiptsPage from "@/features/tenant/receipts/ReceiptsPage";
@@ -15,6 +17,7 @@ import CountSessionsPage from "@/features/tenant/counting/CountSessionsPage";
 import FloorPlansPage from "@/features/gis/floorplans/FloorPlansPage";
 import WarehouseMapPage from "@/features/gis/viewer/WarehouseMapPage";
 import ZoneManagementPage from "@/features/gis/zones/ZoneManagementPage";
+import HazardBuffersPage from "@/features/gis/hazardBuffers/HazardBuffersPage";
 import { RequirePermission } from "@/features/auth/guards/RequirePermission";
 import { RequireAnyPermission } from "@/features/auth/guards/RequireAnyPermission";
 import { TENANT_PERMISSIONS } from "@/features/auth/shared/permissions";
@@ -180,6 +183,30 @@ export const tenantRoutes = [
     element: (
       <RequirePermission permission={TENANT_PERMISSIONS.GIS_ZONES_VIEW}>
         <ZoneManagementPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: PATHS.TENANT.HAZARD_TYPES_PATTERN,
+    element: (
+      <RequirePermission permission={TENANT_PERMISSIONS.HAZARD_TYPES_VIEW}>
+        <TenantHazardTypesPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: PATHS.TENANT.ZONE_TYPES_PATTERN,
+    element: (
+      <RequirePermission permission={TENANT_PERMISSIONS.ZONE_TYPES_VIEW}>
+        <TenantZoneTypesPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: PATHS.TENANT.GIS_HAZARD_BUFFERS_PATTERN,
+    element: (
+      <RequirePermission permission={TENANT_PERMISSIONS.GIS_HAZARD_BUFFERS_VIEW}>
+        <HazardBuffersPage />
       </RequirePermission>
     ),
   },

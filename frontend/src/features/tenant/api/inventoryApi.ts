@@ -1,5 +1,6 @@
 import { normalizeTenantSlug } from "@/features/auth/shared/scope";
 import { api } from "@/lib/api";
+import axios from "axios";
 import type {
   AdjustRequest,
   InventoryListParams,
@@ -11,6 +12,7 @@ import type {
   ProductLookupPageResult,
   ProductLookupParams,
   ReceiveRequest,
+  StorageRuleViolation,
   TransferRequest,
   TransferResult,
 } from "@/features/tenant/types/inventory";
@@ -165,4 +167,14 @@ export function extractInventoryErrorMessage(error: unknown, fallback: string): 
     return (error.response.data as { message: string }).message;
   }
   return fallback;
+}
+
+const STORAGE_RULE_TYPES = new Set(["HAZARD_BUFFER", "ZONE", "REQUIRED_ZONE"]);
+
+export function isStorageRuleViolationError(
+  error: unknown
+): error is { response: { data: StorageRuleViolation } } {
+  if (!axios.isAxiosError(error)) return false;
+  const ruleType = (error.response?.data as StorageRuleViolation | undefined)?.ruleType;
+  return typeof ruleType === "string" && STORAGE_RULE_TYPES.has(ruleType);
 }

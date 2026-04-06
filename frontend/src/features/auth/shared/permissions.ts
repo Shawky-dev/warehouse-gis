@@ -71,6 +71,20 @@ export const TENANT_PERMISSIONS = {
   GIS_FLOOR_PLAN_MANAGE: "gis.floorplan.manage",
   GIS_ZONES_VIEW: "gis.zones.view",
   GIS_ZONES_MANAGE: "gis.zones.manage",
+  HAZARD_TYPES_VIEW: "tenant.hazard_types.view",
+  HAZARD_TYPES_CREATE: "tenant.hazard_types.create",
+  HAZARD_TYPES_EDIT: "tenant.hazard_types.edit",
+  HAZARD_TYPES_DEACTIVATE: "tenant.hazard_types.deactivate",
+  HAZARD_TYPES_REACTIVATE: "tenant.hazard_types.reactivate",
+  HAZARD_TYPES_HARD_DELETE: "tenant.hazard_types.hard_delete",
+  ZONE_TYPES_VIEW: "tenant.zone_types.view",
+  ZONE_TYPES_CREATE: "tenant.zone_types.create",
+  ZONE_TYPES_EDIT: "tenant.zone_types.edit",
+  ZONE_TYPES_DEACTIVATE: "tenant.zone_types.deactivate",
+  ZONE_TYPES_REACTIVATE: "tenant.zone_types.reactivate",
+  ZONE_TYPES_HARD_DELETE: "tenant.zone_types.hard_delete",
+  GIS_HAZARD_BUFFERS_VIEW: "gis.hazard_buffers.view",
+  GIS_HAZARD_BUFFERS_MANAGE: "gis.hazard_buffers.manage",
 } as const;
 
 export type LandlordPermission = (typeof LANDLORD_PERMISSIONS)[keyof typeof LANDLORD_PERMISSIONS];

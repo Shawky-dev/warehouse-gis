@@ -13,7 +13,10 @@ import TextSymbol from "@arcgis/core/symbols/TextSymbol.js";
 import MapView from "@arcgis/core/views/MapView.js";
 import Sketch from "@arcgis/core/widgets/Sketch.js";
 import { getTemplateColor } from "./templateColors";
+import { resolveZoneDisplayColor } from "../zones/zoneTypeColors";
 import type { ExistingPolygon, EditorTemplate } from "./useEditorState";
+import type { GeoJsonFeatureCollection, ZoneFeatureProps } from "../zones/zonesApi";
+import type { HazardBufferFeatureProps } from "@/features/tenant/types/gis";
 
 esriConfig.assetsPath = `${import.meta.env.BASE_URL}assets`;
 
@@ -63,6 +66,12 @@ interface WarehouseMapViewProps {
   editingGisBlockId?: string | null;
   onEditComplete?: (gisBlockId: string, rings: number[][][]) => void;
   onEditCancel?: () => void;
+  // Viewer overlays (read-only)
+  zonesGeoJson?: GeoJsonFeatureCollection<ZoneFeatureProps> | null;
+  hazardBuffersGeoJson?: GeoJsonFeatureCollection<HazardBufferFeatureProps> | null;
+  highlightAreaIds?: string[];
+  zonesLayerVisible?: boolean;
+  hazardBuffersLayerVisible?: boolean;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -87,6 +96,11 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
       editingGisBlockId,
       onEditComplete,
       onEditCancel,
+      zonesGeoJson,
+      hazardBuffersGeoJson,
+      highlightAreaIds,
+      zonesLayerVisible,
+      hazardBuffersLayerVisible,
     },
     ref
   ) {
@@ -95,6 +109,9 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
     const sketchVMRef = useRef<Sketch | null>(null);
     const sketchLayerRef = useRef<GraphicsLayer | null>(null);
     const layersByTemplateRef = useRef<Map<string, GraphicsLayer>>(new Map());
+    const viewerZonesLayerRef = useRef<GraphicsLayer | null>(null);
+    const viewerHazardBuffersLayerRef = useRef<GraphicsLayer | null>(null);
+    const viewerHighlightLayerRef = useRef<GraphicsLayer | null>(null);
     const svgLayerRef = useRef<MediaLayer | null>(null);
 
     // Stable refs that mirror the latest prop values — used in event handlers so we
@@ -166,8 +183,15 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
       const sketchLayer = new GraphicsLayer({ id: "gis-sketch", title: "Sketch" });
       sketchLayerRef.current = sketchLayer;
 
+      const viewerZonesLayer = new GraphicsLayer({ id: "viewer-zones", title: "Zones", visible: zonesLayerVisible ?? true });
+      const viewerHazardBuffersLayer = new GraphicsLayer({ id: "viewer-hazard-buffers", title: "Hazard Buffers", visible: hazardBuffersLayerVisible ?? true });
+      const viewerHighlightLayer = new GraphicsLayer({ id: "viewer-highlight", title: "Highlight" });
+      viewerZonesLayerRef.current = viewerZonesLayer;
+      viewerHazardBuffersLayerRef.current = viewerHazardBuffersLayer;
+      viewerHighlightLayerRef.current = viewerHighlightLayer;
+
       const esriMap = new EsriMap({
-        layers: [mediaLayer, ...Array.from(layers.values()), sketchLayer],
+        layers: [mediaLayer, viewerZonesLayer, viewerHazardBuffersLayer, ...Array.from(layers.values()), sketchLayer, viewerHighlightLayer],
       });
 
       const mapView = new MapView({
@@ -327,6 +351,9 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
         layersByTemplateRef.current = new Map();
         svgLayerRef.current = null;
         editingMetaRef.current = null;
+        viewerZonesLayerRef.current = null;
+        viewerHazardBuffersLayerRef.current = null;
+        viewerHighlightLayerRef.current = null;
         mapView.destroy();
         mapViewRef.current = null;
       };
@@ -473,6 +500,80 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
         svgLayerRef.current.visible = svgVisible ?? true;
       }
     }, [svgVisible]);
+
+    // ── Effect: render viewer zones overlay ───────────────────────────────────
+    useEffect(() => {
+      const layer = viewerZonesLayerRef.current;
+      if (!layer) return;
+      layer.graphics.removeAll();
+      for (const feature of zonesGeoJson?.features ?? []) {
+        const props = feature.properties;
+        const { fill, stroke } = resolveZoneDisplayColor(props.displayColor, props.name);
+        const rings = (feature.geometry as { coordinates: number[][][] }).coordinates;
+        const polygon = new Polygon({ rings, spatialReference: { wkid: 4326 } });
+        layer.add(new Graphic({
+          geometry: polygon,
+          symbol: new SimpleFillSymbol({ color: fill, outline: { color: stroke, width: 1.5 } }),
+          attributes: { viewerZoneId: props.id },
+        }));
+      }
+    }, [zonesGeoJson]);
+
+    // ── Effect: render viewer hazard buffers overlay ──────────────────────────
+    useEffect(() => {
+      const layer = viewerHazardBuffersLayerRef.current;
+      if (!layer) return;
+      layer.graphics.removeAll();
+      for (const feature of hazardBuffersGeoJson?.features ?? []) {
+        const rings = (feature.geometry as { coordinates: number[][][] }).coordinates;
+        layer.add(new Graphic({
+          geometry: new Polygon({ rings, spatialReference: { wkid: 4326 } }),
+          symbol: new SimpleFillSymbol({
+            color: [220, 38, 38, 0.2],
+            outline: { color: [220, 38, 38], width: 1.5 },
+          }),
+          attributes: { viewerBufferId: feature.properties.id },
+        }));
+      }
+    }, [hazardBuffersGeoJson]);
+
+    // ── Effect: render highlight overlay ─────────────────────────────────────
+    useEffect(() => {
+      const layer = viewerHighlightLayerRef.current;
+      if (!layer) return;
+      layer.graphics.removeAll();
+      if (!highlightAreaIds?.length) return;
+      const allFeatures = [
+        ...(zonesGeoJson?.features ?? []),
+        ...(hazardBuffersGeoJson?.features ?? []),
+      ];
+      for (const feature of allFeatures) {
+        const id: string = (feature.properties as { id: string }).id;
+        if (!highlightAreaIds.includes(id)) continue;
+        const rings = (feature.geometry as { coordinates: number[][][] }).coordinates;
+        layer.add(new Graphic({
+          geometry: new Polygon({ rings, spatialReference: { wkid: 4326 } }),
+          symbol: new SimpleFillSymbol({
+            color: [250, 204, 21, 0.3],
+            outline: { color: [234, 179, 8], width: 3 },
+          }),
+        }));
+      }
+    }, [highlightAreaIds, zonesGeoJson, hazardBuffersGeoJson]);
+
+    // ── Effect: toggle viewer zones layer visibility ──────────────────────────
+    useEffect(() => {
+      if (viewerZonesLayerRef.current) {
+        viewerZonesLayerRef.current.visible = zonesLayerVisible ?? true;
+      }
+    }, [zonesLayerVisible]);
+
+    // ── Effect: toggle viewer hazard buffers layer visibility ─────────────────
+    useEffect(() => {
+      if (viewerHazardBuffersLayerRef.current) {
+        viewerHazardBuffersLayerRef.current.visible = hazardBuffersLayerVisible ?? true;
+      }
+    }, [hazardBuffersLayerVisible]);
 
     return (
       <div className="relative">

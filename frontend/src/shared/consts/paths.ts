@@ -44,6 +44,9 @@ export const PATHS = {
     GIS_FLOOR_PLANS_PATTERN: "/:tenantSlug/gis/floor-plans",
     GIS_MAP_PATTERN: "/:tenantSlug/gis/map",
     GIS_ZONES_PATTERN: "/:tenantSlug/gis/zones",
+    HAZARD_TYPES_PATTERN: "/:tenantSlug/hazard-types",
+    ZONE_TYPES_PATTERN: "/:tenantSlug/zone-types",
+    GIS_HAZARD_BUFFERS_PATTERN: "/:tenantSlug/gis/hazard-buffers",
     root: (tenantSlug: string) => `/${tenantSlug}`,
     authLogin: (tenantSlug: string) => `/${tenantSlug}/auth/login`,
     products: (tenantSlug: string) => `/${tenantSlug}/products`,
@@ -68,5 +71,8 @@ export const PATHS = {
     gisFloorPlans: (tenantSlug: string) => `/${tenantSlug}/gis/floor-plans`,
     gisMap: (tenantSlug: string) => `/${tenantSlug}/gis/map`,
     gisZones: (tenantSlug: string) => `/${tenantSlug}/gis/zones`,
+    hazardTypes: (tenantSlug: string) => `/${tenantSlug}/hazard-types`,
+    zoneTypes: (tenantSlug: string) => `/${tenantSlug}/zone-types`,
+    gisHazardBuffers: (tenantSlug: string) => `/${tenantSlug}/gis/hazard-buffers`,
   },
 };

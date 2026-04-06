@@ -237,3 +237,31 @@ databaseChangeLog:
         - sqlFile:
             path: db/migration/tenant/V34__redesign_zone_tables.sql
             relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-hazard-zone-types-35
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V35__create_hazard_and_zone_types.sql
+            relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-extend-categories-zones-36
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V36__extend_categories_and_zones.sql
+            relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-product-hazard-type-37
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V37__add_hazard_type_to_products.sql
+            relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-hazard-buffers-38
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V38__create_hazard_buffers_and_seed_permissions.sql
+            relativeToChangelogFile: false

@@ -1,0 +1,215 @@
+{
+    "type": "FeatureCollection",
+    "features": [
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [
+                            0.000000,
+                            0.000000
+                        ],
+                        [
+                            0.000800,
+                            0.000000
+                        ],
+                        [
+                            0.000800,
+                            0.000250
+                        ],
+                        [
+                            0.000000,
+                            0.000250
+                        ],
+                        [
+                            0.000000,
+                            0.000000
+                        ]
+                    ]
+                ]
+            },
+            "properties": {
+                "name": "Receiving Dock",
+                "description": "Inbound goods unloading and staging area",
+                "violationAction": "WARN"
+            }
+        },
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [
+                            0.000000,
+                            0.000300
+                        ],
+                        [
+                            0.000600,
+                            0.000300
+                        ],
+                        [
+                            0.000600,
+                            0.000700
+                        ],
+                        [
+                            0.000000,
+                            0.000700
+                        ],
+                        [
+                            0.000000,
+                            0.000300
+                        ]
+                    ]
+                ]
+            },
+            "properties": {
+                "name": "Bulk Storage Aisle A",
+                "description": "High-bay racking — forklifts only",
+                "violationAction": "BLOCK"
+            }
+        },
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [
+                            0.000650,
+                            0.000300
+                        ],
+                        [
+                            0.001200,
+                            0.000300
+                        ],
+                        [
+                            0.001200,
+                            0.000700
+                        ],
+                        [
+                            0.000650,
+                            0.000700
+                        ],
+                        [
+                            0.000650,
+                            0.000300
+                        ]
+                    ]
+                ]
+            },
+            "properties": {
+                "name": "Bulk Storage Aisle B",
+                "description": "High-bay racking — forklifts only",
+                "violationAction": "BLOCK"
+            }
+        },
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [
+                            0.000000,
+                            0.000750
+                        ],
+                        [
+                            0.000500,
+                            0.000750
+                        ],
+                        [
+                            0.000500,
+                            0.001000
+                        ],
+                        [
+                            0.000000,
+                            0.001000
+                        ],
+                        [
+                            0.000000,
+                            0.000750
+                        ]
+                    ]
+                ]
+            },
+            "properties": {
+                "name": "Cold Storage Room",
+                "description": "Temperature-controlled zone — maintain 2°C to 8°C",
+                "violationAction": "BLOCK"
+            }
+        },
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [
+                            0.000550,
+                            0.000750
+                        ],
+                        [
+                            0.001200,
+                            0.000750
+                        ],
+                        [
+                            0.001200,
+                            0.001000
+                        ],
+                        [
+                            0.000550,
+                            0.001000
+                        ],
+                        [
+                            0.000550,
+                            0.000750
+                        ]
+                    ]
+                ]
+            },
+            "properties": {
+                "name": "Packing and Dispatch",
+                "description": "Order picking, packing and outbound staging",
+                "violationAction": "WARN"
+            }
+        },
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [
+                            0.000850,
+                            0.000000
+                        ],
+                        [
+                            0.001200,
+                            0.000000
+                        ],
+                        [
+                            0.001200,
+                            0.000250
+                        ],
+                        [
+                            0.000850,
+                            0.000250
+                        ],
+                        [
+                            0.000850,
+                            0.000000
+                        ]
+                    ]
+                ]
+            },
+            "properties": {
+                "name": "Office and Welfare Area",
+                "description": "Staff offices, break room and first-aid point",
+                "violationAction": "WARN"
+            }
+        }
+    ]
+}

@@ -23,6 +23,9 @@ export interface ZoneRecord {
     violationAction: "BLOCK" | "WARN";
     source: "MANUAL" | "ARCGIS_IMPORT";
     categoryRules: CategoryRule[];
+    zoneTypeId: string | null;
+    zoneTypeCode: string | null;
+    displayColor: string | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -35,6 +38,8 @@ export interface ZoneRequest {
     violationAction: "BLOCK" | "WARN";
     source?: string;
     categoryRules: CategoryRule[];
+    zoneTypeId?: string | null;
+    displayColor?: string | null;
 }
 
 // ── GeoJSON feature property interfaces ───────────────────────────────────────
@@ -46,6 +51,9 @@ export interface ZoneFeatureProps {
     violationAction: "BLOCK" | "WARN";
     source: "MANUAL" | "ARCGIS_IMPORT";
     categoryRules: CategoryRule[];
+    zoneTypeId: string | null;
+    zoneTypeCode: string | null;
+    displayColor: string | null;
 }
 
 export interface LocationFeatureProps {

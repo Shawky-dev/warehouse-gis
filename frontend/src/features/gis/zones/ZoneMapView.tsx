@@ -12,7 +12,7 @@ import SimpleFillSymbol from "@arcgis/core/symbols/SimpleFillSymbol.js";
 import TextSymbol from "@arcgis/core/symbols/TextSymbol.js";
 import MapView from "@arcgis/core/views/MapView.js";
 import Sketch from "@arcgis/core/widgets/Sketch.js";
-import { getZoneColor } from "./zoneTypeColors";
+import { resolveZoneDisplayColor } from "./zoneTypeColors";
 import type {
     GeoJsonFeatureCollection,
     ZoneFeatureProps,
@@ -47,13 +47,12 @@ interface ZoneMapViewProps {
 const LOCATION_FILL: [number, number, number, number] = [107, 114, 128, 0.12];
 const LOCATION_STROKE = "#9ca3af";
 
-function getZoneFillColor(name: string | null | undefined, selected: boolean): [number, number, number, number] {
-    const color = getZoneColor(name);
-    const match = color.fill.match(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/);
-    const r = match ? parseInt(match[1]) : 107;
-    const g = match ? parseInt(match[2]) : 114;
-    const b = match ? parseInt(match[3]) : 128;
-    return [r, g, b, selected ? 0.35 : 0.15];
+function getZoneColors(props: ZoneFeatureProps, selected: boolean) {
+    const { fill, stroke } = resolveZoneDisplayColor(props.displayColor, props.name);
+    return {
+        fill: [fill[0], fill[1], fill[2], selected ? 0.35 : fill[3]] as [number, number, number, number],
+        stroke,
+    };
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -279,7 +278,7 @@ export function ZoneMapView({
 
         for (const feature of zonesGeoJson?.features ?? []) {
             const props = feature.properties;
-            const color = getZoneColor(props.name);
+            const colors = getZoneColors(props, props.id === currentSelectedId);
             const rings = (feature.geometry as { coordinates: number[][][] }).coordinates;
             const polygon = new Polygon({ rings, spatialReference: { wkid: 4326 } });
             const isSelected = props.id === currentSelectedId;
@@ -287,8 +286,8 @@ export function ZoneMapView({
             layer.add(new Graphic({
                 geometry: polygon,
                 symbol: new SimpleFillSymbol({
-                    color: getZoneFillColor(props.name, isSelected),
-                    outline: { color: color.stroke, width: isSelected ? 3 : 2 },
+                    color: colors.fill,
+                    outline: { color: colors.stroke, width: isSelected ? 3 : 2 },
                 }),
                 attributes: { zoneId: props.id, zoneProps: props },
             }));
@@ -299,7 +298,7 @@ export function ZoneMapView({
                     geometry: centroid,
                     symbol: new TextSymbol({
                         text: props.name,
-                        color: color.stroke,
+                        color: colors.stroke,
                         haloColor: "white",
                         haloSize: "1.5px",
                         font: { size: 11, weight: "bold" },
@@ -339,10 +338,10 @@ export function ZoneMapView({
         for (const g of layer.graphics.toArray()) {
             if (g.geometry?.type === "polygon" && g.attributes?.zoneId) {
                 const isSelected = g.attributes.zoneId === selectedZoneId;
-                const color = getZoneColor(g.attributes.zoneProps?.name as string | undefined);
+                const colors = getZoneColors(g.attributes.zoneProps as ZoneFeatureProps, isSelected);
                 g.symbol = new SimpleFillSymbol({
-                    color: getZoneFillColor(g.attributes.zoneProps?.name as string | undefined, isSelected),
-                    outline: { color: color.stroke, width: isSelected ? 3 : 2 },
+                    color: colors.fill,
+                    outline: { color: colors.stroke, width: isSelected ? 3 : 2 },
                 });
             }
         }

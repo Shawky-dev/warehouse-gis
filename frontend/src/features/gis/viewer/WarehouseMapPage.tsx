@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Globe } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Button } from "@/shared/components/ui/button";
@@ -11,15 +11,56 @@ import { useEditorState } from "../floorplans/useEditorState";
 import { WarehouseMapView } from "../floorplans/WarehouseMapView";
 import { ViewerLayerPanel } from "./ViewerLayerPanel";
 import { LocationInspectPanel } from "./LocationInspectPanel";
+import { fetchZonesGeoJson } from "../zones/zonesApi";
+import { fetchHazardBuffersGeoJson } from "../hazardBuffers/hazardBuffersApi";
+import type { GeoJsonFeatureCollection, ZoneFeatureProps } from "../zones/zonesApi";
+import type { HazardBufferFeatureProps } from "@/features/tenant/types/gis";
 
 export default function WarehouseMapPage() {
   const { t } = useI18n();
   const navigate = useNavigate();
+  const location = useLocation();
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
   const slug = normalizeTenantSlug(tenantSlug ?? "");
 
   const { config, loading, error, svgContent } = useFloorPlanApi();
   const { templates, existingPolygons, polygonCountByTemplate } = useEditorState();
+
+  // Highlight IDs passed via navigation state (from StorageRuleViolationBanner "View on map")
+  const locationState = location.state as {
+    highlightAreaId?: string;
+    highlightSuggestedZoneIds?: string[];
+  } | null;
+  const highlightAreaIds = useMemo(() => {
+    const ids: string[] = [];
+    if (locationState?.highlightAreaId) ids.push(locationState.highlightAreaId);
+    if (locationState?.highlightSuggestedZoneIds) ids.push(...locationState.highlightSuggestedZoneIds);
+    return ids;
+  }, [locationState]);
+
+  const [zonesGeoJson, setZonesGeoJson] = useState<GeoJsonFeatureCollection<ZoneFeatureProps> | null>(null);
+  const [hazardBuffersGeoJson, setHazardBuffersGeoJson] = useState<GeoJsonFeatureCollection<HazardBufferFeatureProps> | null>(null);
+  const [zonesVisible, setZonesVisible] = useState(true);
+  const [hazardBuffersVisible, setHazardBuffersVisible] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [zones, buffers] = await Promise.all([
+          fetchZonesGeoJson(slug),
+          fetchHazardBuffersGeoJson(slug),
+        ]);
+        if (!cancelled) {
+          setZonesGeoJson(zones);
+          setHazardBuffersGeoJson(buffers);
+        }
+      } catch {
+        // overlay data is best-effort; don't block the map
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [slug]);
 
   const [selectedPolygon, setSelectedPolygon] = useState<{
     gisBlockId: string;
@@ -97,6 +138,10 @@ export default function WarehouseMapPage() {
                   onSvgVisibilityToggle={() => setSvgVisible((v) => !v)}
                   selectedPolygon={selectedPolygon}
                   onClearSelection={() => setSelectedPolygon(null)}
+                  zonesVisible={zonesVisible}
+                  onZonesVisibilityToggle={() => setZonesVisible((v) => !v)}
+                  hazardBuffersVisible={hazardBuffersVisible}
+                  onHazardBuffersVisibilityToggle={() => setHazardBuffersVisible((v) => !v)}
                 />
               </div>
               <div className="relative flex-1">
@@ -116,6 +161,11 @@ export default function WarehouseMapPage() {
                   visibilityByTemplate={visibilityByTemplate}
                   svgVisible={svgVisible}
                   selectedGisBlockId={selectedPolygon?.gisBlockId}
+                  zonesGeoJson={zonesGeoJson}
+                  hazardBuffersGeoJson={hazardBuffersGeoJson}
+                  highlightAreaIds={highlightAreaIds}
+                  zonesLayerVisible={zonesVisible}
+                  hazardBuffersLayerVisible={hazardBuffersVisible}
                   onPolygonSelect={(gisBlockId, templateName, label) => {
                     if (gisBlockId && templateName && label) {
                       const ep = existingPolygons.find((p) => p.gisBlockId === gisBlockId);

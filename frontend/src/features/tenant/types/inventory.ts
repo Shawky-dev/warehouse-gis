@@ -148,3 +148,61 @@ export interface AdjustRequest {
   notes: string;
   reasonCode?: string | null;
 }
+
+// ── Storage rule violation types ──────────────────────────────────────────────
+
+export interface ViolatedAreaSummary {
+  id: string;
+  name: string;
+  type: string;
+}
+
+export interface ZoneSummary {
+  id: string;
+  name: string;
+}
+
+export interface HazardTypeSummary {
+  id: string;
+  code: string;
+  displayName: string;
+}
+
+export interface ZoneTypeSummary {
+  id: string;
+  code: string;
+  displayName: string;
+}
+
+export interface HazardBufferViolation {
+  ruleType: "HAZARD_BUFFER";
+  violationAction: "BLOCK";
+  error: string;
+  message: string;
+  violatedArea: ViolatedAreaSummary;
+  restrictedHazardTypes: HazardTypeSummary[];
+}
+
+export interface ZoneRuleViolation {
+  ruleType: "ZONE";
+  violationAction: "BLOCK" | "WARN";
+  error: string;
+  message: string;
+  violatedArea: ViolatedAreaSummary;
+  suggestedZones: ZoneSummary[];
+}
+
+export interface RequiredZoneViolation {
+  ruleType: "REQUIRED_ZONE";
+  violationAction: "WARN";
+  error: string;
+  message: string;
+  violatedArea?: ViolatedAreaSummary;
+  requiredZoneType: ZoneTypeSummary;
+  suggestedZones: ZoneSummary[];
+}
+
+export type StorageRuleViolation =
+  | HazardBufferViolation
+  | ZoneRuleViolation
+  | RequiredZoneViolation;

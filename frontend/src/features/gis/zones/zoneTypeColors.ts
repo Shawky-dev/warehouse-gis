@@ -29,3 +29,31 @@ export function getZoneTypeColor(zoneType: string | null | undefined): { fill: s
     return getZoneColor(zoneType);
 }
 
+/**
+ * Resolves the ArcGIS symbol colors for a zone.
+ * Prefers the zone's own `displayColor` hex value; falls back to name-based hashing.
+ */
+export function resolveZoneDisplayColor(
+    displayColor: string | null | undefined,
+    name: string | null | undefined
+): { fill: [number, number, number, number]; stroke: [number, number, number] } {
+    if (displayColor && /^#[0-9a-fA-F]{6}$/.test(displayColor)) {
+        const r = parseInt(displayColor.slice(1, 3), 16);
+        const g = parseInt(displayColor.slice(3, 5), 16);
+        const b = parseInt(displayColor.slice(5, 7), 16);
+        return { fill: [r, g, b, 0.15], stroke: [r, g, b] };
+    }
+    const { fill, stroke } = getZoneColor(name);
+    // parse rgba(r,g,b,a) fill string
+    const fillMatch = fill.match(/rgba\(([^)]+)\)/);
+    if (fillMatch) {
+        const [fr, fg, fb] = fillMatch[1].split(",").map(Number);
+        const strokeMatch = stroke.match(/#([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})/);
+        if (strokeMatch) {
+            const [, sr, sg, sb] = strokeMatch.map((v, i) => i === 0 ? v : parseInt(v, 16));
+            return { fill: [fr, fg, fb, 0.15], stroke: [sr as number, sg as number, sb as number] };
+        }
+    }
+    return { fill: [107, 114, 128, 0.15], stroke: [107, 114, 128] };
+}
+

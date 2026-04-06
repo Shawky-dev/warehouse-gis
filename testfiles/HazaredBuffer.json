@@ -1,0 +1,117 @@
+{
+    "type": "FeatureCollection",
+    "features": [
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [
+                            0.000100,
+                            0.000100
+                        ],
+                        [
+                            0.000400,
+                            0.000100
+                        ],
+                        [
+                            0.000400,
+                            0.000350
+                        ],
+                        [
+                            0.000100,
+                            0.000350
+                        ],
+                        [
+                            0.000100,
+                            0.000100
+                        ]
+                    ]
+                ]
+            },
+            "properties": {
+                "name": "Chemical Storage Zone A",
+                "notes": "Flammable liquids — keep ignition sources out",
+                "restrictedHazardTypes": [
+                    "FLAMMABLE",
+                    "CHEMICAL"
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [
+                            0.000500,
+                            0.000050
+                        ],
+                        [
+                            0.000750,
+                            0.000050
+                        ],
+                        [
+                            0.000750,
+                            0.000300
+                        ],
+                        [
+                            0.000500,
+                            0.000300
+                        ],
+                        [
+                            0.000500,
+                            0.000050
+                        ]
+                    ]
+                ]
+            },
+            "properties": {
+                "name": "Oxidizer Buffer Zone",
+                "notes": "Oxidizing agents — segregate from flammables",
+                "restrictedHazardTypes": [
+                    "EXPLOSIVE"
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [
+                            0.000150,
+                            0.000400
+                        ],
+                        [
+                            0.000550,
+                            0.000400
+                        ],
+                        [
+                            0.000550,
+                            0.000600
+                        ],
+                        [
+                            0.000150,
+                            0.000600
+                        ],
+                        [
+                            0.000150,
+                            0.000400
+                        ]
+                    ]
+                ]
+            },
+            "properties": {
+                "name": "Corrosives Exclusion Area",
+                "notes": "Acid and base storage — restricted access",
+                "restrictedHazardTypes": [
+                    "CHEMICAL"
+                ]
+            }
+        }
+    ]
+}

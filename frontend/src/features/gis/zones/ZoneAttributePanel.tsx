@@ -12,7 +12,8 @@ import {
 } from "@/shared/components/ui/select";
 import { Badge } from "@/shared/components/ui/badge";
 import { listCategories } from "@/features/tenant/api/f0Api";
-import type { CategoryResult } from "@/features/tenant/types/f0";
+import { listZoneTypes } from "@/features/tenant/api/zoneTypeApi";
+import type { CategoryResult, ZoneTypeResult } from "@/features/tenant/types/f0";
 import { createZone, updateZone, deleteZone, extractZoneErrorMessage } from "./zonesApi";
 import type { ZoneRecord, CategoryRule } from "./zonesApi";
 import { Move, Trash2 } from "lucide-react";
@@ -45,9 +46,12 @@ export function ZoneAttributePanel({
     const isCreateMode = pendingGeometry != null && zone == null;
 
     const [allCategories, setAllCategories] = useState<CategoryResult[]>([]);
+    const [allZoneTypes, setAllZoneTypes] = useState<ZoneTypeResult[]>([]);
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
     const [violationAction, setViolationAction] = useState<"BLOCK" | "WARN">("BLOCK");
+    const [zoneTypeId, setZoneTypeId] = useState("");
+    const [displayColor, setDisplayColor] = useState("#6B7280");
     const [categoryRules, setCategoryRules] = useState<Record<string, RuleType>>({});
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
@@ -58,6 +62,9 @@ export function ZoneAttributePanel({
         let cancelled = false;
         void listCategories(slug, { size: 100, active: true }).then((result) => {
             if (!cancelled) setAllCategories(result.content);
+        });
+        void listZoneTypes(slug, { active: true }).then((result) => {
+            if (!cancelled) setAllZoneTypes(result);
         });
         return () => { cancelled = true; };
     }, [slug]);
@@ -75,6 +82,8 @@ export function ZoneAttributePanel({
         setName(zone.name);
         setDescription(zone.description ?? "");
         setViolationAction(zone.violationAction);
+        setZoneTypeId(zone.zoneTypeId ?? "");
+        setDisplayColor(zone.displayColor ?? "#6B7280");
         const rules: Record<string, RuleType> = {};
         for (const r of zone.categoryRules) {
             rules[r.categoryId] = r.ruleType as RuleType;
@@ -115,6 +124,8 @@ export function ZoneAttributePanel({
                     violationAction,
                     coordinates: pendingGeometry!,
                     categoryRules: rules,
+                    zoneTypeId: zoneTypeId || null,
+                    displayColor,
                 });
             } else {
                 result = await updateZone(slug, zone!.id, {
@@ -122,6 +133,8 @@ export function ZoneAttributePanel({
                     description: description || null,
                     violationAction,
                     categoryRules: rules,
+                    zoneTypeId: zoneTypeId || null,
+                    displayColor,
                 });
             }
             onSaveSuccess(result);
@@ -239,6 +252,48 @@ export function ZoneAttributePanel({
                 <p className="text-[10px] text-muted-foreground">
                     {t(`gis.zones.action.${violationAction}.hint` as Parameters<typeof t>[0])}
                 </p>
+            </div>
+
+            {/* Zone type */}
+            {allZoneTypes.length > 0 && (
+                <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium">{t("gis.zones.zoneTypeLabel")}</label>
+                    <select
+                        className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+                        value={zoneTypeId}
+                        disabled={!canManage}
+                        onChange={(e) => setZoneTypeId(e.target.value)}
+                    >
+                        <option value="">{t("gis.zones.zoneTypePlaceholder")}</option>
+                        {allZoneTypes.map((zt) => (
+                            <option key={zt.id} value={zt.id}>{zt.code} — {zt.displayName}</option>
+                        ))}
+                    </select>
+                </div>
+            )}
+
+            {/* Display color */}
+            <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium">{t("gis.zones.displayColorLabel")}</label>
+                <div className="flex items-center gap-2">
+                    <input
+                        type="color"
+                        value={displayColor}
+                        disabled={!canManage}
+                        onChange={(e) => setDisplayColor(e.target.value)}
+                        className="h-8 w-10 cursor-pointer rounded border border-input bg-background p-0.5"
+                    />
+                    <span className="font-mono text-xs text-muted-foreground">{displayColor}</span>
+                    {canManage && (
+                        <button
+                            type="button"
+                            className="text-xs text-muted-foreground underline hover:text-foreground"
+                            onClick={() => setDisplayColor("#6B7280")}
+                        >
+                            {t("gis.zones.displayColorReset")}
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Category rules */}

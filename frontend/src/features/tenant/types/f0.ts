@@ -87,6 +87,10 @@ export interface CategoryResult {
   id: string;
   name: string;
   description: string | null;
+  code: string;
+  displayName: string;
+  requiredZoneTypeId: string | null;
+  requiredZoneTypeCode: string | null;
   active: boolean;
   createdAt: string;
   updatedAt: string;
@@ -111,11 +115,17 @@ export interface ListCategoriesParams {
 export interface CreateCategoryRequest {
   name: string;
   description?: string | null;
+  code?: string | null;
+  displayName?: string | null;
+  requiredZoneTypeId?: string | null;
 }
 
 export interface UpdateCategoryRequest {
   name: string;
   description?: string | null;
+  code?: string | null;
+  displayName?: string | null;
+  requiredZoneTypeId?: string | null;
 }
 
 export interface ProductSupplierResult {
@@ -135,6 +145,8 @@ export interface ProductResult {
   baseUomName: string;
   categoryId: string | null;
   categoryName: string | null;
+  hazardTypeId: string | null;
+  hazardTypeCode: string | null;
   trackLot: boolean;
   trackExpiry: boolean;
   active: boolean;
@@ -168,6 +180,7 @@ export interface CreateProductRequest {
   description?: string | null;
   baseUomId: string;
   categoryId?: string | null;
+  hazardTypeId?: string | null;
   trackLot?: boolean | null;
   trackExpiry?: boolean | null;
   supplierIds?: string[];
@@ -180,10 +193,65 @@ export interface UpdateProductRequest {
   description?: string | null;
   baseUomId: string;
   categoryId?: string | null;
+  hazardTypeId?: string | null;
   trackLot?: boolean | null;
   trackExpiry?: boolean | null;
   supplierIds?: string[];
   primarySupplierId?: string | null;
+}
+
+// ── HazardType ────────────────────────────────────────────────────────────────
+
+export interface HazardTypeResult {
+  id: string;
+  code: string;
+  displayName: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  deactivatedAt: string | null;
+}
+
+export interface ListHazardTypesParams {
+  search?: string;
+  active?: boolean;
+}
+
+export interface CreateHazardTypeRequest {
+  code: string;
+  displayName: string;
+}
+
+export interface UpdateHazardTypeRequest {
+  code: string;
+  displayName: string;
+}
+
+// ── ZoneType ──────────────────────────────────────────────────────────────────
+
+export interface ZoneTypeResult {
+  id: string;
+  code: string;
+  displayName: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  deactivatedAt: string | null;
+}
+
+export interface ListZoneTypesParams {
+  search?: string;
+  active?: boolean;
+}
+
+export interface CreateZoneTypeRequest {
+  code: string;
+  displayName: string;
+}
+
+export interface UpdateZoneTypeRequest {
+  code: string;
+  displayName: string;
 }
 
 export interface AuditLogItem {

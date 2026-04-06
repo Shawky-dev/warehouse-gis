@@ -28,9 +28,9 @@ import type {
   StockEntry,
   ProductLookupItem,
 } from "@/features/tenant/types/inventory";
-import { isZoneViolationError } from "@/features/gis/zones/zonesApi";
-import type { ZoneViolationError } from "@/features/gis/zones/zonesApi";
-import { ZoneViolationBanner } from "@/shared/components/ZoneViolationBanner";
+import { isStorageRuleViolationError } from "@/features/tenant/api/inventoryApi";
+import type { StorageRuleViolation } from "@/features/tenant/types/inventory";
+import { StorageRuleViolationBanner } from "@/shared/components/StorageRuleViolationBanner";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
@@ -147,7 +147,7 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
   const [opSubmitting, setOpSubmitting] = useState(false);
   const [opSuccess, setOpSuccess] = useState<string | null>(null);
   const [opError, setOpError] = useState<string | null>(null);
-  const [opZoneViolation, setOpZoneViolation] = useState<ZoneViolationError | null>(null);
+  const [opZoneViolation, setOpZoneViolation] = useState<StorageRuleViolation | null>(null);
   // Snapshot of the last submitted form payload — used to retry with override
   const [lastOpPayload, setLastOpPayload] = useState<
     | { kind: "receive"; payload: Parameters<typeof receiveStock>[1] }
@@ -604,7 +604,7 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
         }
       }
     } catch (error) {
-      if (isZoneViolationError(error)) {
+      if (isStorageRuleViolationError(error)) {
         setOpZoneViolation(error.response.data);
       } else {
         setOpError(extractInventoryErrorMessage(error, t("inventory.ops.failed")));
@@ -1082,8 +1082,8 @@ export default function InventoryPage({ section = "stock" }: InventoryPageProps)
                 {opSuccess ? <p className="text-sm text-green-700 md:col-span-2">{opSuccess}</p> : null}
                 {opZoneViolation ? (
                   <div className="md:col-span-2">
-                    <ZoneViolationBanner
-                      error={opZoneViolation}
+                    <StorageRuleViolationBanner
+                      violation={opZoneViolation}
                       onOverride={async () => {
                         if (!lastOpPayload) return;
                         try {
