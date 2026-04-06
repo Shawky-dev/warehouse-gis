@@ -215,6 +215,15 @@ export function useEditorState() {
     [slug, availableBlocks, fetchExistingPolygons]
   );
 
+  // PATCH an existing polygon's geometry without changing its block assignment
+  const reshapePolygon = useCallback(
+    async (gisBlockId: string, rings: number[][][], templateName: string) => {
+      await api.patch(`/${slug}/gis/blocks/manual/${gisBlockId}/geometry`, { rings });
+      await fetchExistingPolygons(templateName);
+    },
+    [slug, fetchExistingPolygons]
+  );
+
   // DELETE a polygon then refresh GeoJSON for that template
   const deletePolygon = useCallback(
     async (gisBlockId: string, templateName: string) => {
@@ -263,6 +272,7 @@ export function useEditorState() {
     openReassignDialog,
     savePolygon,
     reassignPolygon,
+    reshapePolygon,
     deletePolygon,
     clearPendingPolygon,
     clearPendingReassign,

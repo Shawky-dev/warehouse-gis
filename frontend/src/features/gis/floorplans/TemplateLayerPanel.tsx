@@ -1,6 +1,6 @@
 import type { ComponentType } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Box, Eye, EyeOff, ImageIcon, Layers, MousePointer, Pencil, RotateCcw, Trash2 } from "lucide-react";
+import { Box, Eye, EyeOff, ImageIcon, Layers, Pencil, RotateCcw, Trash2 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
@@ -17,9 +17,6 @@ interface TemplateLayerPanelProps {
   polygonCountByTemplate: Record<string, number>;
   totalBlocksByTemplate: Record<string, number>;
   hasActiveLayout: boolean;
-  // Draw mode toggle
-  isDrawMode: boolean;
-  onDrawModeChange: (drawing: boolean) => void;
   // Layer visibility
   visibilityByTemplate: Record<string, boolean>;
   onVisibilityToggle: (templateName: string) => void;
@@ -29,6 +26,7 @@ interface TemplateLayerPanelProps {
   selectedPolygon: { gisBlockId: string; templateName: string; label: string } | null;
   onDeleteSelected: () => void;
   onReassignSelected: () => void;
+  onEditShape: () => void;
   // Undo
   canUndo: boolean;
   onUndo: () => void;
@@ -41,8 +39,6 @@ export function TemplateLayerPanel({
   polygonCountByTemplate,
   totalBlocksByTemplate,
   hasActiveLayout,
-  isDrawMode,
-  onDrawModeChange,
   visibilityByTemplate,
   onVisibilityToggle,
   svgVisible,
@@ -50,6 +46,7 @@ export function TemplateLayerPanel({
   selectedPolygon,
   onDeleteSelected,
   onReassignSelected,
+  onEditShape,
   canUndo,
   onUndo,
 }: TemplateLayerPanelProps) {
@@ -65,61 +62,20 @@ export function TemplateLayerPanel({
   return (
     <div className="flex h-full flex-col gap-2 rounded-md border bg-card p-3">
 
-      {/* Toolbar: Draw / Select toggle + Undo */}
-      <div className="flex items-center gap-1">
-        <div className="flex flex-1 overflow-hidden rounded-md border">
-          <button
-            type="button"
-            onClick={() => onDrawModeChange(true)}
-            className={`flex flex-1 items-center justify-center gap-1 px-2 py-1 text-xs transition-colors ${
-              isDrawMode
-                ? "bg-accent text-accent-foreground font-medium"
-                : "hover:bg-accent/50"
-            }`}
-          >
-            <Pencil className="h-3 w-3" />
-            {t("gis.editor.drawMode")}
-          </button>
-          <button
-            type="button"
-            onClick={() => onDrawModeChange(false)}
-            className={`flex flex-1 items-center justify-center gap-1 border-l px-2 py-1 text-xs transition-colors ${
-              !isDrawMode
-                ? "bg-accent text-accent-foreground font-medium"
-                : "hover:bg-accent/50"
-            }`}
-          >
-            <MousePointer className="h-3 w-3" />
-            {t("gis.editor.selectMode")}
-          </button>
-        </div>
-        {canUndo && (
+      {/* Undo button row */}
+      {canUndo && (
+        <div className="flex items-center gap-1">
           <button
             type="button"
             title={t("gis.editor.undoAction")}
             onClick={onUndo}
-            className="flex shrink-0 items-center rounded-md border p-1 transition-colors hover:bg-accent/50"
+            className="flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-xs transition-colors hover:bg-accent/50"
           >
             <RotateCcw className="h-3.5 w-3.5" />
+            {t("gis.editor.undoAction")}
           </button>
-        )}
-      </div>
-
-      {/* Keyboard hint pills */}
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-muted-foreground">
-        <span className="flex items-center gap-0.5">
-          <kbd className="rounded border border-border bg-muted px-1 font-mono text-[10px]">D</kbd>
-          {t("gis.editor.kbdDraw")}
-        </span>
-        <span className="flex items-center gap-0.5">
-          <kbd className="rounded border border-border bg-muted px-1 font-mono text-[10px]">Esc</kbd>
-          {t("gis.editor.kbdCancel")}
-        </span>
-        <span className="flex items-center gap-0.5">
-          <kbd className="rounded border border-border bg-muted px-1 font-mono text-[10px]">Del</kbd>
-          {t("gis.editor.kbdDelete")}
-        </span>
-      </div>
+        </div>
+      )}
 
       {/* Progress indicator */}
       {totalBlocks > 0 && (
@@ -145,9 +101,8 @@ export function TemplateLayerPanel({
 
       {/* SVG floor plan layer row */}
       <div
-        className={`flex w-full items-center rounded-sm transition-colors hover:bg-accent/50 ${
-          !svgVisible ? "opacity-40" : ""
-        }`}
+        className={`flex w-full items-center rounded-sm transition-colors hover:bg-accent/50 ${!svgVisible ? "opacity-40" : ""
+          }`}
       >
         <div className="flex min-w-0 flex-1 items-center gap-1.5 px-2 py-1.5">
           <ImageIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -196,9 +151,8 @@ export function TemplateLayerPanel({
             return (
               <div
                 key={tpl.id}
-                className={`flex w-full items-center rounded-sm transition-colors ${
-                  isActive ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
-                } ${!isVisible ? "opacity-40" : ""}`}
+                className={`flex w-full items-center rounded-sm transition-colors ${isActive ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
+                  } ${!isVisible ? "opacity-40" : ""}`}
               >
                 <button
                   type="button"
@@ -251,6 +205,14 @@ export function TemplateLayerPanel({
             <span className="min-w-0 flex-1 truncate text-sm font-medium">
               {selectedPolygon.label}
             </span>
+            <button
+              type="button"
+              title={t("gis.editor.editShapeAction")}
+              onClick={onEditShape}
+              className="shrink-0 rounded p-0.5 transition-colors hover:bg-accent/50"
+            >
+              <Box className="h-3.5 w-3.5" />
+            </button>
             <button
               type="button"
               title={t("gis.editor.reassignAction")}

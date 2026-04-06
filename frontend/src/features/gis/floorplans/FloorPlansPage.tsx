@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useParams } from "react-router-dom";
-import { Map, Upload, Trash2, Send } from "lucide-react";
+import { Map, Upload, Trash2, Send, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
@@ -39,6 +39,7 @@ export default function FloorPlansPage() {
     openReassignDialog,
     savePolygon,
     reassignPolygon,
+    reshapePolygon,
     deletePolygon,
     clearPendingPolygon,
     clearPendingReassign,
@@ -57,7 +58,7 @@ export default function FloorPlansPage() {
     templateName: string;
     label: string;
   } | null>(null);
-  const [isDrawMode, setIsDrawMode] = useState(false);
+  const [editingGisBlockId, setEditingGisBlockId] = useState<string | null>(null);
   const [visibilityOverrides, setVisibilityOverrides] = useState<Record<string, boolean>>({});
   const [svgVisible, setSvgVisible] = useState(true);
   const [canUndo, setCanUndo] = useState(false);
@@ -75,16 +76,12 @@ export default function FloorPlansPage() {
 
     function handleKeyDown(e: KeyboardEvent) {
       if (dialogOpen) return;
-      // D — toggle draw mode on
-      if ((e.key === "d" || e.key === "D") && !e.metaKey && !e.ctrlKey) {
-        setIsDrawMode(true);
-      }
-      // Escape — exit draw mode
+      // Escape — cancel edit
       if (e.key === "Escape") {
-        setIsDrawMode(false);
+        setEditingGisBlockId(null);
       }
       // Delete / Backspace — delete the selected polygon
-      if ((e.key === "Delete" || e.key === "Backspace") && selectedPolygon) {
+      if ((e.key === "Delete" || e.key === "Backspace") && selectedPolygon && !editingGisBlockId) {
         void deletePolygon(selectedPolygon.gisBlockId, selectedPolygon.templateName);
         setSelectedPolygon(null);
         toast.success(t("gis.editor.deleteSuccess"));
@@ -93,7 +90,7 @@ export default function FloorPlansPage() {
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [pendingPolygon, pendingReassign, selectedPolygon, deletePolygon, t]);
+  }, [pendingPolygon, pendingReassign, selectedPolygon, editingGisBlockId, deletePolygon, t]);
 
   // ── Stats ──────────────────────────────────────────────────────────────────
   const totalMapped = Object.values(polygonCountByTemplate).reduce((a, b) => a + b, 0);
@@ -151,6 +148,11 @@ export default function FloorPlansPage() {
   function handleReassignSelected() {
     if (!selectedPolygon) return;
     void openReassignDialog(selectedPolygon.gisBlockId, selectedPolygon.templateName);
+  }
+
+  function handleEditShape() {
+    if (!selectedPolygon) return;
+    setEditingGisBlockId(selectedPolygon.gisBlockId);
   }
 
   function handleUndo() {
@@ -294,8 +296,6 @@ export default function FloorPlansPage() {
                     polygonCountByTemplate={polygonCountByTemplate}
                     totalBlocksByTemplate={totalBlocksByTemplate}
                     hasActiveLayout={hasActiveLayout}
-                    isDrawMode={isDrawMode}
-                    onDrawModeChange={setIsDrawMode}
                     visibilityByTemplate={visibilityByTemplate}
                     onVisibilityToggle={handleVisibilityToggle}
                     svgVisible={svgVisible}
@@ -303,6 +303,7 @@ export default function FloorPlansPage() {
                     selectedPolygon={selectedPolygon}
                     onDeleteSelected={handleDeleteSelected}
                     onReassignSelected={handleReassignSelected}
+                    onEditShape={handleEditShape}
                     canUndo={canUndo}
                     onUndo={handleUndo}
                   />
@@ -320,8 +321,6 @@ export default function FloorPlansPage() {
                   templates={templates}
                   activeTemplateName={activeTemplateName}
                   existingPolygons={existingPolygons}
-                  isDrawMode={isDrawMode}
-                  onDrawModeChange={setIsDrawMode}
                   visibilityByTemplate={visibilityByTemplate}
                   svgVisible={svgVisible}
                   selectedGisBlockId={selectedPolygon?.gisBlockId}
@@ -336,6 +335,18 @@ export default function FloorPlansPage() {
                     setCanUndo(true);
                     void openAssignmentDialog({ rings, templateName });
                   }}
+                  editingGisBlockId={editingGisBlockId}
+                  onEditComplete={(gisBlockId, rings) => {
+                    const templateName = selectedPolygon?.templateName ?? "";
+                    void reshapePolygon(gisBlockId, rings, templateName).then(() => {
+                      setEditingGisBlockId(null);
+                      toast.success(t("gis.editor.editShapeSuccess"));
+                    }).catch(() => {
+                      setEditingGisBlockId(null);
+                      toast.error(t("gis.editor.editShapeError"));
+                    });
+                  }}
+                  onEditCancel={() => setEditingGisBlockId(null)}
                 />
               </div>
             </div>

@@ -17,6 +17,7 @@ import {
     importZones,
     fetchZonesGeoJson,
     fetchLocationsGeoJson,
+    updateZone,
 } from "./zonesApi";
 import type {
     ZoneRecord,
@@ -48,6 +49,8 @@ export default function ZoneManagementPage() {
     const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
     const [drawPending, setDrawPending] = useState(false);
     const [pendingGeometry, setPendingGeometry] = useState<number[][][] | null>(null);
+
+    const [editingZoneId, setEditingZoneId] = useState<string | null>(null);
 
     const [importing, setImporting] = useState(false);
     const importInputRef = useRef<HTMLInputElement>(null);
@@ -112,6 +115,27 @@ export default function ZoneManagementPage() {
         await loadAll();
         setSelectedZoneId(null);
     }, [loadAll]);
+
+    const handleMoveComplete = useCallback(async (zoneId: string, rings: number[][][]) => {
+        const zone = zones.find((z) => z.id === zoneId);
+        if (!zone) return;
+        try {
+            await updateZone(slug, zoneId, {
+                name: zone.name,
+                description: zone.description,
+                violationAction: zone.violationAction,
+                categoryRules: zone.categoryRules,
+                coordinates: rings,
+            });
+            await loadAll();
+        } finally {
+            setEditingZoneId(null);
+        }
+    }, [slug, zones, loadAll]);
+
+    const handleMoveCanceled = useCallback(() => {
+        setEditingZoneId(null);
+    }, []);
 
     // ArcGIS Pro GeoJSON import
     const handleImportFile = useCallback(async (file: File) => {
@@ -267,6 +291,9 @@ export default function ZoneManagementPage() {
                                     onDeselect={handleDeselect}
                                     onDrawComplete={handleDrawComplete}
                                     onDrawCancel={handleDrawCancel}
+                                    editingZoneId={editingZoneId}
+                                    onMoveComplete={handleMoveComplete}
+                                    onMoveCanceled={handleMoveCanceled}
                                 />
                             </div>
 
@@ -280,6 +307,7 @@ export default function ZoneManagementPage() {
                                     onSaveSuccess={handleSaveSuccess}
                                     onDeleteSuccess={handleDeleteSuccess}
                                     onCancelCreate={handleCancelCreate}
+                                    onEditShape={selectedZoneId ? () => { setEditingZoneId(selectedZoneId); } : undefined}
                                 />
                             </div>
                         </div>

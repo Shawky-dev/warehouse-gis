@@ -15,7 +15,7 @@ import { listCategories } from "@/features/tenant/api/f0Api";
 import type { CategoryResult } from "@/features/tenant/types/f0";
 import { createZone, updateZone, deleteZone, extractZoneErrorMessage } from "./zonesApi";
 import type { ZoneRecord, CategoryRule } from "./zonesApi";
-import { Trash2 } from "lucide-react";
+import { Move, Trash2 } from "lucide-react";
 
 type RuleType = "ALLOWED" | "PROHIBITED" | "NONE";
 
@@ -28,6 +28,7 @@ interface ZoneAttributePanelProps {
     onSaveSuccess: (updated: ZoneRecord) => void;
     onDeleteSuccess: (zoneId: string) => void;
     onCancelCreate?: () => void;
+    onEditShape?: () => void;
 }
 
 export function ZoneAttributePanel({
@@ -38,6 +39,7 @@ export function ZoneAttributePanel({
     onSaveSuccess,
     onDeleteSuccess,
     onCancelCreate,
+    onEditShape,
 }: ZoneAttributePanelProps) {
     const { t } = useI18n();
     const isCreateMode = pendingGeometry != null && zone == null;
@@ -165,16 +167,29 @@ export function ZoneAttributePanel({
                     )}
                 </div>
                 {!isCreateMode && canManage ? (
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
-                        onClick={handleDelete}
-                        disabled={deleting}
-                        title={t("gis.zones.deleteZone")}
-                    >
-                        <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                        {onEditShape && (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 shrink-0"
+                                onClick={onEditShape}
+                                title={t("gis.zones.editShape")}
+                            >
+                                <Move className="h-3.5 w-3.5" />
+                            </Button>
+                        )}
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
+                            onClick={handleDelete}
+                            disabled={deleting}
+                            title={t("gis.zones.deleteZone")}
+                        >
+                            <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                    </div>
                 ) : isCreateMode && onCancelCreate ? (
                     <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={onCancelCreate}>
                         {t("gis.zones.cancelCreate")}

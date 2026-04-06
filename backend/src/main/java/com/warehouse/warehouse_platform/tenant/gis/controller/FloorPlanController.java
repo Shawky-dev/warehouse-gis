@@ -89,8 +89,7 @@ public class FloorPlanController {
                 "anchorLat", gisProperties.getAnchorLat(),
                 "widthMeters", gisProperties.getWidthMeters(),
                 "lengthMeters", gisProperties.getLengthMeters(),
-                "hasFloorPlan", hasFloorPlan
-        ));
+                "hasFloorPlan", hasFloorPlan));
     }
 
     @GetMapping("/floorplan/svg")
@@ -153,7 +152,8 @@ public class FloorPlanController {
     // ── New endpoints ─────────────────────────────────────────────────────────
 
     /**
-     * Returns a flat list of layout blocks for the active layout filtered by template name.
+     * Returns a flat list of layout blocks for the active layout filtered by
+     * template name.
      * Each entry includes id, fullCode, templateName, and depth.
      */
     @GetMapping("/floorplan/blocks")
@@ -267,7 +267,8 @@ public class FloorPlanController {
     }
 
     /**
-     * Reassigns an existing GisBlock to a different LayoutBlock without changing its geometry.
+     * Reassigns an existing GisBlock to a different LayoutBlock without changing
+     * its geometry.
      */
     @PatchMapping("/blocks/manual/{gisBlockId}")
     @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).GIS_FLOOR_PLAN_MANAGE)")
@@ -298,6 +299,48 @@ public class FloorPlanController {
     }
 
     /**
+     * Updates the geometry of an existing GisBlock without changing its block
+     * assignment.
+     */
+    @PatchMapping("/blocks/manual/{gisBlockId}/geometry")
+    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).GIS_FLOOR_PLAN_MANAGE)")
+    public ResponseEntity<?> updateManualBlockGeometry(
+            @PathVariable String tenantSlug,
+            @PathVariable UUID gisBlockId,
+            @RequestBody GeometryUpdateRequest request,
+            Authentication authentication) {
+        tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
+
+        Optional<GisBlock> opt = gisBlockRepository.findById(gisBlockId);
+        if (opt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        List<List<Double>> exteriorCoords = request.getRings().get(0);
+        Coordinate[] coordinates = new Coordinate[exteriorCoords.size()];
+        for (int i = 0; i < exteriorCoords.size(); i++) {
+            List<Double> pt = exteriorCoords.get(i);
+            coordinates[i] = new Coordinate(pt.get(0), pt.get(1));
+        }
+
+        GeometryFactory gf = new GeometryFactory(new PrecisionModel(), 4326);
+        LinearRing ring = gf.createLinearRing(coordinates);
+        Polygon polygon = gf.createPolygon(ring);
+        Point centroid = polygon.getCentroid();
+        centroid.setSRID(4326);
+
+        GisBlock gisBlock = opt.get();
+        gisBlock.setGeometry(polygon);
+        gisBlock.setCentroidGeom(centroid);
+        gisBlockRepository.save(gisBlock);
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("id", gisBlock.getId());
+        resp.put("label", gisBlock.getLabel());
+        return ResponseEntity.ok(resp);
+    }
+
+    /**
      * Deletes a manually drawn GisBlock polygon by its UUID.
      */
     @DeleteMapping("/blocks/manual/{gisBlockId}")
@@ -321,18 +364,65 @@ public class FloorPlanController {
         private int depth;
         private List<List<List<Double>>> rings;
 
-        public UUID getLayoutBlockId() { return layoutBlockId; }
-        public void setLayoutBlockId(UUID layoutBlockId) { this.layoutBlockId = layoutBlockId; }
-        public String getTemplateName() { return templateName; }
-        public void setTemplateName(String templateName) { this.templateName = templateName; }
-        public String getLabel() { return label; }
-        public void setLabel(String label) { this.label = label; }
-        public String getPositionPath() { return positionPath; }
-        public void setPositionPath(String positionPath) { this.positionPath = positionPath; }
-        public int getDepth() { return depth; }
-        public void setDepth(int depth) { this.depth = depth; }
-        public List<List<List<Double>>> getRings() { return rings; }
-        public void setRings(List<List<List<Double>>> rings) { this.rings = rings; }
+        public UUID getLayoutBlockId() {
+            return layoutBlockId;
+        }
+
+        public void setLayoutBlockId(UUID layoutBlockId) {
+            this.layoutBlockId = layoutBlockId;
+        }
+
+        public String getTemplateName() {
+            return templateName;
+        }
+
+        public void setTemplateName(String templateName) {
+            this.templateName = templateName;
+        }
+
+        public String getLabel() {
+            return label;
+        }
+
+        public void setLabel(String label) {
+            this.label = label;
+        }
+
+        public String getPositionPath() {
+            return positionPath;
+        }
+
+        public void setPositionPath(String positionPath) {
+            this.positionPath = positionPath;
+        }
+
+        public int getDepth() {
+            return depth;
+        }
+
+        public void setDepth(int depth) {
+            this.depth = depth;
+        }
+
+        public List<List<List<Double>>> getRings() {
+            return rings;
+        }
+
+        public void setRings(List<List<List<Double>>> rings) {
+            this.rings = rings;
+        }
+    }
+
+    public static class GeometryUpdateRequest {
+        private List<List<List<Double>>> rings;
+
+        public List<List<List<Double>>> getRings() {
+            return rings;
+        }
+
+        public void setRings(List<List<List<Double>>> rings) {
+            this.rings = rings;
+        }
     }
 
     public static class ReassignRequest {
@@ -341,13 +431,36 @@ public class FloorPlanController {
         private String positionPath;
         private int depth;
 
-        public UUID getLayoutBlockId() { return layoutBlockId; }
-        public void setLayoutBlockId(UUID layoutBlockId) { this.layoutBlockId = layoutBlockId; }
-        public String getLabel() { return label; }
-        public void setLabel(String label) { this.label = label; }
-        public String getPositionPath() { return positionPath; }
-        public void setPositionPath(String positionPath) { this.positionPath = positionPath; }
-        public int getDepth() { return depth; }
-        public void setDepth(int depth) { this.depth = depth; }
+        public UUID getLayoutBlockId() {
+            return layoutBlockId;
+        }
+
+        public void setLayoutBlockId(UUID layoutBlockId) {
+            this.layoutBlockId = layoutBlockId;
+        }
+
+        public String getLabel() {
+            return label;
+        }
+
+        public void setLabel(String label) {
+            this.label = label;
+        }
+
+        public String getPositionPath() {
+            return positionPath;
+        }
+
+        public void setPositionPath(String positionPath) {
+            this.positionPath = positionPath;
+        }
+
+        public int getDepth() {
+            return depth;
+        }
+
+        public void setDepth(int depth) {
+            this.depth = depth;
+        }
     }
 }

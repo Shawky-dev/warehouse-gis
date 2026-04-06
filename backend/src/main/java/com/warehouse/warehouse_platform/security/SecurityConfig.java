@@ -61,15 +61,17 @@ public class SecurityConfig {
                                 HttpMethod.POST,
                                 "/landlord/auth/login",
                                 "/landlord/auth/refresh",
-                                "/landlord/auth/logout").permitAll()
+                                "/landlord/auth/logout")
+                        .permitAll()
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/*/auth/login",
                                 "/*/auth/refresh",
-                                "/*/auth/logout").permitAll()
+                                "/*/auth/logout")
+                        .permitAll()
                         .requestMatchers("/landlord/**")
-                        .access((authentication, context) ->
-                                new org.springframework.security.authorization.AuthorizationDecision(
+                        .access((authentication,
+                                context) -> new org.springframework.security.authorization.AuthorizationDecision(
                                         isBootstrapTenantAuthentication(authentication.get())))
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
@@ -96,15 +98,14 @@ public class SecurityConfig {
         CorsConfiguration config = new CorsConfiguration();
 
         config.setAllowedOriginPatterns(allowedOriginPatterns);
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of(
                 "Authorization",
                 "Content-Type",
                 "Accept",
                 "Origin",
                 "X-Requested-With",
-                "X-TENANT-ID"
-        ));
+                "X-TENANT-ID"));
         config.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
