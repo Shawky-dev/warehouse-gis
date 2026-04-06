@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { Globe } from "lucide-react";
+import { Globe, Download } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Button } from "@/shared/components/ui/button";
 import { useI18n } from "@/i18n";
 import { normalizeTenantSlug } from "@/features/auth/shared/scope";
 import { PATHS } from "@/shared/consts/paths";
+import { downloadGeoJson } from "@/lib/exportGeoJson";
 import { useFloorPlanApi } from "../floorplans/useFloorPlanApi";
 import { useEditorState } from "../floorplans/useEditorState";
 import { WarehouseMapView } from "../floorplans/WarehouseMapView";
@@ -83,13 +84,54 @@ export default function WarehouseMapPage() {
     setVisibilityOverrides((prev) => ({ ...prev, [templateName]: !(prev[templateName] ?? true) }));
   }
 
+  function handleExport() {
+    type Feature = { type: string; id?: unknown; geometry: unknown; properties: unknown };
+    const features: Feature[] = [];
+    if (zonesVisible && zonesGeoJson) {
+      features.push(...(zonesGeoJson.features as Feature[]));
+    }
+    if (hazardBuffersVisible && hazardBuffersGeoJson) {
+      features.push(...(hazardBuffersGeoJson.features as Feature[]));
+    }
+    for (const polygon of existingPolygons) {
+      if (visibilityByTemplate[polygon.templateName] !== false) {
+        features.push({
+          type: "Feature",
+          geometry: { type: "Polygon", coordinates: polygon.rings },
+          properties: {
+            gisBlockId: polygon.gisBlockId,
+            templateName: polygon.templateName,
+            label: polygon.label,
+            positionPath: polygon.positionPath,
+          },
+        });
+      }
+    }
+    downloadGeoJson({ type: "FeatureCollection", features }, "warehouse-map.geojson");
+  }
+
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-xl font-semibold">{t("gis.viewer.pageTitle")}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {t("gis.viewer.pageDescription")}
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-semibold">{t("gis.viewer.pageTitle")}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {t("gis.viewer.pageDescription")}
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleExport}
+          disabled={
+            (!zonesGeoJson || zonesGeoJson.features.length === 0) &&
+            (!hazardBuffersGeoJson || hazardBuffersGeoJson.features.length === 0) &&
+            existingPolygons.length === 0
+          }
+        >
+          <Download className="mr-1.5 h-3.5 w-3.5" />
+          {t("gis.viewer.exportGeoJson")}
+        </Button>
       </div>
 
       <Card>

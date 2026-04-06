@@ -425,7 +425,7 @@ export default function TenantCategoriesPage() {
                 value={formRequiredZoneTypeId}
                 onChange={(e) => setFormRequiredZoneTypeId(e.target.value)}
               >
-                <option value="">{t("categories.requiredZoneTypePlaceholder")}</option>
+                <option value="" disabled>{t("categories.requiredZoneTypePlaceholder")}</option>
                 {zoneTypes.map((zt) => (
                   <option key={zt.id} value={zt.id}>{zt.code} — {zt.displayName}</option>
                 ))}

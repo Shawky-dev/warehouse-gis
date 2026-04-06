@@ -579,7 +579,7 @@ export default function ReceiptsPage() {
                                             setLineForm((current) => ({ ...current, productId: event.target.value }))
                                         }
                                     >
-                                        <option value="">{t("receipts.form.selectProduct")}</option>
+                                        <option value="" disabled>{t("receipts.form.selectProduct")}</option>
                                         {products.map((product) => (
                                             <option key={product.id} value={product.id}>
                                                 {product.sku} · {product.name}
@@ -597,7 +597,7 @@ export default function ReceiptsPage() {
                                             setLineForm((current) => ({ ...current, destinationLocationId: event.target.value }))
                                         }
                                     >
-                                        <option value="">{t("receipts.form.selectDestination")}</option>
+                                        <option value="" disabled>{t("receipts.form.selectDestination")}</option>
                                         {locations.map((location) => (
                                             <option key={location.id} value={location.id}>
                                                 {location.pathLabel}
@@ -1001,7 +1001,7 @@ export default function ReceiptsPage() {
                                 value={createSupplierId}
                                 onChange={(event) => setCreateSupplierId(event.target.value)}
                             >
-                                <option value="">{t("receipts.form.selectSupplier")}</option>
+                                <option value="" disabled>{t("receipts.form.selectSupplier")}</option>
                                 {suppliers.map((supplier) => (
                                     <option key={supplier.id} value={supplier.id}>
                                         {supplier.code} · {supplier.name}

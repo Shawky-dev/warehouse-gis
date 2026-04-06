@@ -264,7 +264,7 @@ export function ZoneAttributePanel({
                         disabled={!canManage}
                         onChange={(e) => setZoneTypeId(e.target.value)}
                     >
-                        <option value="">{t("gis.zones.zoneTypePlaceholder")}</option>
+                        <option value="" disabled>{t("gis.zones.zoneTypePlaceholder")}</option>
                         {allZoneTypes.map((zt) => (
                             <option key={zt.id} value={zt.id}>{zt.code} — {zt.displayName}</option>
                         ))}

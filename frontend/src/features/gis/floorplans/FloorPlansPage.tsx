@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useParams } from "react-router-dom";
-import { Map, Upload, Trash2, Send, Pencil } from "lucide-react";
+import { Map, Upload, Trash2, Send, Pencil, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
@@ -9,6 +9,7 @@ import { TENANT_PERMISSIONS } from "@/features/auth/shared/permissions";
 import { useI18n } from "@/i18n";
 import { normalizeTenantSlug } from "@/features/auth/shared/scope";
 import { api } from "@/lib/api";
+import { downloadGeoJson } from "@/lib/exportGeoJson";
 import { useFloorPlanApi } from "./useFloorPlanApi";
 import { useEditorState } from "./useEditorState";
 import { WarehouseMapView, type WarehouseMapViewHandle } from "./WarehouseMapView";
@@ -165,13 +166,37 @@ export default function FloorPlansPage() {
     setVisibilityOverrides((prev) => ({ ...prev, [templateName]: !(prev[templateName] ?? true) }));
   }
 
+  function handleExport() {
+    const features = existingPolygons
+      .filter((p) => visibilityByTemplate[p.templateName] !== false)
+      .map((p) => ({
+        type: "Feature" as const,
+        geometry: { type: "Polygon" as const, coordinates: p.rings },
+        properties: {
+          gisBlockId: p.gisBlockId,
+          templateName: p.templateName,
+          label: p.label,
+          positionPath: p.positionPath,
+        },
+      }));
+    downloadGeoJson({ type: "FeatureCollection", features }, "floor-plan-blocks.geojson");
+  }
+
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-xl font-semibold">{t("gis.floorPlans.pageTitle")}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {t("gis.floorPlans.pageDescription")}
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-semibold">{t("gis.floorPlans.pageTitle")}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {t("gis.floorPlans.pageDescription")}
+          </p>
+        </div>
+        {existingPolygons.length > 0 && (
+          <Button variant="outline" size="sm" onClick={handleExport}>
+            <Download className="mr-1.5 h-3.5 w-3.5" />
+            {t("gis.floorPlans.exportGeoJson")}
+          </Button>
+        )}
       </div>
 
       {canManage ? (

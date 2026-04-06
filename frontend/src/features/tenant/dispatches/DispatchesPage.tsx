@@ -622,7 +622,7 @@ export default function DispatchesPage() {
                                             setLineForm((current) => ({ ...current, productId: event.target.value }))
                                         }
                                     >
-                                        <option value="">{t("dispatches.form.selectProduct")}</option>
+                                        <option value="" disabled>{t("dispatches.form.selectProduct")}</option>
                                         {products.map((product) => (
                                             <option key={product.id} value={product.id}>
                                                 {product.sku} · {product.name}
@@ -640,7 +640,7 @@ export default function DispatchesPage() {
                                             setLineForm((current) => ({ ...current, sourceLocationId: event.target.value }))
                                         }
                                     >
-                                        <option value="">{t("dispatches.form.selectSource")}</option>
+                                        <option value="" disabled>{t("dispatches.form.selectSource")}</option>
                                         {locations.map((location) => (
                                             <option key={location.id} value={location.id}>
                                                 {location.pathLabel}

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Layers, PlusCircle, Upload, Shield, AlertTriangle } from "lucide-react";
+import { Layers, PlusCircle, Upload, Shield, AlertTriangle, Download } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Button } from "@/shared/components/ui/button";
 import { Badge } from "@/shared/components/ui/badge";
@@ -9,6 +9,7 @@ import { TENANT_PERMISSIONS } from "@/features/auth/shared/permissions";
 import { useI18n } from "@/i18n";
 import { normalizeTenantSlug } from "@/features/auth/shared/scope";
 import { PATHS } from "@/shared/consts/paths";
+import { downloadGeoJson } from "@/lib/exportGeoJson";
 import { useFloorPlanApi } from "../floorplans/useFloorPlanApi";
 import { ZoneMapView } from "./ZoneMapView";
 import { ZoneAttributePanel } from "./ZoneAttributePanel";
@@ -165,6 +166,15 @@ export default function ZoneManagementPage() {
                 </div>
                 {canManage && (
                     <div className="flex gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={!zonesGeoJson || zonesGeoJson.features.length === 0}
+                            onClick={() => downloadGeoJson(zonesGeoJson!, "zones.geojson")}
+                        >
+                            <Download className="mr-1.5 h-3.5 w-3.5" />
+                            {t("gis.zones.exportGeoJson")}
+                        </Button>
                         <Button
                             variant="outline"
                             size="sm"

@@ -198,9 +198,14 @@ public class HazardBufferService {
     }
 
     private List<HazardType> resolveHazardTypes(JsonNode props, int index) {
-        JsonNode typesNode = props.has("restrictedHazardTypes")
-                ? props.path("restrictedHazardTypes")
-                : props.path("hazardType");
+        JsonNode typesNode;
+        if (props.has("restrictedHazardTypes")) {
+            typesNode = props.path("restrictedHazardTypes");
+        } else if (props.has("restrictedHazardTypeCodes")) {
+            typesNode = props.path("restrictedHazardTypeCodes");
+        } else {
+            typesNode = props.path("hazardType");
+        }
 
         List<String> codes = new ArrayList<>();
         if (typesNode.isArray()) {

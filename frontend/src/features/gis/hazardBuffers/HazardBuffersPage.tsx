@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
+import { Download } from "lucide-react";
 import { normalizeTenantSlug } from "@/features/auth/shared/scope";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { TENANT_PERMISSIONS } from "@/features/auth/shared/permissions";
@@ -7,10 +8,12 @@ import { useI18n } from "@/i18n";
 import {
     deleteHazardBuffer,
     extractHazardBufferErrorMessage,
+    fetchHazardBuffersGeoJson,
     importHazardBuffers,
     listHazardBuffers,
 } from "@/features/gis/hazardBuffers/hazardBuffersApi";
 import type { HazardBufferResult } from "@/features/tenant/types/gis";
+import { downloadGeoJson } from "@/lib/exportGeoJson";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import {
@@ -36,6 +39,7 @@ export default function HazardBuffersPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [pageError, setPageError] = useState<string | null>(null);
     const [isImporting, setIsImporting] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<HazardBufferResult | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
@@ -78,6 +82,18 @@ export default function HazardBuffersPage() {
         }
     };
 
+    const handleExport = async () => {
+        setIsExporting(true);
+        try {
+            const geoJson = await fetchHazardBuffersGeoJson(slug);
+            downloadGeoJson(geoJson, "hazard-buffers.geojson");
+        } catch {
+            // export failure is non-critical
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
     const handleDelete = async () => {
         if (!deleteTarget) return;
         setIsDeleting(true);
@@ -100,6 +116,14 @@ export default function HazardBuffersPage() {
             </div>
 
             <div className="flex items-center gap-2">
+                <Button
+                    variant="outline"
+                    disabled={items.length === 0 || isExporting}
+                    onClick={() => void handleExport()}
+                >
+                    <Download className="mr-1.5 h-4 w-4" />
+                    {isExporting ? "..." : t("gis.hazardBuffers.exportGeoJson")}
+                </Button>
                 {canManage && (
                     <>
                         <Button onClick={handleImportClick} disabled={isImporting}>

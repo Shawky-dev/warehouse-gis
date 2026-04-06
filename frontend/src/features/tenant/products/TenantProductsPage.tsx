@@ -542,7 +542,7 @@ export default function TenantProductsPage() {
                 value={formBaseUomId}
                 onChange={(e) => setFormBaseUomId(e.target.value)}
               >
-                <option value="">{t("products.baseUomPlaceholder")}</option>
+                <option value="" disabled>{t("products.baseUomPlaceholder")}</option>
                 {allUoms.map((uom) => (
                   <option key={uom.id} value={uom.id}>
                     {uom.code} – {uom.name}
@@ -558,7 +558,7 @@ export default function TenantProductsPage() {
                 value={formCategoryId}
                 onChange={(e) => setFormCategoryId(e.target.value)}
               >
-                <option value="">{t("products.categoryPlaceholder")}</option>
+                <option value="" disabled>{t("products.categoryPlaceholder")}</option>
                 {allCategories.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -574,7 +574,7 @@ export default function TenantProductsPage() {
                 value={formHazardTypeId}
                 onChange={(e) => setFormHazardTypeId(e.target.value)}
               >
-                <option value="">{t("products.hazardTypePlaceholder")}</option>
+                <option value="" disabled>{t("products.hazardTypePlaceholder")}</option>
                 {allHazardTypes.map((ht) => (
                   <option key={ht.id} value={ht.id}>
                     {ht.code} — {ht.displayName}
@@ -623,7 +623,7 @@ export default function TenantProductsPage() {
                   value={formPrimarySupplierId}
                   onChange={(e) => setFormPrimarySupplierId(e.target.value)}
                 >
-                  <option value="">{t("products.primarySupplierPlaceholder")}</option>
+                  <option value="" disabled>{t("products.primarySupplierPlaceholder")}</option>
                   {allSuppliers
                     .filter((s) => formSupplierIds.includes(s.id))
                     .map((s) => (

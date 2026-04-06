@@ -25,8 +25,8 @@ export function StorageRuleViolationBanner({
                         <p className="font-medium">{t("gis.storageViolation.hazardBuffer.title")}</p>
                         <p>{violation.message}</p>
                         <p className="mt-0.5">
-                            <span className="font-medium">{t("gis.storageViolation.hazardBuffer.areaLabel")}: </span>
-                            {violation.violatedArea.name}
+                            <span className="font-medium">{t("gis.storageViolation.hazardBuffer.violatedArea")}: </span>
+                            {violation.violatedArea?.name}
                         </p>
                         {violation.restrictedHazardTypes.length > 0 && (
                             <div className="flex flex-wrap items-center gap-1">
@@ -71,13 +71,13 @@ export function StorageRuleViolationBanner({
                     <div className="space-y-1">
                         <p className="font-medium">
                             {isBlock
-                                ? t("gis.storageViolation.zone.titleBlock")
-                                : t("gis.storageViolation.zone.titleWarn")}
+                                ? t("gis.storageViolation.zone.blockTitle")
+                                : t("gis.storageViolation.zone.warnTitle")}
                         </p>
                         <p>{violation.message}</p>
                         <p className="mt-0.5">
-                            <span className="font-medium">{t("gis.storageViolation.zone.areaLabel")}: </span>
-                            {violation.violatedArea.name}
+                            <span className="font-medium">{t("gis.storageViolation.zone.violatedArea")}: </span>
+                            {violation.violatedArea?.name}
                         </p>
                         {violation.suggestedZones.length > 0 && (
                             <p className="mt-0.5">
@@ -126,7 +126,7 @@ export function StorageRuleViolationBanner({
                     <p>{violation.message}</p>
                     <p className="mt-0.5">
                         <span className="font-medium">{t("gis.storageViolation.requiredZone.requiredType")}: </span>
-                        {violation.requiredZoneType.displayName}
+                        {violation.requiredZoneType?.displayName}
                     </p>
                     {violation.suggestedZones.length > 0 && (
                         <p className="mt-0.5">
