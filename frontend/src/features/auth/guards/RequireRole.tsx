@@ -1,7 +1,6 @@
 import { useAuth } from "@/features/auth/context/AuthContext";
 import type { ReactNode } from "react";
 import { AuthStatusScreen } from "@/features/auth/components/AuthStatusScreen";
-import { useI18n } from "@/i18n";
 import { AccessDeniedScreen } from "@/features/auth/components/AccessDeniedScreen";
 
 interface RequireRoleProps {
@@ -11,15 +10,9 @@ interface RequireRoleProps {
 
 export function RequireRole({ role, children }: RequireRoleProps) {
   const { status, hasRole } = useAuth();
-  const { t } = useI18n();
 
   if (status === "idle" || status === "loading") {
-    return (
-      <AuthStatusScreen
-        title={t("authStatus.permissionsTitle")}
-        description={t("authStatus.permissionsDescription")}
-      />
-    );
+    return <AuthStatusScreen variant="permissions" />;
   }
 
   if (!hasRole(role)) {

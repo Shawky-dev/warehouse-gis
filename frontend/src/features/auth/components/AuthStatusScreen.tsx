@@ -1,17 +1,28 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
+import { useI18n } from "@/i18n";
+
+export type AuthStatusVariant = "restoring" | "permissions" | "preparing" | "workspace";
+
+const VARIANT_KEYS: Record<AuthStatusVariant, { title: string; description: string }> = {
+  restoring: { title: "authStatus.restoringTitle", description: "authStatus.restoringDescription" },
+  permissions: { title: "authStatus.permissionsTitle", description: "authStatus.permissionsDescription" },
+  preparing: { title: "authStatus.preparingTitle", description: "authStatus.preparingDescription" },
+  workspace: { title: "authStatus.workspaceTitle", description: "authStatus.workspaceDescription" },
+};
 
 interface AuthStatusScreenProps {
-  title: string;
-  description: string;
+  variant: AuthStatusVariant;
 }
 
-export function AuthStatusScreen({ title, description }: AuthStatusScreenProps) {
+export function AuthStatusScreen({ variant }: AuthStatusScreenProps) {
+  const { t } = useI18n();
+  const keys = VARIANT_KEYS[variant];
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>{title}</CardTitle>
-          <CardDescription>{description}</CardDescription>
+          <CardTitle>{t(keys.title)}</CardTitle>
+          <CardDescription>{t(keys.description)}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="h-1.5 w-full overflow-hidden bg-muted">
