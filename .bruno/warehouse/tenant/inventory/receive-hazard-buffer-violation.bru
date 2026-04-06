@@ -1,0 +1,39 @@
+meta {
+  name: receive-hazard-buffer-violation
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{URL}}/{{TENANT_SLUG}}/inventory/receive
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+body:json {
+  {
+    "locationId": "{{LOCATION_ID}}",
+    "productId": "{{FLAMMABLE_PRODUCT_ID}}",
+    "qty": "5.00",
+    "notes": "Test: should fail with HAZARD_BUFFER_VIOLATION (BLOCK)"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Scenario: product has hazardType = FLAMMABLE, location is inside a hazard buffer
+  that restricts FLAMMABLE. Expected response: 409 Conflict with error = HAZARD_BUFFER_VIOLATION,
+  violationAction = BLOCK. Cannot be overridden.
+}

@@ -2,6 +2,7 @@ package com.warehouse.warehouse_platform.tenant.category;
 
 import com.warehouse.warehouse_platform.tenant.audit.TenantAuditService;
 import com.warehouse.warehouse_platform.tenant.product.ProductRepository;
+import com.warehouse.warehouse_platform.tenant.zonetype.ZoneTypeRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,18 +31,21 @@ class TenantCategoryManagementServiceTest {
     private ProductRepository productRepository;
 
     @Mock
+    private ZoneTypeRepository zoneTypeRepository;
+
+    @Mock
     private TenantAuditService tenantAuditService;
 
     private TenantCategoryManagementService service;
 
     @BeforeEach
     void setUp() {
-        service = new TenantCategoryManagementService(productCategoryRepository, productRepository, tenantAuditService);
+        service = new TenantCategoryManagementService(productCategoryRepository, productRepository, zoneTypeRepository,
+                tenantAuditService);
     }
 
     @Test
     void createCategory_shouldNormalizeNameAndAudit() {
-        when(productCategoryRepository.findByNameIgnoreCase("Perishables")).thenReturn(Optional.empty());
         when(productCategoryRepository.save(any(ProductCategory.class))).thenAnswer(invocation -> {
             ProductCategory saved = invocation.getArgument(0);
             saved.setId(UUID.fromString("11111111-1111-1111-1111-111111111111"));
@@ -50,12 +54,13 @@ class TenantCategoryManagementServiceTest {
             return saved;
         });
 
-        TenantCategoryManagementService.CategoryResult result =
-                service.createCategory("  Perishables  ", "Food items with expiry");
+        TenantCategoryManagementService.CategoryResult result = service.createCategory("  Perishables  ",
+                "Food items with expiry");
 
         assertEquals("Perishables", result.name());
         assertEquals("Food items with expiry", result.description());
-        verify(tenantAuditService).record(eq("CATEGORY_CREATE"), eq("CATEGORY"), eq(result.id().toString()), eq(null), any());
+        verify(tenantAuditService).record(eq("CATEGORY_CREATE"), eq("CATEGORY"), eq(result.id().toString()), eq(null),
+                any());
 
         ArgumentCaptor<ProductCategory> captor = ArgumentCaptor.forClass(ProductCategory.class);
         verify(productCategoryRepository).save(captor.capture());
@@ -64,7 +69,7 @@ class TenantCategoryManagementServiceTest {
 
     @Test
     void createCategory_shouldRejectDuplicateName() {
-        when(productCategoryRepository.findByNameIgnoreCase("Metals"))
+        when(productCategoryRepository.findByCodeIgnoreCase("METALS"))
                 .thenReturn(Optional.of(category(UUID.randomUUID(), "Metals", true)));
 
         TenantCategoryManagementException ex = assertThrows(
@@ -77,7 +82,8 @@ class TenantCategoryManagementServiceTest {
     @Test
     void hardDeleteCategory_shouldRejectWhenStillActive() {
         UUID categoryId = UUID.fromString("22222222-2222-2222-2222-222222222222");
-        when(productCategoryRepository.findById(categoryId)).thenReturn(Optional.of(category(categoryId, "Metals", true)));
+        when(productCategoryRepository.findById(categoryId))
+                .thenReturn(Optional.of(category(categoryId, "Metals", true)));
 
         TenantCategoryManagementException ex = assertThrows(
                 TenantCategoryManagementException.class,
@@ -89,7 +95,8 @@ class TenantCategoryManagementServiceTest {
     @Test
     void hardDeleteCategory_shouldRejectWhenReferencedByProducts() {
         UUID categoryId = UUID.fromString("33333333-3333-3333-3333-333333333333");
-        when(productCategoryRepository.findById(categoryId)).thenReturn(Optional.of(category(categoryId, "Metals", false)));
+        when(productCategoryRepository.findById(categoryId))
+                .thenReturn(Optional.of(category(categoryId, "Metals", false)));
         when(productRepository.countByCategory_Id(categoryId)).thenReturn(2L);
 
         TenantCategoryManagementException ex = assertThrows(
@@ -102,13 +109,15 @@ class TenantCategoryManagementServiceTest {
     @Test
     void hardDeleteCategory_shouldDeleteWhenInactiveAndUnreferenced() {
         UUID categoryId = UUID.fromString("44444444-4444-4444-4444-444444444444");
-        when(productCategoryRepository.findById(categoryId)).thenReturn(Optional.of(category(categoryId, "Metals", false)));
+        when(productCategoryRepository.findById(categoryId))
+                .thenReturn(Optional.of(category(categoryId, "Metals", false)));
         when(productRepository.countByCategory_Id(categoryId)).thenReturn(0L);
 
         service.hardDeleteCategory(categoryId);
 
         verify(productCategoryRepository).delete(any(ProductCategory.class));
-        verify(tenantAuditService).record(eq("CATEGORY_HARD_DELETE"), eq("CATEGORY"), eq(categoryId.toString()), any(), eq(null));
+        verify(tenantAuditService).record(eq("CATEGORY_HARD_DELETE"), eq("CATEGORY"), eq(categoryId.toString()), any(),
+                eq(null));
     }
 
     private ProductCategory category(UUID id, String name, boolean active) {

@@ -1,0 +1,24 @@
+meta {
+  name: list-hazard-buffers
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{URL}}/{{TENANT_SLUG}}/gis/hazard-buffers
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

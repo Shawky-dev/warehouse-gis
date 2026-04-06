@@ -11,6 +11,7 @@ import com.warehouse.warehouse_platform.tenant.warehouse.layout.WarehouseLayout;
 import com.warehouse.warehouse_platform.tenant.warehouse.layout.WarehouseLayoutRepository;
 import com.warehouse.warehouse_platform.tenant.warehouse.locationkind.WarehouseLocationKind;
 import com.warehouse.warehouse_platform.tenant.gis.service.GisZoneValidationService;
+import com.warehouse.warehouse_platform.tenant.gis.service.InventoryValidationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -45,6 +46,8 @@ class InventoryLedgerServiceTest {
         BlockTemplateRepository blockTemplateRepository;
         @Mock
         GisZoneValidationService gisZoneValidationService;
+        @Mock
+        InventoryValidationService inventoryValidationService;
 
         InventoryLedgerService service;
 
@@ -63,7 +66,8 @@ class InventoryLedgerServiceTest {
                                 productRepository,
                                 warehouseLayoutRepository,
                                 blockTemplateRepository,
-                                gisZoneValidationService);
+                                gisZoneValidationService,
+                                inventoryValidationService);
         }
 
         @Test

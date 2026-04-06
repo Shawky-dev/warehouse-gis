@@ -1,6 +1,7 @@
 package com.warehouse.warehouse_platform.tenant.inventory;
 
 import com.warehouse.warehouse_platform.tenant.gis.service.GisZoneValidationService;
+import com.warehouse.warehouse_platform.tenant.gis.service.InventoryValidationService;
 import com.warehouse.warehouse_platform.tenant.product.Product;
 import com.warehouse.warehouse_platform.tenant.product.ProductRepository;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplate;
@@ -46,6 +47,7 @@ public class InventoryLedgerService {
     private final WarehouseLayoutRepository warehouseLayoutRepository;
     private final BlockTemplateRepository blockTemplateRepository;
     private final GisZoneValidationService gisZoneValidationService;
+    private final InventoryValidationService inventoryValidationService;
 
     public InventoryLedgerService(
             StockMovementRepository movementRepository,
@@ -53,13 +55,15 @@ public class InventoryLedgerService {
             ProductRepository productRepository,
             WarehouseLayoutRepository warehouseLayoutRepository,
             BlockTemplateRepository blockTemplateRepository,
-            GisZoneValidationService gisZoneValidationService) {
+            GisZoneValidationService gisZoneValidationService,
+            InventoryValidationService inventoryValidationService) {
         this.movementRepository = movementRepository;
         this.layoutBlockRepository = layoutBlockRepository;
         this.productRepository = productRepository;
         this.warehouseLayoutRepository = warehouseLayoutRepository;
         this.blockTemplateRepository = blockTemplateRepository;
         this.gisZoneValidationService = gisZoneValidationService;
+        this.inventoryValidationService = inventoryValidationService;
     }
 
     @Transactional
@@ -77,8 +81,7 @@ public class InventoryLedgerService {
         validateQtyPositive(qty, "receive qty must be positive");
         assertSelectableLocation(locationId);
         Product product = loadProduct(productId);
-        UUID categoryId = product.getCategory() != null ? product.getCategory().getId() : null;
-        gisZoneValidationService.assertLocationAllowsProduct(locationId, categoryId, zoneOverride);
+        inventoryValidationService.assertLocationAllowsProduct(locationId, product, zoneOverride);
         String normalizedLotNumber = normalizeOptional(lotNumber);
 
         StockMovement movement = StockMovement.builder()
@@ -143,8 +146,7 @@ public class InventoryLedgerService {
         assertSelectableLocation(fromLocationId);
         assertSelectableLocation(toLocationId);
         Product product = loadProduct(productId);
-        UUID categoryId = product.getCategory() != null ? product.getCategory().getId() : null;
-        gisZoneValidationService.assertLocationAllowsProduct(toLocationId, categoryId, zoneOverride);
+        inventoryValidationService.assertLocationAllowsProduct(toLocationId, product, zoneOverride);
         String normalizedLotNumber = normalizeOptional(lotNumber);
         String normalizedReasonCode = normalizeOptional(reasonCode);
         assertSufficientStock(fromLocationId, product, normalizedLotNumber, qty);

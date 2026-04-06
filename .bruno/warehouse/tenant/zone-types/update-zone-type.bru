@@ -1,0 +1,31 @@
+meta {
+  name: update-zone-type
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{URL}}/{{TENANT_SLUG}}/zone-types/{{ZONE_TYPE_ID}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+body:json {
+  {
+    "code": "{{ZONE_TYPE_CODE}}",
+    "displayName": "{{ZONE_TYPE_UPDATED_NAME}}"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

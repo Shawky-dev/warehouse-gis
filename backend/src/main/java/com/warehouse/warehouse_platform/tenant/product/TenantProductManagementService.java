@@ -3,6 +3,8 @@ package com.warehouse.warehouse_platform.tenant.product;
 import com.warehouse.warehouse_platform.tenant.audit.TenantAuditService;
 import com.warehouse.warehouse_platform.tenant.category.ProductCategory;
 import com.warehouse.warehouse_platform.tenant.category.ProductCategoryRepository;
+import com.warehouse.warehouse_platform.tenant.hazardtype.HazardType;
+import com.warehouse.warehouse_platform.tenant.hazardtype.HazardTypeRepository;
 import com.warehouse.warehouse_platform.tenant.supplier.Supplier;
 import com.warehouse.warehouse_platform.tenant.supplier.SupplierRepository;
 import com.warehouse.warehouse_platform.tenant.uom.UnitOfMeasure;
@@ -33,6 +35,7 @@ public class TenantProductManagementService {
     private final ProductRepository productRepository;
     private final UnitOfMeasureRepository unitOfMeasureRepository;
     private final ProductCategoryRepository productCategoryRepository;
+    private final HazardTypeRepository hazardTypeRepository;
     private final SupplierRepository supplierRepository;
     private final ProductSupplierRepository productSupplierRepository;
     private final TenantAuditService tenantAuditService;
@@ -41,12 +44,14 @@ public class TenantProductManagementService {
             ProductRepository productRepository,
             UnitOfMeasureRepository unitOfMeasureRepository,
             ProductCategoryRepository productCategoryRepository,
+            HazardTypeRepository hazardTypeRepository,
             SupplierRepository supplierRepository,
             ProductSupplierRepository productSupplierRepository,
             TenantAuditService tenantAuditService) {
         this.productRepository = productRepository;
         this.unitOfMeasureRepository = unitOfMeasureRepository;
         this.productCategoryRepository = productCategoryRepository;
+        this.hazardTypeRepository = hazardTypeRepository;
         this.supplierRepository = supplierRepository;
         this.productSupplierRepository = productSupplierRepository;
         this.tenantAuditService = tenantAuditService;
@@ -102,6 +107,7 @@ public class TenantProductManagementService {
             String description,
             UUID baseUomId,
             UUID categoryId,
+            UUID hazardTypeId,
             Boolean trackLot,
             Boolean trackExpiry,
             Set<UUID> supplierIds,
@@ -118,7 +124,8 @@ public class TenantProductManagementService {
                 });
 
         UnitOfMeasure baseUom = loadBaseUom(baseUomId);
-        ProductCategory category = loadCategoryIfProvided(categoryId);
+        ProductCategory category = loadCategory(categoryId);
+        HazardType hazardType = loadHazardType(hazardTypeId);
         SupplierResolution supplierResolution = resolveSuppliers(supplierIds, primarySupplierId);
 
         Product product = Product.builder()
@@ -127,6 +134,7 @@ public class TenantProductManagementService {
                 .description(normalizedDescription)
                 .baseUom(baseUom)
                 .category(category)
+                .hazardType(hazardType)
                 .trackLot(normalizedTrackLot)
                 .trackExpiry(normalizedTrackExpiry)
                 .active(true)
@@ -148,6 +156,7 @@ public class TenantProductManagementService {
             String description,
             UUID baseUomId,
             UUID categoryId,
+            UUID hazardTypeId,
             Boolean trackLot,
             Boolean trackExpiry,
             Set<UUID> supplierIds,
@@ -165,7 +174,8 @@ public class TenantProductManagementService {
                 });
 
         UnitOfMeasure baseUom = loadBaseUom(baseUomId);
-        ProductCategory category = loadCategoryIfProvided(categoryId);
+        ProductCategory category = loadCategory(categoryId);
+        HazardType hazardType = loadHazardType(hazardTypeId);
         SupplierResolution supplierResolution = resolveSuppliers(supplierIds, primarySupplierId);
 
         existing.setSku(normalizedSku);
@@ -173,6 +183,7 @@ public class TenantProductManagementService {
         existing.setDescription(normalizeOptional(description, 1000, "description"));
         existing.setBaseUom(baseUom);
         existing.setCategory(category);
+        existing.setHazardType(hazardType);
         existing.setTrackLot(normalizeBoolean(trackLot, false));
         existing.setTrackExpiry(normalizeBoolean(trackExpiry, false));
 
@@ -243,12 +254,28 @@ public class TenantProductManagementService {
                 .orElseThrow(() -> TenantProductManagementException.badRequest("Base UOM not found: " + baseUomId));
     }
 
-    private ProductCategory loadCategoryIfProvided(UUID categoryId) {
+    private ProductCategory loadCategory(UUID categoryId) {
         if (categoryId == null) {
-            return null;
+            throw TenantProductManagementException.badRequest("categoryId must not be null");
         }
-        return productCategoryRepository.findById(categoryId)
+        ProductCategory cat = productCategoryRepository.findById(categoryId)
                 .orElseThrow(() -> TenantProductManagementException.badRequest("Category not found: " + categoryId));
+        if (!Boolean.TRUE.equals(cat.getActive())) {
+            throw TenantProductManagementException.badRequest("Category is inactive: " + categoryId);
+        }
+        return cat;
+    }
+
+    private HazardType loadHazardType(UUID hazardTypeId) {
+        if (hazardTypeId == null) {
+            throw TenantProductManagementException.badRequest("hazardTypeId must not be null");
+        }
+        HazardType ht = hazardTypeRepository.findById(hazardTypeId)
+                .orElseThrow(() -> TenantProductManagementException.badRequest("Hazard type not found: " + hazardTypeId));
+        if (!Boolean.TRUE.equals(ht.getIsActive())) {
+            throw TenantProductManagementException.badRequest("Hazard type is inactive: " + hazardTypeId);
+        }
+        return ht;
     }
 
     private SupplierResolution resolveSuppliers(Set<UUID> supplierIds, UUID primarySupplierId) {
@@ -411,6 +438,7 @@ public class TenantProductManagementService {
                 .toList();
 
         ProductCategory category = product.getCategory();
+        HazardType hazardType = product.getHazardType();
 
         return new ProductResult(
                 product.getId(),
@@ -422,6 +450,9 @@ public class TenantProductManagementService {
                 product.getBaseUom().getName(),
                 category != null ? category.getId() : null,
                 category != null ? category.getName() : null,
+                category != null ? category.getCode() : null,
+                hazardType != null ? hazardType.getId() : null,
+                hazardType != null ? hazardType.getCode() : null,
                 !Boolean.FALSE.equals(product.getTrackLot()),
                 !Boolean.FALSE.equals(product.getTrackExpiry()),
                 !Boolean.FALSE.equals(product.getActive()),
@@ -451,6 +482,9 @@ public class TenantProductManagementService {
             String baseUomName,
             UUID categoryId,
             String categoryName,
+            String categoryCode,
+            UUID hazardTypeId,
+            String hazardTypeCode,
             boolean trackLot,
             boolean trackExpiry,
             boolean active,

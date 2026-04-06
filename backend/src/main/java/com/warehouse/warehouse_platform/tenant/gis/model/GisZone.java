@@ -1,10 +1,13 @@
 package com.warehouse.warehouse_platform.tenant.gis.model;
 
+import com.warehouse.warehouse_platform.tenant.zonetype.ZoneType;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
@@ -50,6 +53,14 @@ public class GisZone {
     @Column(nullable = false, length = 20)
     private String source;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "zone_type_id")
+    private ZoneType zoneType;
+
+    /** Hex color in #RRGGBB format. Metadata only; not used in validation. */
+    @Column(name = "display_color", length = 7)
+    private String displayColor;
+
     @Builder.Default
     @OneToMany(mappedBy = "zone", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<GisZoneCategoryRule> categoryRules = new ArrayList<>();
@@ -71,6 +82,8 @@ public class GisZone {
             violationAction = "BLOCK";
         if (source == null)
             source = "MANUAL";
+        if (displayColor == null)
+            displayColor = "#6B7280";
     }
 
     @PreUpdate

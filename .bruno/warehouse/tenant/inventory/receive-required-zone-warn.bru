@@ -1,0 +1,39 @@
+meta {
+  name: receive-required-zone-warn
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{URL}}/{{TENANT_SLUG}}/inventory/receive
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+body:json {
+  {
+    "locationId": "{{LOCATION_ID}}",
+    "productId": "{{PERISHABLE_PRODUCT_ID}}",
+    "qty": "3.00",
+    "notes": "Test: should fail with REQUIRED_ZONE_VIOLATION (WARN) — location not in REFRIGERATED zone"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Scenario: product category has requiredZoneType = REFRIGERATED, but the target location
+  is not inside any REFRIGERATED zone. Expected response: 422 Unprocessable Entity with
+  error = REQUIRED_ZONE_VIOLATION, violationAction = WARN, suggestedZones = [...REFRIGERATED zones].
+}

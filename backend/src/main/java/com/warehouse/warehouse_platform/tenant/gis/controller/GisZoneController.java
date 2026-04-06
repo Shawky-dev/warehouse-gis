@@ -6,6 +6,8 @@ import com.warehouse.warehouse_platform.tenant.gis.model.GisZone;
 import com.warehouse.warehouse_platform.tenant.gis.model.GisZoneCategoryRule;
 import com.warehouse.warehouse_platform.tenant.gis.repository.GisZoneCategoryRuleRepository;
 import com.warehouse.warehouse_platform.tenant.gis.repository.GisZoneRepository;
+import com.warehouse.warehouse_platform.tenant.zonetype.ZoneType;
+import com.warehouse.warehouse_platform.tenant.zonetype.ZoneTypeRepository;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -40,14 +42,17 @@ public class GisZoneController {
     private final TenantAccessPolicy tenantAccessPolicy;
     private final GisZoneRepository gisZoneRepository;
     private final GisZoneCategoryRuleRepository gisZoneCategoryRuleRepository;
+    private final ZoneTypeRepository zoneTypeRepository;
 
     public GisZoneController(
             TenantAccessPolicy tenantAccessPolicy,
             GisZoneRepository gisZoneRepository,
-            GisZoneCategoryRuleRepository gisZoneCategoryRuleRepository) {
+            GisZoneCategoryRuleRepository gisZoneCategoryRuleRepository,
+            ZoneTypeRepository zoneTypeRepository) {
         this.tenantAccessPolicy = tenantAccessPolicy;
         this.gisZoneRepository = gisZoneRepository;
         this.gisZoneCategoryRuleRepository = gisZoneCategoryRuleRepository;
+        this.zoneTypeRepository = zoneTypeRepository;
     }
 
     // ── List ─────────────────────────────────────────────────────────────────
@@ -96,6 +101,8 @@ public class GisZoneController {
                 .geometry(ringsToPolygon(request.coordinates()))
                 .violationAction(request.violationAction())
                 .source(request.source() != null ? request.source() : "MANUAL")
+                .zoneType(resolveZoneType(request.zoneTypeId()))
+                .displayColor(normalizeDisplayColor(request.displayColor()))
                 .build();
 
         GisZone saved = gisZoneRepository.save(zone);
@@ -124,6 +131,8 @@ public class GisZoneController {
             zone.setGeometry(ringsToPolygon(request.coordinates()));
         }
         zone.setViolationAction(request.violationAction());
+        zone.setZoneType(resolveZoneType(request.zoneTypeId()));
+        zone.setDisplayColor(normalizeDisplayColor(request.displayColor()));
 
         GisZone saved = gisZoneRepository.save(zone);
         saved = applyRules(saved, request.categoryRules());
@@ -207,17 +216,36 @@ public class GisZoneController {
         return gisZoneRepository.findById(zone.getId()).orElse(zone);
     }
 
+    private ZoneType resolveZoneType(UUID zoneTypeId) {
+        if (zoneTypeId == null) return null;
+        return zoneTypeRepository.findById(zoneTypeId)
+                .orElseThrow(() -> GisException.badRequest("Zone type not found: " + zoneTypeId));
+    }
+
+    private static String normalizeDisplayColor(String color) {
+        if (color == null || color.isBlank()) return null;
+        String trimmed = color.trim();
+        if (!trimmed.matches("#[0-9A-Fa-f]{6}")) {
+            throw GisException.badRequest("displayColor must be in #RRGGBB format: " + trimmed);
+        }
+        return trimmed.toUpperCase(java.util.Locale.ROOT);
+    }
+
     private ZoneResponse toResponse(GisZone zone) {
         List<CategoryRuleResponse> rules = gisZoneCategoryRuleRepository.findByZoneId(zone.getId())
                 .stream()
                 .map(r -> new CategoryRuleResponse(r.getCategoryId(), r.getRuleType()))
                 .toList();
+        ZoneType zt = zone.getZoneType();
         return new ZoneResponse(
                 zone.getId(),
                 zone.getName(),
                 zone.getDescription(),
                 zone.getViolationAction(),
                 zone.getSource(),
+                zt != null ? zt.getId() : null,
+                zt != null ? zt.getCode() : null,
+                zone.getDisplayColor(),
                 rules,
                 zone.getCreatedAt(),
                 zone.getUpdatedAt());
@@ -260,6 +288,12 @@ public class GisZoneController {
                     : "null");
             sb.append(",\"violationAction\":\"").append(z.getViolationAction()).append("\"");
             sb.append(",\"source\":\"").append(z.getSource()).append("\"");
+            ZoneType zt = z.getZoneType();
+            sb.append(",\"zoneTypeId\":").append(zt != null ? "\"" + zt.getId() + "\"" : "null");
+            sb.append(",\"zoneTypeCode\":").append(zt != null ? "\"" + jsonEscape(zt.getCode()) + "\"" : "null");
+            sb.append(",\"displayColor\":").append(z.getDisplayColor() != null
+                    ? "\"" + jsonEscape(z.getDisplayColor()) + "\""
+                    : "null");
             sb.append(",\"categoryRules\":").append(rulesToJson(rules));
             sb.append("}}");
         }
@@ -316,6 +350,8 @@ public class GisZoneController {
             List<List<List<Double>>> coordinates,
             @NotBlank @Pattern(regexp = "BLOCK|WARN") String violationAction,
             String source,
+            UUID zoneTypeId,
+            @Pattern(regexp = "#[0-9A-Fa-f]{6}") String displayColor,
             List<CategoryRuleRequest> categoryRules) {
     }
 
@@ -328,6 +364,9 @@ public class GisZoneController {
             String description,
             String violationAction,
             String source,
+            UUID zoneTypeId,
+            String zoneTypeCode,
+            String displayColor,
             List<CategoryRuleResponse> categoryRules,
             java.time.Instant createdAt,
             java.time.Instant updatedAt) {

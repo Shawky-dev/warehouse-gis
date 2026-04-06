@@ -1,0 +1,31 @@
+meta {
+  name: create-hazard-type
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{URL}}/{{TENANT_SLUG}}/hazard-types
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+body:json {
+  {
+    "code": "{{HAZARD_TYPE_CODE}}",
+    "displayName": "{{HAZARD_TYPE_NAME}}"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

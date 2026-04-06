@@ -67,7 +67,9 @@ public class TenantCategoryController {
             @Valid @RequestBody CreateCategoryRequest request,
             Authentication authentication) {
         tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
-        return ResponseEntity.ok(tenantCategoryManagementService.createCategory(request.name(), request.description()));
+        return ResponseEntity.ok(tenantCategoryManagementService.createCategory(
+                request.name(), request.code(), request.displayName(), request.description(),
+                request.requiredZoneTypeId()));
     }
 
     @PutMapping("/{categoryId}")
@@ -78,7 +80,9 @@ public class TenantCategoryController {
             @Valid @RequestBody UpdateCategoryRequest request,
             Authentication authentication) {
         tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
-        return ResponseEntity.ok(tenantCategoryManagementService.updateCategory(categoryId, request.name(), request.description()));
+        return ResponseEntity.ok(tenantCategoryManagementService.updateCategory(
+                categoryId, request.name(), request.code(), request.displayName(), request.description(),
+                request.requiredZoneTypeId()));
     }
 
     @PostMapping("/{categoryId}/soft-delete")
@@ -116,11 +120,17 @@ public class TenantCategoryController {
 
     public record CreateCategoryRequest(
             @NotBlank @Size(max = 120) String name,
-            @Size(max = 500) String description) {
+            @Size(max = 60) String code,
+            @Size(max = 120) String displayName,
+            @Size(max = 500) String description,
+            UUID requiredZoneTypeId) {
     }
 
     public record UpdateCategoryRequest(
             @NotBlank @Size(max = 120) String name,
-            @Size(max = 500) String description) {
+            @Size(max = 60) String code,
+            @Size(max = 120) String displayName,
+            @Size(max = 500) String description,
+            UUID requiredZoneTypeId) {
     }
 }

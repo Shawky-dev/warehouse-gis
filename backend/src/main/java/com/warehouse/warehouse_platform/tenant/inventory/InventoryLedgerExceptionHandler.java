@@ -1,6 +1,7 @@
 package com.warehouse.warehouse_platform.tenant.inventory;
 
 import com.warehouse.warehouse_platform.tenant.gis.GisZoneViolationException;
+import com.warehouse.warehouse_platform.tenant.gis.StorageRuleViolationException;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -8,6 +9,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.util.List;
 import java.util.Objects;
 
 @RestControllerAdvice(basePackages = "com.warehouse.warehouse_platform.tenant.inventory")
@@ -27,6 +29,22 @@ public class InventoryLedgerExceptionHandler {
                         exception.getMessage(),
                         exception.getViolationAction(),
                         exception.getViolatedZone(),
+                        exception.getSuggestedZones()));
+    }
+
+    @ExceptionHandler(StorageRuleViolationException.class)
+    public ResponseEntity<StorageRuleViolationResponse> handleStorageRuleViolation(
+            StorageRuleViolationException exception) {
+        return ResponseEntity.status(Objects.requireNonNull(exception.getStatus()))
+                .body(new StorageRuleViolationResponse(
+                        exception.getCode(),
+                        exception.getMessage(),
+                        exception.getRuleType().name(),
+                        exception.getViolationAction(),
+                        exception.getViolatedZone(),
+                        exception.getViolatedBuffer(),
+                        exception.getRestrictedHazardTypes(),
+                        exception.getRequiredZoneType(),
                         exception.getSuggestedZones()));
     }
 
@@ -52,6 +70,18 @@ public class InventoryLedgerExceptionHandler {
             String message,
             String violationAction,
             GisZoneViolationException.ZoneSummary violatedZone,
-            java.util.List<GisZoneViolationException.ZoneSummary> suggestedZones) {
+            List<GisZoneViolationException.ZoneSummary> suggestedZones) {
+    }
+
+    public record StorageRuleViolationResponse(
+            String error,
+            String message,
+            String ruleType,
+            String violationAction,
+            StorageRuleViolationException.ZoneSummary violatedZone,
+            StorageRuleViolationException.HazardBufferSummary violatedBuffer,
+            List<StorageRuleViolationException.HazardTypeSummary> restrictedHazardTypes,
+            StorageRuleViolationException.ZoneTypeSummary requiredZoneType,
+            List<StorageRuleViolationException.ZoneSummary> suggestedZones) {
     }
 }

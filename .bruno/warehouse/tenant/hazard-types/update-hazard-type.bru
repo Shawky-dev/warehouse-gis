@@ -1,0 +1,31 @@
+meta {
+  name: update-hazard-type
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{URL}}/{{TENANT_SLUG}}/hazard-types/{{HAZARD_TYPE_ID}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+body:json {
+  {
+    "code": "{{HAZARD_TYPE_CODE}}",
+    "displayName": "{{HAZARD_TYPE_UPDATED_NAME}}"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

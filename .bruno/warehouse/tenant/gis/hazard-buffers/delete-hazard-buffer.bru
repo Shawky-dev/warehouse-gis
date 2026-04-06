@@ -1,0 +1,24 @@
+meta {
+  name: delete-hazard-buffer
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{URL}}/{{TENANT_SLUG}}/gis/hazard-buffers/{{HAZARD_BUFFER_ID}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

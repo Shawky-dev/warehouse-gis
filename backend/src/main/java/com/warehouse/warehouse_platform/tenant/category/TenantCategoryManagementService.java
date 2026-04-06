@@ -2,6 +2,9 @@ package com.warehouse.warehouse_platform.tenant.category;
 
 import com.warehouse.warehouse_platform.tenant.audit.TenantAuditService;
 import com.warehouse.warehouse_platform.tenant.product.ProductRepository;
+import com.warehouse.warehouse_platform.tenant.zonetype.ZoneType;
+import com.warehouse.warehouse_platform.tenant.zonetype.ZoneTypeException;
+import com.warehouse.warehouse_platform.tenant.zonetype.ZoneTypeRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -21,14 +24,17 @@ public class TenantCategoryManagementService {
 
     private final ProductCategoryRepository productCategoryRepository;
     private final ProductRepository productRepository;
+    private final ZoneTypeRepository zoneTypeRepository;
     private final TenantAuditService tenantAuditService;
 
     public TenantCategoryManagementService(
             ProductCategoryRepository productCategoryRepository,
             ProductRepository productRepository,
+            ZoneTypeRepository zoneTypeRepository,
             TenantAuditService tenantAuditService) {
         this.productCategoryRepository = productCategoryRepository;
         this.productRepository = productRepository;
+        this.zoneTypeRepository = zoneTypeRepository;
         this.tenantAuditService = tenantAuditService;
     }
 
@@ -50,18 +56,22 @@ public class TenantCategoryManagementService {
     }
 
     @Transactional
-    public CategoryResult createCategory(String name, String description) {
-        String normalizedName = normalizeName(name);
+    public CategoryResult createCategory(String name, String code, String displayName, String description, UUID requiredZoneTypeId) {
+        String normalizedName = normalizeName(name != null ? name : (displayName != null ? displayName : ""));
+        String normalizedCode = normalizeCode(code != null ? code : normalizedName);
+        String normalizedDisplay = normalizeDisplayName(displayName != null ? displayName : normalizedName);
         String normalizedDescription = normalizeOptional(description, 500, "description");
 
-        productCategoryRepository.findByNameIgnoreCase(normalizedName)
-                .ifPresent(existing -> {
-                    throw TenantCategoryManagementException.conflict("Category name already exists: " + normalizedName);
-                });
+        assertCodeUnique(normalizedCode, null);
+
+        ZoneType requiredZoneType = resolveZoneType(requiredZoneTypeId);
 
         ProductCategory category = ProductCategory.builder()
                 .name(normalizedName)
+                .code(normalizedCode)
+                .displayName(normalizedDisplay)
                 .description(normalizedDescription)
+                .requiredZoneType(requiredZoneType)
                 .active(true)
                 .build();
 
@@ -71,27 +81,44 @@ public class TenantCategoryManagementService {
         return result;
     }
 
+    /** Backward-compatible single-arg create used by legacy callers. */
     @Transactional
-    public CategoryResult updateCategory(UUID categoryId, String name, String description) {
+    public CategoryResult createCategory(String name, String description) {
+        return createCategory(name, null, name, description, null);
+    }
+
+    @Transactional
+    public CategoryResult updateCategory(UUID categoryId, String name, String code, String displayName, String description, UUID requiredZoneTypeId) {
         ProductCategory existing = loadCategory(categoryId);
         CategoryResult before = toResult(existing);
 
-        String normalizedName = normalizeName(name);
+        String normalizedName = normalizeName(name != null ? name : (displayName != null ? displayName : existing.getName()));
+        String normalizedCode = normalizeCode(code != null ? code : normalizedName);
+        String normalizedDisplay = normalizeDisplayName(displayName != null ? displayName : normalizedName);
         String normalizedDescription = normalizeOptional(description, 500, "description");
 
-        productCategoryRepository.findByNameIgnoreCase(normalizedName)
-                .filter(found -> !found.getId().equals(categoryId))
-                .ifPresent(found -> {
-                    throw TenantCategoryManagementException.conflict("Category name already exists: " + normalizedName);
-                });
+        assertCodeUnique(normalizedCode, categoryId);
+
+        ZoneType requiredZoneType = resolveZoneType(requiredZoneTypeId);
 
         existing.setName(normalizedName);
+        existing.setCode(normalizedCode);
+        existing.setDisplayName(normalizedDisplay);
         existing.setDescription(normalizedDescription);
+        existing.setRequiredZoneType(requiredZoneType);
 
         ProductCategory saved = productCategoryRepository.save(existing);
         CategoryResult after = toResult(saved);
         tenantAuditService.record("CATEGORY_UPDATE", "CATEGORY", after.id().toString(), before, after);
         return after;
+    }
+
+    /** Backward-compatible two-arg update used by legacy callers. */
+    @Transactional
+    public CategoryResult updateCategory(UUID categoryId, String name, String description) {
+        ProductCategory existing = loadCategory(categoryId);
+        return updateCategory(categoryId, name, existing.getCode(), name, description, 
+                existing.getRequiredZoneType() != null ? existing.getRequiredZoneType().getId() : null);
     }
 
     @Transactional
@@ -140,9 +167,34 @@ public class TenantCategoryManagementService {
         tenantAuditService.record("CATEGORY_HARD_DELETE", "CATEGORY", categoryId.toString(), before, null);
     }
 
-    private ProductCategory loadCategory(UUID categoryId) {
+    // ── package-visible helpers ───────────────────────────────────────────────
+
+    ProductCategory loadCategory(UUID categoryId) {
         return productCategoryRepository.findById(categoryId)
                 .orElseThrow(() -> TenantCategoryManagementException.notFound("Category not found: " + categoryId));
+    }
+
+    // ── private helpers ───────────────────────────────────────────────────────
+
+    private ZoneType resolveZoneType(UUID zoneTypeId) {
+        if (zoneTypeId == null) return null;
+        ZoneType zt = zoneTypeRepository.findById(zoneTypeId)
+                .orElseThrow(() -> TenantCategoryManagementException.badRequest("Zone type not found: " + zoneTypeId));
+        if (!Boolean.TRUE.equals(zt.getIsActive())) {
+            throw TenantCategoryManagementException.badRequest("Zone type is inactive: " + zoneTypeId);
+        }
+        return zt;
+    }
+
+    private void assertCodeUnique(String code, UUID excludeId) {
+        if (excludeId == null) {
+            productCategoryRepository.findByCodeIgnoreCase(code)
+                    .ifPresent(c -> { throw TenantCategoryManagementException.conflict("Category code already exists: " + code); });
+        } else {
+            if (productCategoryRepository.existsByCodeIgnoreCaseAndIdNot(code, excludeId)) {
+                throw TenantCategoryManagementException.conflict("Category code already exists: " + code);
+            }
+        }
     }
 
     private Specification<ProductCategory> buildSpecification(String search, Boolean active) {
@@ -166,9 +218,7 @@ public class TenantCategoryManagementService {
     }
 
     private String normalizeSearch(String search) {
-        if (search == null) {
-            return null;
-        }
+        if (search == null) return null;
         String normalized = search.trim();
         return normalized.isEmpty() ? null : normalized;
     }
@@ -184,14 +234,28 @@ public class TenantCategoryManagementService {
         return normalized;
     }
 
+    static String normalizeCode(String code) {
+        if (code == null || code.isBlank()) {
+            throw TenantCategoryManagementException.badRequest("code must not be blank");
+        }
+        return code.trim().toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9_]+", "_");
+    }
+
+    private static String normalizeDisplayName(String displayName) {
+        if (displayName == null || displayName.isBlank()) {
+            throw TenantCategoryManagementException.badRequest("displayName must not be blank");
+        }
+        String trimmed = displayName.trim();
+        if (trimmed.length() > 120) {
+            throw TenantCategoryManagementException.badRequest("displayName must be at most 120 characters");
+        }
+        return trimmed;
+    }
+
     private String normalizeOptional(String value, int maxLength, String field) {
-        if (value == null) {
-            return null;
-        }
+        if (value == null) return null;
         String normalized = value.trim();
-        if (normalized.isEmpty()) {
-            return null;
-        }
+        if (normalized.isEmpty()) return null;
         if (normalized.length() > maxLength) {
             throw TenantCategoryManagementException.badRequest(field + " must be at most " + maxLength + " characters");
         }
@@ -199,10 +263,15 @@ public class TenantCategoryManagementService {
     }
 
     private CategoryResult toResult(ProductCategory category) {
+        ZoneType zt = category.getRequiredZoneType();
         return new CategoryResult(
                 category.getId(),
                 category.getName(),
+                category.getCode(),
+                category.getDisplayName(),
                 category.getDescription(),
+                zt != null ? zt.getId() : null,
+                zt != null ? zt.getCode() : null,
                 !Boolean.FALSE.equals(category.getActive()),
                 category.getCreatedAt(),
                 category.getUpdatedAt(),
@@ -212,7 +281,11 @@ public class TenantCategoryManagementService {
     public record CategoryResult(
             UUID id,
             String name,
+            String code,
+            String displayName,
             String description,
+            UUID requiredZoneTypeId,
+            String requiredZoneTypeCode,
             boolean active,
             Instant createdAt,
             Instant updatedAt,

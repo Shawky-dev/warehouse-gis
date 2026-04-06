@@ -1,6 +1,7 @@
 package com.warehouse.warehouse_platform.tenant.product;
 
 import com.warehouse.warehouse_platform.tenant.category.ProductCategory;
+import com.warehouse.warehouse_platform.tenant.hazardtype.HazardType;
 import com.warehouse.warehouse_platform.tenant.uom.UnitOfMeasure;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -45,9 +46,13 @@ public class Product {
     @JoinColumn(name = "base_uom_id", nullable = false)
     private UnitOfMeasure baseUom;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = true)
-    @JoinColumn(name = "category_id", nullable = true)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "category_id", nullable = false)
     private ProductCategory category;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "hazard_type_id", nullable = false)
+    private HazardType hazardType;
 
     @Column(name = "track_lot", nullable = false)
     @Builder.Default

@@ -1,0 +1,38 @@
+meta {
+  name: import-hazard-buffers
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{URL}}/{{TENANT_SLUG}}/gis/hazard-buffers/import
+  body: multipartForm
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+body:multipart {
+  file: @file()
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Upload a GeoJSON FeatureCollection file containing hazard buffer polygons.
+  Each Feature must have properties:
+    - "name": string (required)
+    - "hazardTypeCodes": string[] e.g. ["FLAMMABLE", "EXPLOSIVE"]
+    - "notes": string (optional)
+    - "source": string (optional)
+  Geometry must be a Polygon in EPSG:4326.
+}

@@ -18,4 +18,22 @@ public interface GisZoneRepository extends JpaRepository<GisZone, UUID> {
     List<GisZone> findZonesContainingLocation(@Param("layoutBlockId") UUID layoutBlockId);
 
     List<GisZone> findAllByOrderByCreatedAtAsc();
+
+    long countByZoneType_Id(UUID zoneTypeId);
+
+    List<GisZone> findByZoneType_Id(UUID zoneTypeId);
+
+    /**
+     * Returns true when at least one zone with the given zoneTypeId spatially
+     * contains the block for the given location.
+     */
+    @Query(value = """
+            SELECT COUNT(*) > 0 FROM gis_zones z
+            WHERE z.zone_type_id = :zoneTypeId
+              AND ST_Contains(z.geometry,
+                  (SELECT geometry FROM gis_blocks WHERE layout_block_id = :layoutBlockId LIMIT 1))
+            """, nativeQuery = true)
+    boolean existsZoneOfTypeContainingLocation(
+            @Param("layoutBlockId") UUID layoutBlockId,
+            @Param("zoneTypeId") UUID zoneTypeId);
 }

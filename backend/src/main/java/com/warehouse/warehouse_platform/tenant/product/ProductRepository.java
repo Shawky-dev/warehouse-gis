@@ -15,4 +15,6 @@ public interface ProductRepository extends JpaRepository<Product, UUID>, JpaSpec
     long countByBaseUom_Id(UUID baseUomId);
 
     long countByCategory_Id(UUID categoryId);
+
+    long countByHazardType_Id(UUID hazardTypeId);
 }

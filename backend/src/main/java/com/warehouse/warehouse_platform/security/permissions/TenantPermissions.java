@@ -64,6 +64,20 @@ public final class TenantPermissions {
     public static final String GIS_LAYOUT_VIEW = "gis.layout.view";
     public static final String GIS_ZONES_VIEW = "gis.zones.view";
     public static final String GIS_ZONES_MANAGE = "gis.zones.manage";
+    public static final String HAZARD_TYPES_VIEW = "tenant.hazard_types.view";
+    public static final String HAZARD_TYPES_CREATE = "tenant.hazard_types.create";
+    public static final String HAZARD_TYPES_EDIT = "tenant.hazard_types.edit";
+    public static final String HAZARD_TYPES_DEACTIVATE = "tenant.hazard_types.deactivate";
+    public static final String HAZARD_TYPES_REACTIVATE = "tenant.hazard_types.reactivate";
+    public static final String HAZARD_TYPES_HARD_DELETE = "tenant.hazard_types.hard_delete";
+    public static final String ZONE_TYPES_VIEW = "tenant.zone_types.view";
+    public static final String ZONE_TYPES_CREATE = "tenant.zone_types.create";
+    public static final String ZONE_TYPES_EDIT = "tenant.zone_types.edit";
+    public static final String ZONE_TYPES_DEACTIVATE = "tenant.zone_types.deactivate";
+    public static final String ZONE_TYPES_REACTIVATE = "tenant.zone_types.reactivate";
+    public static final String ZONE_TYPES_HARD_DELETE = "tenant.zone_types.hard_delete";
+    public static final String GIS_HAZARD_BUFFERS_VIEW = "gis.hazard_buffers.view";
+    public static final String GIS_HAZARD_BUFFERS_MANAGE = "gis.hazard_buffers.manage";
 
     private TenantPermissions() {
     }
