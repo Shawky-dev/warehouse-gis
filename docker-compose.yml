@@ -19,8 +19,6 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
-    ports:
-      - "5432:5432"
 
   backend:
     build:
@@ -63,13 +61,9 @@ services:
       - postgres_password
       - jwt_private_key
       - jwt_public_key
-    expose:
-      - "8080"
     networks:
       - warehouse-backend
       - warehouse-frontend
-    ports:
-      - "3000:8080"
 
   frontend:
     build:

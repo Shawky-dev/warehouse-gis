@@ -5,7 +5,6 @@ WORKDIR /app
 COPY pom.xml ./
 RUN mvn -B -DskipTests dependency:go-offline
 
-COPY docker-entrypoint.sh ./docker-entrypoint.sh
 COPY src ./src
 RUN mvn -B -DskipTests clean package
 
@@ -16,7 +15,7 @@ WORKDIR /app
 RUN groupadd --system app && useradd --system --gid app --create-home app
 
 COPY --from=build /app/target/*.jar /app/app.jar
-COPY --from=build /app/docker-entrypoint.sh /app/docker-entrypoint.sh
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 
 RUN chmod 500 /app/docker-entrypoint.sh && chown -R app:app /app
 
