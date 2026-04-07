@@ -1,9 +1,10 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { useI18n } from "@/i18n";
+import type { TranslationKey } from "@/i18n";
 
 export type AuthStatusVariant = "restoring" | "permissions" | "preparing" | "workspace";
 
-const VARIANT_KEYS: Record<AuthStatusVariant, { title: string; description: string }> = {
+const VARIANT_KEYS: Record<AuthStatusVariant, { title: TranslationKey; description: TranslationKey }> = {
   restoring: { title: "authStatus.restoringTitle", description: "authStatus.restoringDescription" },
   permissions: { title: "authStatus.permissionsTitle", description: "authStatus.permissionsDescription" },
   preparing: { title: "authStatus.preparingTitle", description: "authStatus.preparingDescription" },
