@@ -78,6 +78,8 @@ public final class TenantPermissions {
     public static final String ZONE_TYPES_HARD_DELETE = "tenant.zone_types.hard_delete";
     public static final String GIS_HAZARD_BUFFERS_VIEW = "gis.hazard_buffers.view";
     public static final String GIS_HAZARD_BUFFERS_MANAGE = "gis.hazard_buffers.manage";
+    public static final String GIS_HEATMAPS_VIEW = "gis.heatmaps.view";
+    public static final String GIS_HEATMAPS_MANAGE = "gis.heatmaps.manage";
 
     private TenantPermissions() {
     }

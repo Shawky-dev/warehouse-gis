@@ -1,0 +1,41 @@
+meta {
+  name: list-dynamic-metrics
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{URL}}/{{TENANT_SLUG}}/gis/heatmaps/dynamic/metrics
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Returns all registered dynamic heatmap metrics.
+  The `unit` field is always present (null when not applicable).
+
+  Required permission: gis.heatmaps.view (ADMIN, MANAGER)
+
+  Response:
+  [
+    {
+      "key": "quantity_sum",
+      "label": "Total Stock Quantity",
+      "description": "Sum of stock quantities at each leaf warehouse location",
+      "unit": null
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+meta {
+  name: upload-static-heatmap
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{URL}}/{{TENANT_SLUG}}/gis/heatmaps/static
+  body: multipartForm
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+body:multipart {
+  file: @file()
+  name: My Heatmap Layer
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Uploads a GeoTIFF file as a new static heatmap layer.
+  The file is published into the tenant GeoServer workspace as a coverage store and layer.
+  The first uploaded heatmap for a tenant is automatically set as the default.
+
+  Required permission: gis.heatmaps.manage (ADMIN, MANAGER)
+
+  Form fields:
+    file  — a GeoTIFF file (.tif or .tiff)
+    name  — display name for the heatmap
+
+  Response: 201 Created with the static heatmap record.
+}

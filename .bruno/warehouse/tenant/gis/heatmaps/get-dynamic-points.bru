@@ -1,0 +1,63 @@
+meta {
+  name: get-dynamic-points
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{URL}}/{{TENANT_SLUG}}/gis/heatmaps/dynamic/points?metric={{METRIC_KEY}}
+  body: none
+  auth: bearer
+}
+
+params:query {
+  metric: {{METRIC_KEY}}
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+vars:pre-request {
+  METRIC_KEY: quantity_sum
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Returns a GeoJSON FeatureCollection of weighted heatmap points for the given metric.
+  Unknown metric keys return 400.
+  Locations with null centroid_geom or non-positive aggregated stock are excluded.
+  An empty result returns an empty FeatureCollection (not an error).
+
+  Required permission: gis.heatmaps.view (ADMIN, MANAGER)
+
+  Query params:
+    metric  — metric key, e.g. "quantity_sum"
+
+  Response: GeoJSON FeatureCollection
+  {
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "geometry": { "type": "Point", "coordinates": [lon, lat] },
+        "properties": {
+          "locationId": "<uuid>",
+          "label": "A.01.L1",
+          "positionPath": "A.01.L1",
+          "metricKey": "quantity_sum",
+          "weight": 150.0,
+          "rawValue": 150.0
+        }
+      }
+    ]
+  }
+}

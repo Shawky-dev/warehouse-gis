@@ -1,0 +1,37 @@
+meta {
+  name: set-default-heatmap
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{URL}}/{{TENANT_SLUG}}/gis/heatmaps/static/{{HEATMAP_ID}}/default
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Designates the specified heatmap as the default active heatmap.
+  Any previously default heatmap is cleared.
+  Only ACTIVE heatmaps can be set as default.
+
+  Required permission: gis.heatmaps.manage (ADMIN, MANAGER)
+
+  Path variables:
+    HEATMAP_ID  — UUID of the static heatmap to set as default
+
+  Response: 200 OK with the updated heatmap record.
+}

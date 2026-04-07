@@ -1,0 +1,50 @@
+meta {
+  name: wms-get-map
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{URL}}/{{TENANT_SLUG}}/gis/wms?SERVICE=WMS&REQUEST=GetMap&LAYERS={{WMS_LAYER}}&BBOX=-180,-90,180,90&WIDTH=800&HEIGHT=600&SRS=EPSG:4326&FORMAT=image/png
+  body: none
+  auth: bearer
+}
+
+params:query {
+  SERVICE: WMS
+  REQUEST: GetMap
+  LAYERS: {{WMS_LAYER}}
+  BBOX: -180,-90,180,90
+  WIDTH: 800
+  HEIGHT: 600
+  SRS: EPSG:4326
+  FORMAT: image/png
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Proxies a WMS GetMap request to the tenant GeoServer workspace.
+  Only ACTIVE layers registered in gis_static_heatmaps are permitted.
+  Orphaned or unknown layer names are rejected with 400.
+  Cross-tenant layer names (workspace prefix for another tenant) are rejected with 400.
+
+  Required permission: gis.heatmaps.view (ADMIN, MANAGER)
+
+  Query params:
+    WMS_LAYER  — bare layer name from the list-static-heatmaps response
+                 (e.g. "heatmap_static_abc12345"). Workspace prefix is optional.
+
+  Response: image/png — rendered map tile.
+}

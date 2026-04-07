@@ -677,6 +677,76 @@ public class GeoServerProvisioningService {
     }
   }
 
+  // ─── Raster / static-heatmap operations ──────────────────────────────────
+
+  /**
+   * Ensures that the tenant workspace and PostGIS datastore exist in GeoServer.
+   * Both operations are idempotent; calling this before uploading a raster is
+   * safe.
+   */
+  public void ensureTenantWorkspace(String tenantSlug) {
+    String workspaceName = "wh_" + tenantSlug;
+    createWorkspace(workspaceName);
+    createDataStore(workspaceName, tenantSlug);
+  }
+
+  /**
+   * Uploads a GeoTIFF as a new coverage store in the tenant workspace.
+   * GeoServer auto-configures a coverage (layer) with the same name.
+   *
+   * @param tenantSlug tenant identifier
+   * @param storeName  coverage store name (also used as the coverage/layer name)
+   * @param tiffBytes  raw GeoTIFF bytes
+   */
+  public void uploadGeoTiffCoverageStore(String tenantSlug, String storeName, byte[] tiffBytes) {
+    String workspaceName = "wh_" + tenantSlug;
+    String url = props.url()
+        + "/rest/workspaces/" + workspaceName
+        + "/coveragestores/" + storeName
+        + "/file.geotiff?configure=all&coverageName=" + storeName;
+    try {
+      RequestEntity<byte[]> req = RequestEntity
+          .put(URI.create(url))
+          .header("Content-Type", "image/tiff")
+          .body(tiffBytes);
+      geoServerRestTemplate.exchange(req, Void.class);
+      log.debug("GeoServer GeoTIFF coverage store uploaded: {}/{}", workspaceName, storeName);
+    } catch (RestClientResponseException e) {
+      log.warn("GeoServer GeoTIFF upload failed for [{}] [{}]: {}", storeName, e.getStatusCode(), e.getMessage());
+      throw GeoServerProvisioningException.serverError(
+          "Failed to upload GeoTIFF coverage store '%s': %s".formatted(storeName, e.getMessage()));
+    }
+  }
+
+  /**
+   * Deletes a coverage store (and all associated coverages and layers) from the
+   * tenant workspace.
+   * A 404 from GeoServer is treated as already-deleted and does not raise an
+   * error.
+   *
+   * @param tenantSlug tenant identifier
+   * @param storeName  coverage store name to delete
+   */
+  public void deleteRasterCoverageStore(String tenantSlug, String storeName) {
+    String workspaceName = "wh_" + tenantSlug;
+    String url = props.url()
+        + "/rest/workspaces/" + workspaceName
+        + "/coveragestores/" + storeName
+        + "?recurse=true&purge=all";
+    try {
+      geoServerRestTemplate.delete(url);
+      log.debug("GeoServer coverage store deleted: {}/{}", workspaceName, storeName);
+    } catch (RestClientResponseException e) {
+      if (e.getStatusCode() == HttpStatusCode.valueOf(404)) {
+        log.debug("GeoServer coverage store not found, treating as already deleted: {}/{}", workspaceName, storeName);
+        return;
+      }
+      log.warn("GeoServer coverage store delete failed [{}]: {}", e.getStatusCode(), e.getMessage());
+      throw GeoServerProvisioningException.serverError(
+          "Failed to delete GeoServer coverage store '%s': %s".formatted(storeName, e.getMessage()));
+    }
+  }
+
   // ─── Utilities ────────────────────────────────────────────────────────────
 
   /**
