@@ -86,6 +86,7 @@ public class StaticHeatmapController {
             UUID id,
             String name,
             String sourceFilename,
+            String geoserverLayerName,
             boolean isDefault,
             Instant createdAt,
             Instant updatedAt) {
@@ -95,6 +96,7 @@ public class StaticHeatmapController {
                     h.getId(),
                     h.getName(),
                     h.getSourceFilename(),
+                    h.getGeoserverLayerName(),
                     h.isDefault(),
                     h.getCreatedAt(),
                     h.getUpdatedAt());

@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Globe, Download } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Button } from "@/shared/components/ui/button";
 import { useI18n } from "@/i18n";
 import { normalizeTenantSlug } from "@/features/auth/shared/scope";
+import { useAuth } from "@/features/auth/context/AuthContext";
+import { TENANT_PERMISSIONS } from "@/features/auth/shared/permissions";
 import { PATHS } from "@/shared/consts/paths";
 import { downloadGeoJson } from "@/lib/exportGeoJson";
 import { useFloorPlanApi } from "../floorplans/useFloorPlanApi";
@@ -14,8 +16,13 @@ import { ViewerLayerPanel } from "./ViewerLayerPanel";
 import { LocationInspectPanel } from "./LocationInspectPanel";
 import { fetchZonesGeoJson } from "../zones/zonesApi";
 import { fetchHazardBuffersGeoJson } from "../hazardBuffers/hazardBuffersApi";
+import {
+  listStaticHeatmaps,
+  listDynamicHeatmapMetrics,
+  getDynamicHeatmapPoints,
+} from "../heatmaps/heatmapsApi";
 import type { GeoJsonFeatureCollection, ZoneFeatureProps } from "../zones/zonesApi";
-import type { HazardBufferFeatureProps } from "@/features/tenant/types/gis";
+import type { HazardBufferFeatureProps, StaticHeatmapRecord, DynamicHeatmapMetric, DynamicHeatmapFeatureProps } from "@/features/tenant/types/gis";
 
 export default function WarehouseMapPage() {
   const { t } = useI18n();
@@ -23,6 +30,8 @@ export default function WarehouseMapPage() {
   const location = useLocation();
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
   const slug = normalizeTenantSlug(tenantSlug ?? "");
+  const { hasPermission } = useAuth();
+  const canViewHeatmaps = hasPermission(TENANT_PERMISSIONS.GIS_HEATMAPS_VIEW);
 
   const { config, loading, error, svgContent } = useFloorPlanApi();
   const { templates, existingPolygons, polygonCountByTemplate } = useEditorState();
@@ -44,6 +53,18 @@ export default function WarehouseMapPage() {
   const [zonesVisible, setZonesVisible] = useState(true);
   const [hazardBuffersVisible, setHazardBuffersVisible] = useState(true);
 
+  // Static heatmap state
+  const [staticHeatmaps, setStaticHeatmaps] = useState<StaticHeatmapRecord[]>([]);
+  const [selectedStaticHeatmapId, setSelectedStaticHeatmapId] = useState<string | null>(null);
+  const [staticHeatmapVisible, setStaticHeatmapVisible] = useState(true);
+
+  // Dynamic heatmap state
+  const [dynamicMetrics, setDynamicMetrics] = useState<DynamicHeatmapMetric[]>([]);
+  const [selectedDynamicMetricKey, setSelectedDynamicMetricKey] = useState<string | null>(null);
+  const [dynamicHeatmapVisible, setDynamicHeatmapVisible] = useState(true);
+  const [dynamicHeatmapData, setDynamicHeatmapData] = useState<GeoJsonFeatureCollection<DynamicHeatmapFeatureProps> | null>(null);
+  const [isDynamicHeatmapRefreshing, setIsDynamicHeatmapRefreshing] = useState(false);
+
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -62,6 +83,72 @@ export default function WarehouseMapPage() {
     })();
     return () => { cancelled = true; };
   }, [slug]);
+
+  // Fetch static heatmaps and select default
+  useEffect(() => {
+    if (!canViewHeatmaps) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const heatmaps = await listStaticHeatmaps(slug);
+        if (cancelled) return;
+        setStaticHeatmaps(heatmaps);
+        const defaultHeatmap = heatmaps.find((h) => h.isDefault) ?? heatmaps[0] ?? null;
+        setSelectedStaticHeatmapId((prev) => {
+          if (prev && heatmaps.some((h) => h.id === prev)) return prev;
+          return defaultHeatmap?.id ?? null;
+        });
+      } catch {
+        // heatmap overlay is best-effort
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [slug, canViewHeatmaps]);
+
+  // Fetch dynamic metrics and select default
+  useEffect(() => {
+    if (!canViewHeatmaps) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const metrics = await listDynamicHeatmapMetrics(slug);
+        if (cancelled) return;
+        setDynamicMetrics(metrics);
+        const defaultMetric =
+          metrics.find((m) => m.key === "quantity_sum") ?? metrics[0] ?? null;
+        setSelectedDynamicMetricKey((prev) => {
+          if (prev && metrics.some((m) => m.key === prev)) return prev;
+          return defaultMetric?.key ?? null;
+        });
+      } catch {
+        // dynamic metrics are best-effort
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [slug, canViewHeatmaps]);
+
+  // Fetch dynamic heatmap points (manual refresh + metric change)
+  const fetchDynamicPoints = useCallback(async (metricKey: string) => {
+    setIsDynamicHeatmapRefreshing(true);
+    try {
+      const data = await getDynamicHeatmapPoints(slug, metricKey);
+      setDynamicHeatmapData(data);
+    } catch {
+      // best-effort
+    } finally {
+      setIsDynamicHeatmapRefreshing(false);
+    }
+  }, [slug]);
+
+  // Fetch points on first enable or metric change
+  const prevDynamicMetricRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!canViewHeatmaps || !dynamicHeatmapVisible || !selectedDynamicMetricKey) return;
+    if (prevDynamicMetricRef.current === selectedDynamicMetricKey && dynamicHeatmapData !== null) return;
+    prevDynamicMetricRef.current = selectedDynamicMetricKey;
+    void fetchDynamicPoints(selectedDynamicMetricKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canViewHeatmaps, dynamicHeatmapVisible, selectedDynamicMetricKey]);
 
   const [selectedPolygon, setSelectedPolygon] = useState<{
     gisBlockId: string;
@@ -92,6 +179,9 @@ export default function WarehouseMapPage() {
     }
     if (hazardBuffersVisible && hazardBuffersGeoJson) {
       features.push(...(hazardBuffersGeoJson.features as Feature[]));
+    }
+    if (dynamicHeatmapVisible && dynamicHeatmapData) {
+      features.push(...(dynamicHeatmapData.features as Feature[]));
     }
     for (const polygon of existingPolygons) {
       if (visibilityByTemplate[polygon.templateName] !== false) {
@@ -184,6 +274,25 @@ export default function WarehouseMapPage() {
                   onZonesVisibilityToggle={() => setZonesVisible((v) => !v)}
                   hazardBuffersVisible={hazardBuffersVisible}
                   onHazardBuffersVisibilityToggle={() => setHazardBuffersVisible((v) => !v)}
+                  {...(canViewHeatmaps && {
+                    staticHeatmaps,
+                    selectedStaticHeatmapId,
+                    onStaticHeatmapSelect: (id) => setSelectedStaticHeatmapId(id),
+                    staticHeatmapVisible,
+                    onStaticHeatmapVisibilityToggle: () => setStaticHeatmapVisible((v) => !v),
+                    dynamicMetrics,
+                    selectedDynamicMetricKey,
+                    onDynamicMetricSelect: (key) => {
+                      setSelectedDynamicMetricKey(key);
+                      setDynamicHeatmapData(null);
+                    },
+                    dynamicHeatmapVisible,
+                    onDynamicHeatmapVisibilityToggle: () => setDynamicHeatmapVisible((v) => !v),
+                    isDynamicHeatmapRefreshing,
+                    onDynamicHeatmapRefresh: () => {
+                      if (selectedDynamicMetricKey) void fetchDynamicPoints(selectedDynamicMetricKey);
+                    },
+                  })}
                 />
               </div>
               <div className="relative flex-1">
@@ -208,6 +317,13 @@ export default function WarehouseMapPage() {
                   highlightAreaIds={highlightAreaIds}
                   zonesLayerVisible={zonesVisible}
                   hazardBuffersLayerVisible={hazardBuffersVisible}
+                  {...(canViewHeatmaps && {
+                    wmsBaseUrl: `/${slug}/gis/wms`,
+                    selectedStaticHeatmap: staticHeatmaps.find((h) => h.id === selectedStaticHeatmapId) ?? null,
+                    staticHeatmapLayerVisible: staticHeatmapVisible,
+                    dynamicHeatmapData: dynamicHeatmapData ?? undefined,
+                    dynamicHeatmapLayerVisible: dynamicHeatmapVisible,
+                  })}
                   onPolygonSelect={(gisBlockId, templateName, label) => {
                     if (gisBlockId && templateName && label) {
                       const ep = existingPolygons.find((p) => p.gisBlockId === gisBlockId);

@@ -1,6 +1,6 @@
 import type { ComponentType } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Box, Eye, EyeOff, ImageIcon, Layers, MapPin, ShieldAlert, X } from "lucide-react";
+import { Box, Eye, EyeOff, ImageIcon, Layers, MapPin, ShieldAlert, X, Flame, RefreshCw } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
@@ -9,6 +9,7 @@ import { PATHS } from "@/shared/consts/paths";
 import { normalizeTenantSlug } from "@/features/auth/shared/scope";
 import { getTemplateStroke } from "../floorplans/templateColors";
 import type { EditorTemplate } from "../floorplans/useEditorState";
+import type { StaticHeatmapRecord, DynamicHeatmapMetric } from "@/features/tenant/types/gis";
 
 interface ViewerLayerPanelProps {
   templates: EditorTemplate[];
@@ -23,6 +24,20 @@ interface ViewerLayerPanelProps {
   onZonesVisibilityToggle?: () => void;
   hazardBuffersVisible?: boolean;
   onHazardBuffersVisibilityToggle?: () => void;
+  // Static heatmap props
+  staticHeatmaps?: StaticHeatmapRecord[];
+  selectedStaticHeatmapId?: string | null;
+  onStaticHeatmapSelect?: (id: string) => void;
+  staticHeatmapVisible?: boolean;
+  onStaticHeatmapVisibilityToggle?: () => void;
+  // Dynamic heatmap props
+  dynamicMetrics?: DynamicHeatmapMetric[];
+  selectedDynamicMetricKey?: string | null;
+  onDynamicMetricSelect?: (key: string) => void;
+  dynamicHeatmapVisible?: boolean;
+  onDynamicHeatmapVisibilityToggle?: () => void;
+  isDynamicHeatmapRefreshing?: boolean;
+  onDynamicHeatmapRefresh?: () => void;
 }
 
 export function ViewerLayerPanel({
@@ -38,6 +53,18 @@ export function ViewerLayerPanel({
   onZonesVisibilityToggle,
   hazardBuffersVisible,
   onHazardBuffersVisibilityToggle,
+  staticHeatmaps,
+  selectedStaticHeatmapId,
+  onStaticHeatmapSelect,
+  staticHeatmapVisible,
+  onStaticHeatmapVisibilityToggle,
+  dynamicMetrics,
+  selectedDynamicMetricKey,
+  onDynamicMetricSelect,
+  dynamicHeatmapVisible,
+  onDynamicHeatmapVisibilityToggle,
+  isDynamicHeatmapRefreshing,
+  onDynamicHeatmapRefresh,
 }: ViewerLayerPanelProps) {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -122,6 +149,109 @@ export function ViewerLayerPanel({
               <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
             )}
           </button>
+        </div>
+      )}
+
+      {/* Static heatmap layer section */}
+      {onStaticHeatmapVisibilityToggle !== undefined && (
+        <div className="flex flex-col gap-1">
+          <div
+            className={`flex w-full items-center rounded-sm transition-colors hover:bg-accent/50 ${!staticHeatmapVisible ? "opacity-40" : ""
+              }`}
+          >
+            <div className="flex min-w-0 flex-1 items-center gap-1.5 px-2 py-1.5">
+              <Flame className="h-3.5 w-3.5 shrink-0 text-orange-500" />
+              <span className="flex-1 truncate text-sm font-medium">{t("gis.viewer.staticHeatmapLayer")}</span>
+            </div>
+            <button
+              type="button"
+              title={staticHeatmapVisible ? t("gis.editor.layerVisible") : t("gis.editor.layerHidden")}
+              onClick={onStaticHeatmapVisibilityToggle}
+              className="mr-1 shrink-0 rounded p-0.5 transition-colors hover:bg-accent/50"
+            >
+              {staticHeatmapVisible ? (
+                <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+              ) : (
+                <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
+              )}
+            </button>
+          </div>
+          {onStaticHeatmapSelect && (
+            <select
+              className="mx-2 h-7 rounded border bg-background px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+              value={selectedStaticHeatmapId ?? ""}
+              disabled={!staticHeatmaps || staticHeatmaps.length === 0}
+              onChange={(e) => onStaticHeatmapSelect(e.target.value)}
+              aria-label={t("gis.viewer.staticHeatmapSelect")}
+            >
+              {(!staticHeatmaps || staticHeatmaps.length === 0) ? (
+                <option value="">{t("gis.viewer.staticHeatmapEmpty")}</option>
+              ) : (
+                staticHeatmaps.map((h) => (
+                  <option key={h.id} value={h.id}>{h.name}</option>
+                ))
+              )}
+            </select>
+          )}
+        </div>
+      )}
+
+      {/* Dynamic heatmap layer section */}
+      {onDynamicHeatmapVisibilityToggle !== undefined && (
+        <div className="flex flex-col gap-1">
+          <div
+            className={`flex w-full items-center rounded-sm transition-colors hover:bg-accent/50 ${!dynamicHeatmapVisible ? "opacity-40" : ""
+              }`}
+          >
+            <div className="flex min-w-0 flex-1 items-center gap-1.5 px-2 py-1.5">
+              <Flame className="h-3.5 w-3.5 shrink-0 text-purple-500" />
+              <span className="flex-1 truncate text-sm font-medium">{t("gis.viewer.dynamicHeatmapLayer")}</span>
+            </div>
+            <button
+              type="button"
+              title={dynamicHeatmapVisible ? t("gis.editor.layerVisible") : t("gis.editor.layerHidden")}
+              onClick={onDynamicHeatmapVisibilityToggle}
+              className="mr-1 shrink-0 rounded p-0.5 transition-colors hover:bg-accent/50"
+            >
+              {dynamicHeatmapVisible ? (
+                <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+              ) : (
+                <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
+              )}
+            </button>
+          </div>
+          <div className="mx-2 flex items-center gap-1">
+            {onDynamicMetricSelect && (
+              <select
+                className="h-7 flex-1 rounded border bg-background px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+                value={selectedDynamicMetricKey ?? ""}
+                disabled={!dynamicMetrics || dynamicMetrics.length === 0}
+                onChange={(e) => onDynamicMetricSelect(e.target.value)}
+                aria-label={t("gis.viewer.dynamicMetricSelect")}
+              >
+                {(!dynamicMetrics || dynamicMetrics.length === 0) ? (
+                  <option value="">{t("gis.viewer.dynamicMetricEmpty")}</option>
+                ) : (
+                  dynamicMetrics.map((m) => (
+                    <option key={m.key} value={m.key}>
+                      {m.label}{m.unit ? ` (${m.unit})` : ""}
+                    </option>
+                  ))
+                )}
+              </select>
+            )}
+            {onDynamicHeatmapRefresh && (
+              <button
+                type="button"
+                title={t("gis.viewer.dynamicRefresh")}
+                onClick={onDynamicHeatmapRefresh}
+                disabled={isDynamicHeatmapRefreshing}
+                className="shrink-0 rounded p-1 text-xs transition-colors hover:bg-accent/50 disabled:opacity-50"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 text-muted-foreground ${isDynamicHeatmapRefreshing ? "animate-spin" : ""}`} />
+              </button>
+            )}
+          </div>
         </div>
       )}
 

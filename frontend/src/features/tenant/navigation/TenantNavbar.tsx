@@ -23,6 +23,7 @@ import {
   ScanBarcode,
   ShieldAlert,
   Hexagon,
+  Flame,
 } from "lucide-react";
 import { CameraScanner } from "@/shared/components/CameraScanner";
 import { useScanNavigation } from "@/features/tenant/scan/useScanNavigation";
@@ -98,6 +99,7 @@ export function TenantNavbar() {
   const canViewHazardTypes = hasPermission(TENANT_PERMISSIONS.HAZARD_TYPES_VIEW);
   const canViewZoneTypes = hasPermission(TENANT_PERMISSIONS.ZONE_TYPES_VIEW);
   const canViewHazardBuffers = hasPermission(TENANT_PERMISSIONS.GIS_HAZARD_BUFFERS_VIEW);
+  const canManageHeatmaps = hasPermission(TENANT_PERMISSIONS.GIS_HEATMAPS_MANAGE);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const { navigateFromResult } = useScanNavigation(normalizedSlug);
   const canViewReceipts = hasPermission(TENANT_PERMISSIONS.RECEIPTS_VIEW);
@@ -210,6 +212,15 @@ export function TenantNavbar() {
                     },
                   ]
                   : []),
+                ...(canManageHeatmaps
+                  ? [
+                    {
+                      to: PATHS.TENANT.gisHeatmaps(normalizedSlug),
+                      label: t("tenant.nav.gisHeatmaps"),
+                      icon: Flame,
+                    },
+                  ]
+                  : []),
               ],
             },
           ]
@@ -319,6 +330,7 @@ export function TenantNavbar() {
       canViewHazardTypes,
       canViewZoneTypes,
       canViewHazardBuffers,
+      canManageHeatmaps,
       canViewWarehouse,
       normalizedSlug,
       t,

@@ -48,4 +48,26 @@ describe("TenantNavbar", () => {
 
     expect(screen.getByRole("button", { name: /Inventory/i })).toBeInTheDocument();
   });
+
+  it("shows Heatmaps nav item when user has GIS_HEATMAPS_MANAGE permission", async () => {
+    const user = userEvent.setup();
+    renderNavbar([TENANT_PERMISSIONS.GIS_FLOOR_PLAN_VIEW, TENANT_PERMISSIONS.GIS_HEATMAPS_MANAGE]);
+
+    await user.click(screen.getByRole("button", { name: /GIS/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: "Heatmaps" })).toBeInTheDocument();
+    });
+  });
+
+  it("hides Heatmaps nav item when user lacks GIS_HEATMAPS_MANAGE permission", async () => {
+    const user = userEvent.setup();
+    renderNavbar([TENANT_PERMISSIONS.GIS_FLOOR_PLAN_VIEW]);
+
+    await user.click(screen.getByRole("button", { name: /GIS/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("link", { name: "Heatmaps" })).not.toBeInTheDocument();
+    });
+  });
 });

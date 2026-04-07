@@ -3,11 +3,14 @@ import esriConfig from "@arcgis/core/config.js";
 import Extent from "@arcgis/core/geometry/Extent.js";
 import Polygon from "@arcgis/core/geometry/Polygon.js";
 import Graphic from "@arcgis/core/Graphic.js";
+import FeatureLayer from "@arcgis/core/layers/FeatureLayer.js";
 import GraphicsLayer from "@arcgis/core/layers/GraphicsLayer.js";
 import MediaLayer from "@arcgis/core/layers/MediaLayer.js";
+import WMSLayer from "@arcgis/core/layers/WMSLayer.js";
 import ImageElement from "@arcgis/core/layers/support/ImageElement.js";
 import ExtentAndRotationGeoreference from "@arcgis/core/layers/support/ExtentAndRotationGeoreference.js";
 import EsriMap from "@arcgis/core/Map.js";
+import HeatmapRenderer from "@arcgis/core/renderers/HeatmapRenderer.js";
 import SimpleFillSymbol from "@arcgis/core/symbols/SimpleFillSymbol.js";
 import TextSymbol from "@arcgis/core/symbols/TextSymbol.js";
 import MapView from "@arcgis/core/views/MapView.js";
@@ -16,7 +19,7 @@ import { getTemplateColor } from "./templateColors";
 import { resolveZoneDisplayColor } from "../zones/zoneTypeColors";
 import type { ExistingPolygon, EditorTemplate } from "./useEditorState";
 import type { GeoJsonFeatureCollection, ZoneFeatureProps } from "../zones/zonesApi";
-import type { HazardBufferFeatureProps } from "@/features/tenant/types/gis";
+import type { HazardBufferFeatureProps, DynamicHeatmapFeatureProps, StaticHeatmapRecord } from "@/features/tenant/types/gis";
 
 esriConfig.assetsPath = `${import.meta.env.BASE_URL}assets`;
 
@@ -72,6 +75,13 @@ interface WarehouseMapViewProps {
   highlightAreaIds?: string[];
   zonesLayerVisible?: boolean;
   hazardBuffersLayerVisible?: boolean;
+  // Static heatmap overlay (WMS)
+  wmsBaseUrl?: string;
+  selectedStaticHeatmap?: StaticHeatmapRecord | null;
+  staticHeatmapLayerVisible?: boolean;
+  // Dynamic heatmap overlay (client-side FeatureLayer)
+  dynamicHeatmapData?: GeoJsonFeatureCollection<DynamicHeatmapFeatureProps> | null;
+  dynamicHeatmapLayerVisible?: boolean;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -101,6 +111,11 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
       highlightAreaIds,
       zonesLayerVisible,
       hazardBuffersLayerVisible,
+      wmsBaseUrl,
+      selectedStaticHeatmap,
+      staticHeatmapLayerVisible,
+      dynamicHeatmapData,
+      dynamicHeatmapLayerVisible,
     },
     ref
   ) {
@@ -113,6 +128,8 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
     const viewerHazardBuffersLayerRef = useRef<GraphicsLayer | null>(null);
     const viewerHighlightLayerRef = useRef<GraphicsLayer | null>(null);
     const svgLayerRef = useRef<MediaLayer | null>(null);
+    const staticHeatmapWmsLayerRef = useRef<WMSLayer | null>(null);
+    const dynamicHeatmapFeatureLayerRef = useRef<FeatureLayer | null>(null);
 
     // Stable refs that mirror the latest prop values — used in event handlers so we
     // never capture stale closures and don't need to add props to inner-effect deps.
@@ -190,8 +207,60 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
       viewerHazardBuffersLayerRef.current = viewerHazardBuffersLayer;
       viewerHighlightLayerRef.current = viewerHighlightLayer;
 
+      // Static heatmap WMS layer (under block layers)
+      const staticWmsLayer = new WMSLayer({
+        id: "static-heatmap-wms",
+        url: wmsBaseUrl ?? "",
+        sublayers: selectedStaticHeatmap
+          ? [{ name: selectedStaticHeatmap.geoserverLayerName }]
+          : [],
+        visible: (staticHeatmapLayerVisible ?? true) && !!selectedStaticHeatmap,
+        opacity: 0.55,
+      });
+      staticHeatmapWmsLayerRef.current = staticWmsLayer;
+
+      // Dynamic heatmap FeatureLayer (client-side, under block layers but above WMS)
+      const dynamicLayer = new FeatureLayer({
+        id: "dynamic-heatmap",
+        source: [],
+        objectIdField: "locationId",
+        fields: [
+          { name: "locationId", type: "string" },
+          { name: "label", type: "string" },
+          { name: "positionPath", type: "string" },
+          { name: "metricKey", type: "string" },
+          { name: "weight", type: "double" },
+          { name: "rawValue", type: "double" },
+        ],
+        renderer: new HeatmapRenderer({
+          field: "weight",
+          colorStops: [
+            { color: [63, 40, 102, 0], ratio: 0 },
+            { color: [139, 92, 246, 0.5], ratio: 0.3 },
+            { color: [249, 115, 22, 0.7], ratio: 0.7 },
+            { color: [239, 68, 68, 0.9], ratio: 1 },
+          ],
+          radius: 18,
+          maxDensity: 0.01,
+          minDensity: 0,
+        }),
+        visible: (dynamicHeatmapLayerVisible ?? true) && !!(dynamicHeatmapData?.features.length),
+        blendMode: "normal",
+      });
+      dynamicHeatmapFeatureLayerRef.current = dynamicLayer;
+
+      // Layer order: SVG floor plan → static WMS → dynamic heatmap → block layers → zones → highlight
       const esriMap = new EsriMap({
-        layers: [mediaLayer, viewerZonesLayer, viewerHazardBuffersLayer, ...Array.from(layers.values()), sketchLayer, viewerHighlightLayer],
+        layers: [
+          mediaLayer,
+          staticWmsLayer,
+          dynamicLayer,
+          viewerZonesLayer,
+          viewerHazardBuffersLayer,
+          ...Array.from(layers.values()),
+          sketchLayer,
+          viewerHighlightLayer,
+        ],
       });
 
       const mapView = new MapView({
@@ -574,6 +643,72 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
         viewerHazardBuffersLayerRef.current.visible = hazardBuffersLayerVisible ?? true;
       }
     }, [hazardBuffersLayerVisible]);
+
+    // ── Effect: update static heatmap WMS layer when selection or URL changes ──
+    useEffect(() => {
+      const layer = staticHeatmapWmsLayerRef.current;
+      if (!layer) return;
+      if (selectedStaticHeatmap) {
+        layer.url = wmsBaseUrl ?? "";
+        layer.sublayers.removeAll();
+        layer.sublayers.add({ name: selectedStaticHeatmap.geoserverLayerName } as never);
+        layer.visible = staticHeatmapLayerVisible ?? true;
+      } else {
+        layer.visible = false;
+      }
+    }, [selectedStaticHeatmap, wmsBaseUrl, staticHeatmapLayerVisible]);
+
+    // ── Effect: toggle static heatmap WMS visibility ──────────────────────────
+    useEffect(() => {
+      const layer = staticHeatmapWmsLayerRef.current;
+      if (!layer || !selectedStaticHeatmap) return;
+      layer.visible = staticHeatmapLayerVisible ?? true;
+    }, [staticHeatmapLayerVisible, selectedStaticHeatmap]);
+
+    // ── Effect: update dynamic heatmap FeatureLayer data ─────────────────────
+    useEffect(() => {
+      const layer = dynamicHeatmapFeatureLayerRef.current;
+      if (!layer) return;
+      if (!dynamicHeatmapData?.features.length) {
+        void layer.queryFeatures().then((result) => {
+          layer.applyEdits({ deleteFeatures: result.features });
+        });
+        layer.visible = false;
+        return;
+      }
+      const graphics = dynamicHeatmapData.features.map((feature) => {
+        const coords = (feature.geometry as { coordinates: [number, number] }).coordinates;
+        return new Graphic({
+          geometry: {
+            type: "point",
+            longitude: coords[0],
+            latitude: coords[1],
+          } as never,
+          attributes: {
+            locationId: feature.properties.locationId,
+            label: feature.properties.label,
+            positionPath: feature.properties.positionPath,
+            metricKey: feature.properties.metricKey,
+            weight: feature.properties.weight,
+            rawValue: feature.properties.rawValue,
+          },
+        });
+      });
+      void layer.queryFeatures().then((result) => {
+        void layer.applyEdits({
+          deleteFeatures: result.features,
+          addFeatures: graphics,
+        });
+      });
+      layer.visible = dynamicHeatmapLayerVisible ?? true;
+    }, [dynamicHeatmapData, dynamicHeatmapLayerVisible]);
+
+    // ── Effect: toggle dynamic heatmap layer visibility ───────────────────────
+    useEffect(() => {
+      const layer = dynamicHeatmapFeatureLayerRef.current;
+      if (!layer) return;
+      layer.visible = (dynamicHeatmapLayerVisible ?? true) && !!(dynamicHeatmapData?.features.length);
+    }, [dynamicHeatmapLayerVisible, dynamicHeatmapData]);
 
     return (
       <div className="relative">
