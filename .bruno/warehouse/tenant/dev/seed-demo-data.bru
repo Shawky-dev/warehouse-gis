@@ -1,0 +1,19 @@
+meta {
+  name: seed-demo-data
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{URL}}/{{TENANT_SLUG}}/dev/seed?reset=false&withGis=true
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}

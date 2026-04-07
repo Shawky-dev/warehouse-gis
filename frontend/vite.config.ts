@@ -11,9 +11,6 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), tailwindcss()],
-    optimizeDeps: {
-      exclude: ["@arcgis/core"],
-    },
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
@@ -33,9 +30,6 @@ export default defineConfig(({ mode }) => {
             "X-Forwarded-Prefix": "/api",
           },
         },
-      },
-      watch: {
-        usePolling: true,
       },
     },
     test: {
