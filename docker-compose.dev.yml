@@ -17,57 +17,6 @@ services:
     ports:
       - "${DEV_DB_PORT}:5432"
 
-  backend:
-    image: maven:3.9-eclipse-temurin-21
-    working_dir: /workspace/backend
-    restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      SPRING_PROFILES_ACTIVE: ${DEV_SPRING_PROFILES_ACTIVE}
-      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${DEV_POSTGRES_DB}
-      SPRING_DATASOURCE_USERNAME: ${DEV_POSTGRES_USER}
-      SPRING_DATASOURCE_PASSWORD: ${DEV_POSTGRES_PASSWORD}
-      SECURITY_CORS_ALLOWED_ORIGIN_PATTERNS: ${SECURITY_CORS_ALLOWED_ORIGIN_PATTERNS}
-      SECURITY_AUTH_REFRESH_COOKIE_NAME: ${SECURITY_AUTH_REFRESH_COOKIE_NAME}
-      SECURITY_AUTH_REFRESH_COOKIE_PATH: ${SECURITY_AUTH_REFRESH_COOKIE_PATH}
-      SECURITY_AUTH_REFRESH_COOKIE_SAME_SITE: ${SECURITY_AUTH_REFRESH_COOKIE_SAME_SITE}
-      SECURITY_AUTH_REFRESH_COOKIE_SECURE: ${SECURITY_AUTH_REFRESH_COOKIE_SECURE}
-      SECURITY_AUTH_REFRESH_COOKIE_DOMAIN: ${SECURITY_AUTH_REFRESH_COOKIE_DOMAIN}
-      SECURITY_JWT_PRIVATE_KEY: file:/workspace/backend/src/test/resources/keys/jwt-private.pem
-      SECURITY_JWT_PUBLIC_KEY: file:/workspace/backend/src/test/resources/keys/jwt-public.pem
-      GEOSERVER_URL: http://geoserver:8080/geoserver
-      GEOSERVER_ADMIN_USER: ${DEV_GEOSERVER_ADMIN_USER:-admin}
-      GEOSERVER_ADMIN_PASSWORD: ${DEV_GEOSERVER_ADMIN_PASSWORD:-geoserver}
-      GEOSERVER_DB_HOST: db
-      GEOSERVER_DB_PORT: 5432
-      GEOSERVER_DB_NAME: ${DEV_POSTGRES_DB}
-    volumes:
-      - ./backend:/workspace/backend
-      - ./scripts:/workspace/scripts:ro
-      - maven_cache:/root/.m2
-    command: [ "sh", "/workspace/scripts/backend-dev-watch.sh" ]
-    ports:
-      - "${DEV_BACKEND_PORT}:8080"
-
-  frontend:
-    image: node:20-alpine
-    working_dir: /workspace/frontend
-    restart: unless-stopped
-    depends_on:
-      - backend
-    environment:
-      VITE_API_URL: ${VITE_API_URL}
-      VITE_DEV_PROXY_TARGET: ${VITE_DEV_PROXY_TARGET}
-    volumes:
-      - ./frontend:/workspace/frontend
-      - frontend_node_modules:/workspace/frontend/node_modules
-      - npm_cache:/root/.npm
-    command: [ "sh", "-c", "npm ci && npm run dev -- --host 0.0.0.0 --port 5173" ]
-    ports:
-      - "${DEV_FRONTEND_PORT}:5173"
-
   geoserver:
     image: kartoza/geoserver:2.25.2
     restart: unless-stopped
@@ -87,7 +36,4 @@ services:
 
 volumes:
   postgres_dev_data:
-  maven_cache:
-  frontend_node_modules:
-  npm_cache:
   geoserver_data:

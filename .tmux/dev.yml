@@ -10,11 +10,11 @@ windows:
 
   - window_name: backend
     panes:
-      - cd backend && sh ../scripts/backend-dev-watch.sh
+      - cd backend && ./mvnw spring-boot:run
 
   - window_name: frontend
     panes:
-      - cd frontend && npm run dev -- --host 0.0.0.0 --port 5173
+      - cd frontend && npm run dev
 
   - window_name: db-logs
     panes:
