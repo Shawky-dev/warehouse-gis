@@ -9,6 +9,7 @@ import { useAuth } from "@/features/auth/context/AuthContext";
 import { TENANT_PERMISSIONS } from "@/features/auth/shared/permissions";
 import { PATHS } from "@/shared/consts/paths";
 import { downloadGeoJson } from "@/lib/exportGeoJson";
+import { resolveApiUrl } from "@/lib/api";
 import { useFloorPlanApi } from "../floorplans/useFloorPlanApi";
 import { useEditorState } from "../floorplans/useEditorState";
 import { WarehouseMapView } from "../floorplans/WarehouseMapView";
@@ -318,7 +319,7 @@ export default function WarehouseMapPage() {
                   zonesLayerVisible={zonesVisible}
                   hazardBuffersLayerVisible={hazardBuffersVisible}
                   {...(canViewHeatmaps && {
-                    wmsBaseUrl: `/${slug}/gis/wms`,
+                    wmsBaseUrl: resolveApiUrl(`/${slug}/gis/wms`),
                     selectedStaticHeatmap: staticHeatmaps.find((h) => h.id === selectedStaticHeatmapId) ?? null,
                     staticHeatmapLayerVisible: staticHeatmapVisible,
                     dynamicHeatmapData: dynamicHeatmapData ?? undefined,

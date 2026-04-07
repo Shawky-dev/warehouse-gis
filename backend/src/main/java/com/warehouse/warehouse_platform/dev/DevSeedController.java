@@ -80,10 +80,12 @@ import java.util.UUID;
  * <b>GIS grid (when withGis=true):</b>
  * 
  * <pre>
- *   Leaves are placed in a 9-column × 4-row grid anchored at lon=10.0, lat=51.0.
+ *   Leaves are placed in a 9-column × 4-row grid anchored at the floor-plan
+ *   origin (lon≈0.000228°, lat≈0.000255°).
  *   Columns 0-2 = Aisle A, 3-5 = Aisle B, 6-8 = Aisle C.
  *   Rows 0-1 = Bay 1 (L/R), rows 2-3 = Bay 2 (L/R).
- *   Cell size: 0.001° × 0.0005°  (≈70 m × 55 m for heatmap density purposes).
+ *   Cell size: 0.000050° × 0.000040° — matches the coordinate space of real
+ *   GIS floor-plan blocks so the heatmap overlays correctly in the viewer.
  * </pre>
  */
 @RestController
@@ -93,13 +95,19 @@ import java.util.UUID;
 public class DevSeedController {
 
     // ── GIS grid constants ────────────────────────────────────────────────────
+    // Anchored to match the floor-plan coordinate space used by the GIS viewer
+    // (values near origin, in fractional degrees). Derived from a real Aisle block:
+    // minLon=0.000228, maxLon=0.000409 → aisle width ≈ 0.000181°
+    // minLat=0.000255, maxLat=0.000442 → aisle height ≈ 0.000188°
+    // 3 shelves wide: 3·CELL_LON + 2·GAP_LON = 0.000180°
+    // 4 bay rows tall: 4·CELL_LAT + 3·GAP_LAT = 0.000190°
 
-    private static final double BASE_LON = 10.0;
-    private static final double BASE_LAT = 51.0;
-    private static final double CELL_LON = 0.001;
-    private static final double CELL_LAT = 0.0005;
-    private static final double GAP_LON = 0.0002;
-    private static final double GAP_LAT = 0.0001;
+    private static final double BASE_LON = 0.000228;
+    private static final double BASE_LAT = 0.000255;
+    private static final double CELL_LON = 0.000050;
+    private static final double CELL_LAT = 0.000040;
+    private static final double GAP_LON = 0.000015;
+    private static final double GAP_LAT = 0.000010;
 
     // Inline initializer → excluded from @RequiredArgsConstructor
     private final GeometryFactory geomFactory = new GeometryFactory(new PrecisionModel(), 4326);

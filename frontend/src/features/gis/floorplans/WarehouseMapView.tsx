@@ -15,6 +15,7 @@ import SimpleFillSymbol from "@arcgis/core/symbols/SimpleFillSymbol.js";
 import TextSymbol from "@arcgis/core/symbols/TextSymbol.js";
 import MapView from "@arcgis/core/views/MapView.js";
 import Sketch from "@arcgis/core/widgets/Sketch.js";
+import { getAccessToken } from "@/features/auth/session/authSessionManager";
 import { getTemplateColor } from "./templateColors";
 import { resolveZoneDisplayColor } from "../zones/zoneTypeColors";
 import type { ExistingPolygon, EditorTemplate } from "./useEditorState";
@@ -22,6 +23,43 @@ import type { GeoJsonFeatureCollection, ZoneFeatureProps } from "../zones/zonesA
 import type { HazardBufferFeatureProps, DynamicHeatmapFeatureProps, StaticHeatmapRecord } from "@/features/tenant/types/gis";
 
 esriConfig.assetsPath = `${import.meta.env.BASE_URL}assets`;
+
+let hasConfiguredArcgisAuthInterceptor = false;
+
+function isAppWmsRequest(url: string): boolean {
+  try {
+    return new URL(url, window.location.origin).pathname.includes("/gis/wms");
+  } catch {
+    return false;
+  }
+}
+
+function ensureArcgisAuthInterceptor() {
+  if (hasConfiguredArcgisAuthInterceptor) {
+    return;
+  }
+
+  esriConfig.request.interceptors.push({
+    before(params) {
+      if (typeof params.url !== "string" || !isAppWmsRequest(params.url)) {
+        return;
+      }
+
+      const token = getAccessToken();
+      if (!token) {
+        return;
+      }
+
+      params.requestOptions ??= {};
+      params.requestOptions.headers = {
+        ...(params.requestOptions.headers as Record<string, string> | undefined),
+        Authorization: `Bearer ${token}`,
+      };
+    },
+  });
+
+  hasConfiguredArcgisAuthInterceptor = true;
+}
 
 function getLabelFontSize(depth: number): number {
   if (depth <= 0) return 15;
@@ -119,6 +157,8 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
     },
     ref
   ) {
+    ensureArcgisAuthInterceptor();
+
     const containerRef = useRef<HTMLDivElement>(null);
     const mapViewRef = useRef<MapView | null>(null);
     const sketchVMRef = useRef<Sketch | null>(null);
@@ -220,11 +260,18 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
       staticHeatmapWmsLayerRef.current = staticWmsLayer;
 
       // Dynamic heatmap FeatureLayer (client-side, under block layers but above WMS)
+      // objectIdField must be type "oid" (integer) — ArcGIS silently drops features otherwise.
+      // maxDensity: 0 → auto-calculated from loaded data; required because the floor-plan
+      // coordinate space is fractional degrees (near origin) so a hardcoded value would be
+      // orders of magnitude off and nothing would render.
       const dynamicLayer = new FeatureLayer({
         id: "dynamic-heatmap",
         source: [],
-        objectIdField: "locationId",
+        geometryType: "point",
+        spatialReference: { wkid: 4326 },
+        objectIdField: "OBJECTID",
         fields: [
+          { name: "OBJECTID", type: "oid" },
           { name: "locationId", type: "string" },
           { name: "label", type: "string" },
           { name: "positionPath", type: "string" },
@@ -241,7 +288,7 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
             { color: [239, 68, 68, 0.9], ratio: 1 },
           ],
           radius: 18,
-          maxDensity: 0.01,
+          maxDensity: 0,
           minDensity: 0,
         }),
         visible: (dynamicHeatmapLayerVisible ?? true) && !!(dynamicHeatmapData?.features.length),
@@ -676,7 +723,7 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
         layer.visible = false;
         return;
       }
-      const graphics = dynamicHeatmapData.features.map((feature) => {
+      const graphics = dynamicHeatmapData.features.map((feature, idx) => {
         const coords = (feature.geometry as { coordinates: [number, number] }).coordinates;
         return new Graphic({
           geometry: {
@@ -685,6 +732,7 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
             latitude: coords[1],
           } as never,
           attributes: {
+            OBJECTID: idx + 1,
             locationId: feature.properties.locationId,
             label: feature.properties.label,
             positionPath: feature.properties.positionPath,

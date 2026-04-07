@@ -7,6 +7,18 @@ interface RetryableRequestConfig extends InternalAxiosRequestConfig {
 
 const baseURL = import.meta.env.VITE_API_URL || "/api";
 
+export function resolveApiUrl(path: string): string {
+  if (/^https?:\/\//i.test(path)) {
+    return path;
+  }
+
+  const normalizedPath = path.startsWith("/") ? path.slice(1) : path;
+  const origin = typeof window === "undefined" ? "http://localhost" : window.location.origin;
+  const resolvedBaseUrl = new URL(baseURL.endsWith("/") ? baseURL : `${baseURL}/`, origin);
+
+  return new URL(normalizedPath, resolvedBaseUrl).toString();
+}
+
 export const publicApi = axios.create({
   baseURL,
   withCredentials: true,
