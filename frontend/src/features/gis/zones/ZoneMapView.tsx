@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import esriConfig from "@arcgis/core/config.js";
 import Extent from "@arcgis/core/geometry/Extent.js";
 import Polygon from "@arcgis/core/geometry/Polygon.js";
+import * as centroidOperator from "@arcgis/core/geometry/operators/centroidOperator.js";
 import Graphic from "@arcgis/core/Graphic.js";
 import GraphicsLayer from "@arcgis/core/layers/GraphicsLayer.js";
 import MediaLayer from "@arcgis/core/layers/MediaLayer.js";
@@ -53,6 +54,10 @@ function getZoneColors(props: ZoneFeatureProps, selected: boolean) {
         fill: [fill[0], fill[1], fill[2], selected ? 0.35 : fill[3]] as [number, number, number, number],
         stroke,
     };
+}
+
+function getPolygonCentroid(polygon: Polygon) {
+    return centroidOperator.execute(polygon);
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -292,7 +297,7 @@ export function ZoneMapView({
                 attributes: { zoneId: props.id, zoneProps: props },
             }));
 
-            const centroid = polygon.centroid;
+            const centroid = getPolygonCentroid(polygon);
             if (centroid) {
                 layer.add(new Graphic({
                     geometry: centroid,

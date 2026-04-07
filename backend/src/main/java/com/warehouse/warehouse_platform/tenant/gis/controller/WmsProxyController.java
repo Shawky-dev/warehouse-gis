@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestTemplate;
 
@@ -97,7 +98,8 @@ public class WmsProxyController {
 
         // Build GeoServer WMS URL.
         String queryString = buildQueryString(params);
-        String geoServerUrl = geoServerProperties.url() + "/" + workspace + "/wms?" + queryString;
+        String geoServerBaseUrl = geoServerProperties.url().replaceAll("/+$", "");
+        String geoServerUrl = geoServerBaseUrl + "/" + workspace + "/wms?" + queryString;
 
         // Forward request to GeoServer.
         try {
@@ -113,7 +115,12 @@ public class WmsProxyController {
         } catch (RestClientResponseException e) {
             log.warn("GeoServer WMS proxy failed for tenant={} [{}]: {}", tenantSlug, e.getStatusCode(),
                     e.getMessage());
-            throw GisException.badRequest("GeoServer WMS request failed: " + e.getMessage());
+            throw GisException.badGateway("GeoServer WMS request failed: " + e.getStatusText());
+        } catch (ResourceAccessException e) {
+            log.warn("GeoServer WMS proxy unreachable for tenant={} at {}: {}", tenantSlug, geoServerProperties.url(),
+                    e.getMessage());
+            throw GisException.badGateway(
+                    "GeoServer WMS endpoint is unreachable. Check GEOSERVER_URL for the active backend profile.");
         }
     }
 

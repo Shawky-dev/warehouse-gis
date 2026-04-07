@@ -13,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.Instant;
@@ -23,14 +24,18 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("null")
 class WmsProxyControllerTest {
+    private static Class<byte[]> byteArrayType() {
+        return byte[].class;
+    }
 
     @Mock
     TenantAccessPolicy tenantAccessPolicy;
@@ -114,7 +119,7 @@ class WmsProxyControllerTest {
 
         // Mock GeoServer response
         var mockResponse = ResponseEntity.ok().body(new byte[] { 1, 2, 3 });
-        when(geoServerRestTemplate.getForEntity(anyString(), eq(byte[].class))).thenReturn(mockResponse);
+        when(geoServerRestTemplate.getForEntity(anyString(), eq(byteArrayType()))).thenReturn(mockResponse);
 
         Map<String, String> params = Map.of(
                 "SERVICE", "WMS",
@@ -129,7 +134,7 @@ class WmsProxyControllerTest {
     @Test
     void proxy_shouldForwardGetCapabilities_withoutLayerCheck() {
         var mockResponse = ResponseEntity.ok().body("<Capabilities/>".getBytes());
-        when(geoServerRestTemplate.getForEntity(anyString(), eq(byte[].class))).thenReturn(mockResponse);
+        when(geoServerRestTemplate.getForEntity(anyString(), eq(byteArrayType()))).thenReturn(mockResponse);
 
         Map<String, String> params = Map.of(
                 "SERVICE", "WMS",
@@ -140,9 +145,23 @@ class WmsProxyControllerTest {
     }
 
     @Test
+    void proxy_shouldReturnBadGateway_whenGeoServerIsUnreachable() {
+        when(geoServerRestTemplate.getForEntity(anyString(), eq(byteArrayType())))
+                .thenThrow(new ResourceAccessException("Connection refused"));
+
+        Map<String, String> params = Map.of(
+                "SERVICE", "WMS",
+                "REQUEST", "GetCapabilities");
+
+        GisException exception = assertThrows(GisException.class, () -> controller.proxy(TENANT, params, auth));
+        assertEquals(502, exception.getStatus().value());
+        assertSame("BAD_GATEWAY", exception.getCode());
+    }
+
+    @Test
     void proxy_shouldAccept_caseInsensitiveServiceParam() {
         var mockResponse = ResponseEntity.ok().body(new byte[0]);
-        when(geoServerRestTemplate.getForEntity(anyString(), eq(byte[].class))).thenReturn(mockResponse);
+        when(geoServerRestTemplate.getForEntity(anyString(), eq(byteArrayType()))).thenReturn(mockResponse);
 
         Map<String, String> params = Map.of(
                 "SERVICE", "wms",

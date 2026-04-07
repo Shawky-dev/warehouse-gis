@@ -25,6 +25,10 @@ public class GisException extends RuntimeException {
         return new GisException(HttpStatus.CONFLICT, "CONFLICT", message);
     }
 
+    public static GisException badGateway(String message) {
+        return new GisException(HttpStatus.BAD_GATEWAY, "BAD_GATEWAY", message);
+    }
+
     public HttpStatus getStatus() {
         return status;
     }

@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import esriConfig from "@arcgis/core/config.js";
 import Extent from "@arcgis/core/geometry/Extent.js";
 import Polygon from "@arcgis/core/geometry/Polygon.js";
+import * as centroidOperator from "@arcgis/core/geometry/operators/centroidOperator.js";
 import Graphic from "@arcgis/core/Graphic.js";
 import FeatureLayer from "@arcgis/core/layers/FeatureLayer.js";
 import GraphicsLayer from "@arcgis/core/layers/GraphicsLayer.js";
@@ -78,6 +79,20 @@ function getFillSymbol(templateName: string, selected: boolean): SimpleFillSymbo
   return new SimpleFillSymbol({
     color: [r, g, b, selected ? 0.35 : 0.15],
     outline: { color: color.stroke, width: selected ? 3 : 2 },
+  });
+}
+
+function getPolygonCentroid(polygon: Polygon) {
+  return centroidOperator.execute(polygon);
+}
+
+function buildStaticWmsLayer(wmsBaseUrl: string, geoserverLayerName: string, visible: boolean) {
+  return new WMSLayer({
+    id: "static-heatmap-wms",
+    url: wmsBaseUrl,
+    sublayers: [{ name: geoserverLayerName }],
+    visible,
+    opacity: 0.55,
   });
 }
 
@@ -247,16 +262,14 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
       viewerHazardBuffersLayerRef.current = viewerHazardBuffersLayer;
       viewerHighlightLayerRef.current = viewerHighlightLayer;
 
-      // Static heatmap WMS layer (under block layers)
-      const staticWmsLayer = new WMSLayer({
-        id: "static-heatmap-wms",
-        url: wmsBaseUrl ?? "",
-        sublayers: selectedStaticHeatmap
-          ? [{ name: selectedStaticHeatmap.geoserverLayerName }]
-          : [],
-        visible: (staticHeatmapLayerVisible ?? true) && !!selectedStaticHeatmap,
-        opacity: 0.55,
-      });
+      const staticWmsLayer =
+        selectedStaticHeatmap && wmsBaseUrl
+          ? buildStaticWmsLayer(
+            wmsBaseUrl,
+            selectedStaticHeatmap.geoserverLayerName,
+            staticHeatmapLayerVisible ?? true
+          )
+          : null;
       staticHeatmapWmsLayerRef.current = staticWmsLayer;
 
       // Dynamic heatmap FeatureLayer (client-side, under block layers but above WMS)
@@ -300,7 +313,7 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
       const esriMap = new EsriMap({
         layers: [
           mediaLayer,
-          staticWmsLayer,
+          ...(staticWmsLayer ? [staticWmsLayer] : []),
           dynamicLayer,
           viewerZonesLayer,
           viewerHazardBuffersLayer,
@@ -377,7 +390,7 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
 
                 // Rebuild label at new centroid
                 const updatedPolygon = updatedGraphic.geometry as Polygon;
-                const centroid = updatedPolygon.centroid;
+                const centroid = getPolygonCentroid(updatedPolygon);
                 if (centroid) {
                   // Remove old label for this gisBlockId
                   const oldLabel = templateLayer.graphics.toArray()
@@ -568,7 +581,7 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
           },
         }));
 
-        const centroid = polygon.centroid;
+        const centroid = getPolygonCentroid(polygon);
         if (centroid) {
           const fontSize = getLabelFontSize(ep.depth);
           layer.add(new Graphic({
@@ -693,15 +706,34 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
 
     // ── Effect: update static heatmap WMS layer when selection or URL changes ──
     useEffect(() => {
+      const map = mapViewRef.current?.map;
       const layer = staticHeatmapWmsLayerRef.current;
-      if (!layer) return;
+      if (!map) return;
+
+      if (!selectedStaticHeatmap || !wmsBaseUrl) {
+        if (layer) {
+          layer.visible = false;
+          layer.sublayers.removeAll();
+        }
+        return;
+      }
+
+      if (!layer) {
+        const nextLayer = buildStaticWmsLayer(
+          wmsBaseUrl,
+          selectedStaticHeatmap.geoserverLayerName,
+          staticHeatmapLayerVisible ?? true
+        );
+        staticHeatmapWmsLayerRef.current = nextLayer;
+        map.add(nextLayer, 1);
+        return;
+      }
+
       if (selectedStaticHeatmap) {
         layer.url = wmsBaseUrl ?? "";
         layer.sublayers.removeAll();
         layer.sublayers.add({ name: selectedStaticHeatmap.geoserverLayerName } as never);
         layer.visible = staticHeatmapLayerVisible ?? true;
-      } else {
-        layer.visible = false;
       }
     }, [selectedStaticHeatmap, wmsBaseUrl, staticHeatmapLayerVisible]);
 
