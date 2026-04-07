@@ -1,9 +1,33 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { render, screen, waitFor } from "@testing-library/react";
 import App from "@/app/App";
 import { server } from "@/test/msw/server";
 import { http, HttpResponse } from "msw";
+
+vi.mock("@/features/gis/floorplans/WarehouseMapView", () => ({
+  WarehouseMapView: () => <div>map-view</div>,
+}));
+
+vi.mock("@/features/gis/viewer/WarehouseMapPage", () => ({
+  default: () => <div>warehouse-map-page</div>,
+}));
+
+vi.mock("@/features/gis/floorplans/FloorPlansPage", () => ({
+  default: () => <div>floor-plans-page</div>,
+}));
+
+vi.mock("@/features/gis/zones/ZoneManagementPage", () => ({
+  default: () => <div>zones-page</div>,
+}));
+
+vi.mock("@/features/gis/hazardBuffers/HazardBuffersPage", () => ({
+  default: () => <div>hazard-buffers-page</div>,
+}));
+
+vi.mock("@/features/gis/heatmaps/StaticHeatmapsPage", () => ({
+  default: () => <div>heatmaps-page</div>,
+}));
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 

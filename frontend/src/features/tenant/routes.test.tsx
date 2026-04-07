@@ -55,6 +55,42 @@ vi.mock("@/features/tenant/counting/CountSessionsPage", () => ({
   default: () => <p>tenant-count-sessions-page</p>,
 }));
 
+vi.mock("@/features/gis/floorplans/FloorPlansPage", () => ({
+  default: () => <p>gis-floor-plans-page</p>,
+}));
+
+vi.mock("@/features/gis/viewer/WarehouseMapPage", () => ({
+  default: () => <p>gis-map-page</p>,
+}));
+
+vi.mock("@/features/gis/zones/ZoneManagementPage", () => ({
+  default: () => <p>gis-zones-page</p>,
+}));
+
+vi.mock("@/features/gis/hazardBuffers/HazardBuffersPage", () => ({
+  default: () => <p>gis-hazard-buffers-page</p>,
+}));
+
+vi.mock("@/features/gis/heatmaps/StaticHeatmapsPage", () => ({
+  default: () => <p>gis-heatmaps-page</p>,
+}));
+
+vi.mock("@/features/tenant/hazardtype/TenantHazardTypesPage", () => ({
+  default: () => <p>tenant-hazard-types-page</p>,
+}));
+
+vi.mock("@/features/tenant/zonetype/TenantZoneTypesPage", () => ({
+  default: () => <p>tenant-zone-types-page</p>,
+}));
+
+vi.mock("@/features/tenant/category/TenantCategoriesPage", () => ({
+  default: () => <p>tenant-categories-page</p>,
+}));
+
+vi.mock("@/features/tenant/dashboard/TenantDashboardPage", () => ({
+  default: () => <p>tenant-dashboard-page</p>,
+}));
+
 function renderTenantRoute(path: string) {
   return render(
     <I18nProvider initialLocale="en" storageKey="test-locale-tenant-routes">
@@ -370,5 +406,30 @@ describe("tenant routes RBAC", () => {
     renderTenantRoute("/acme/count-sessions");
 
     expect(screen.getByText("tenant-count-sessions-page")).toBeInTheDocument();
+  });
+
+  it("blocks heatmaps route when gis.heatmaps.manage permission is missing", () => {
+    mockUseAuth.mockReturnValue({
+      status: "authenticated",
+      hasPermission: () => false,
+      hasAnyPermission: () => false,
+    });
+
+    renderTenantRoute("/acme/gis/heatmaps");
+
+    expect(screen.queryByText("gis-heatmaps-page")).not.toBeInTheDocument();
+    expect(screen.getByText("Access denied")).toBeInTheDocument();
+  });
+
+  it("renders heatmaps route when gis.heatmaps.manage permission is present", () => {
+    mockUseAuth.mockReturnValue({
+      status: "authenticated",
+      hasPermission: (permission: string) => permission === TENANT_PERMISSIONS.GIS_HEATMAPS_MANAGE,
+      hasAnyPermission: () => false,
+    });
+
+    renderTenantRoute("/acme/gis/heatmaps");
+
+    expect(screen.getByText("gis-heatmaps-page")).toBeInTheDocument();
   });
 });
