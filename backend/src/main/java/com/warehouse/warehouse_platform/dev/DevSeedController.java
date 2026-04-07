@@ -58,8 +58,8 @@ import java.util.UUID;
  *   and RECEIVE stock movements at every leaf location.
  *
  *   ?reset=true  — wipes demo data first, then re-seeds
- *   ?withGis=false — skips gis_blocks generation (heatmap will not work, but
- *                    all other features still can be tested)
+ *   ?withGis=false — skips gis_blocks generation while keeping the rest of the
+ *                    demo data available for non-GIS flows
  *
  * DELETE /{tenantSlug}/dev/seed
  *   Wipes only demo data (stock movements for demo locations, the Demo Warehouse
@@ -85,7 +85,7 @@ import java.util.UUID;
  *   Columns 0-2 = Aisle A, 3-5 = Aisle B, 6-8 = Aisle C.
  *   Rows 0-1 = Bay 1 (L/R), rows 2-3 = Bay 2 (L/R).
  *   Cell size: 0.000050° × 0.000040° — matches the coordinate space of real
- *   GIS floor-plan blocks so the heatmap overlays correctly in the viewer.
+ *   GIS floor-plan blocks so the viewer overlays align correctly.
  * </pre>
  */
 @RestController
@@ -516,13 +516,13 @@ public class DevSeedController {
 
     /**
      * Creates one {@code gis_block} per layout block (aisles, bays, and shelves).
-     * Every row gets a {@code centroid_geom} so the heatmap query resolves
-     * correctly for leaves and the GIS viewer can render all layers.
+     * Every row gets a {@code centroid_geom} so the GIS viewer can render all
+     * layers consistently.
      *
      * <p>
      * Two options are exposed at the API level:
      * <ul>
-     * <li>{@code withGis=true} — calls this method; heatmap works immediately.</li>
+     * <li>{@code withGis=true} — calls this method and seeds GIS blocks.</li>
      * <li>{@code withGis=false} — skips this method; useful when you only want
      * to test layout / inventory features without the GIS viewer.</li>
      * </ul>
@@ -593,7 +593,7 @@ public class DevSeedController {
      * Three products are assigned to each location using offsets that are
      * coprime to the product list size (20), so no two slots in a single location
      * receive the same product, and the distribution varies across locations to
-     * produce a visible gradient in the heatmap.
+     * produce visible variation across the seeded layout.
      */
     private int seedStock(List<LayoutBlock> leafBlocks, List<Product> products) {
         List<StockMovement> movements = new ArrayList<>();

@@ -3,23 +3,16 @@ package com.warehouse.warehouse_platform.tenant.gis;
 import com.warehouse.warehouse_platform.tenant.gis.controller.GisAdminController;
 import com.warehouse.warehouse_platform.tenant.gis.controller.GisLayerController;
 import com.warehouse.warehouse_platform.tenant.gis.controller.GisZoneController;
-import com.warehouse.warehouse_platform.tenant.gis.controller.StaticHeatmapController;
-import com.warehouse.warehouse_platform.tenant.gis.controller.WmsProxyController;
-import com.warehouse.warehouse_platform.tenant.gis.controller.DynamicHeatmapController;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.util.Map;
 import java.util.Objects;
 
 @RestControllerAdvice(assignableTypes = {
                 GisAdminController.class,
                 GisLayerController.class,
-                GisZoneController.class,
-                StaticHeatmapController.class,
-                WmsProxyController.class,
-                DynamicHeatmapController.class
+                GisZoneController.class
 })
 public class GisExceptionHandler {
 

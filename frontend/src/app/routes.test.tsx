@@ -25,10 +25,6 @@ vi.mock("@/features/gis/hazardBuffers/HazardBuffersPage", () => ({
   default: () => <div>hazard-buffers-page</div>,
 }));
 
-vi.mock("@/features/gis/heatmaps/StaticHeatmapsPage", () => ({
-  default: () => <div>heatmaps-page</div>,
-}));
-
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 
 function createMockStorage(): Storage {

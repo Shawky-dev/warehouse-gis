@@ -71,10 +71,6 @@ vi.mock("@/features/gis/hazardBuffers/HazardBuffersPage", () => ({
   default: () => <p>gis-hazard-buffers-page</p>,
 }));
 
-vi.mock("@/features/gis/heatmaps/StaticHeatmapsPage", () => ({
-  default: () => <p>gis-heatmaps-page</p>,
-}));
-
 vi.mock("@/features/tenant/hazardtype/TenantHazardTypesPage", () => ({
   default: () => <p>tenant-hazard-types-page</p>,
 }));
@@ -408,28 +404,4 @@ describe("tenant routes RBAC", () => {
     expect(screen.getByText("tenant-count-sessions-page")).toBeInTheDocument();
   });
 
-  it("blocks heatmaps route when gis.heatmaps.manage permission is missing", () => {
-    mockUseAuth.mockReturnValue({
-      status: "authenticated",
-      hasPermission: () => false,
-      hasAnyPermission: () => false,
-    });
-
-    renderTenantRoute("/acme/gis/heatmaps");
-
-    expect(screen.queryByText("gis-heatmaps-page")).not.toBeInTheDocument();
-    expect(screen.getByText("Access denied")).toBeInTheDocument();
-  });
-
-  it("renders heatmaps route when gis.heatmaps.manage permission is present", () => {
-    mockUseAuth.mockReturnValue({
-      status: "authenticated",
-      hasPermission: (permission: string) => permission === TENANT_PERMISSIONS.GIS_HEATMAPS_MANAGE,
-      hasAnyPermission: () => false,
-    });
-
-    renderTenantRoute("/acme/gis/heatmaps");
-
-    expect(screen.getByText("gis-heatmaps-page")).toBeInTheDocument();
-  });
 });

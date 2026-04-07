@@ -265,10 +265,3 @@ databaseChangeLog:
         - sqlFile:
             path: db/migration/tenant/V38__create_hazard_buffers_and_seed_permissions.sql
             relativeToChangelogFile: false
-  - changeSet:
-      id: tenant-gis-heatmaps-39
-      author: codex
-      changes:
-        - sqlFile:
-            path: db/migration/tenant/V39__create_gis_static_heatmaps_and_seed_permissions.sql
-            relativeToChangelogFile: false
