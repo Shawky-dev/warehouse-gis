@@ -1,5 +1,5 @@
 session_name: warehouse-dev
-start_directory: .
+start_directory: ..
 
 windows:
   - window_name: infra
