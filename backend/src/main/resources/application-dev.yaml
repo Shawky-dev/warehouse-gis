@@ -1,0 +1,4 @@
+security:
+  jwt:
+    private-key: file:src/test/resources/keys/jwt-private.pem
+    public-key: file:src/test/resources/keys/jwt-public.pem

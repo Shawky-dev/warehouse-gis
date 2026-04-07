@@ -10,7 +10,7 @@ windows:
 
   - window_name: backend
     panes:
-      - cd backend && ./mvnw spring-boot:run
+      - cd backend && SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run
 
   - window_name: frontend
     panes:
