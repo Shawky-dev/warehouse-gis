@@ -16,6 +16,18 @@ export default defineConfig(({ mode }) => {
         "@": path.resolve(__dirname, "./src"),
       },
     },
+    build: {
+      minify: "esbuild",
+      rollupOptions: {
+        maxParallelFileOps: 2,
+        output: {
+          manualChunks: {
+            "arcgis-map-components": ["@arcgis/map-components"],
+            "react-vendor": ["react", "react-dom", "react-router", "react-router-dom"],
+          },
+        },
+      },
+    },
     server: {
       host: true,
       port: 5173,
