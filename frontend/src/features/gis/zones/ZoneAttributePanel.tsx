@@ -18,7 +18,7 @@ import { createZone, updateZone, deleteZone, extractZoneErrorMessage } from "./z
 import type { ZoneRecord, CategoryRule } from "./zonesApi";
 import { Move, Trash2 } from "lucide-react";
 
-type RuleType = "ALLOWED" | "PROHIBITED" | "NONE";
+type RuleType = "ALLOWED" | "PROHIBITED";
 
 interface ZoneAttributePanelProps {
     slug: string;
@@ -95,17 +95,8 @@ export function ZoneAttributePanel({
     const cycleRule = useCallback((categoryId: string) => {
         if (!canManage) return;
         setCategoryRules((prev) => {
-            const current: RuleType = prev[categoryId] ?? "NONE";
-            const next: RuleType =
-                current === "NONE" ? "ALLOWED" :
-                    current === "ALLOWED" ? "PROHIBITED" : "NONE";
-            const updated = { ...prev };
-            if (next === "NONE") {
-                delete updated[categoryId];
-            } else {
-                updated[categoryId] = next;
-            }
-            return updated;
+            const current: RuleType = prev[categoryId] ?? "ALLOWED";
+            return { ...prev, [categoryId]: current === "ALLOWED" ? "PROHIBITED" : "ALLOWED" };
         });
     }, [canManage]);
 
@@ -113,9 +104,9 @@ export function ZoneAttributePanel({
         setSaving(true);
         setSaveError(null);
         try {
-            const rules: CategoryRule[] = Object.entries(categoryRules).map(
-                ([categoryId, ruleType]) => ({ categoryId, ruleType: ruleType as "ALLOWED" | "PROHIBITED" })
-            );
+            const rules: CategoryRule[] = Object.entries(categoryRules)
+                .filter(([, ruleType]) => ruleType === "PROHIBITED")
+                .map(([categoryId, ruleType]) => ({ categoryId, ruleType: ruleType as "ALLOWED" | "PROHIBITED" }));
             let result: ZoneRecord;
             if (isCreateMode) {
                 result = await createZone(slug, {
@@ -303,7 +294,7 @@ export function ZoneAttributePanel({
                     <p className="text-[10px] text-muted-foreground">{t("gis.zones.categoryRulesHint")}</p>
                     <div className="flex flex-col divide-y rounded-md border">
                         {allCategories.map((cat) => {
-                            const rule: RuleType = categoryRules[cat.id] ?? "NONE";
+                            const rule: RuleType = categoryRules[cat.id] ?? "ALLOWED";
                             return (
                                 <div key={cat.id} className="flex items-center justify-between px-2.5 py-1.5">
                                     <span className="truncate text-xs">{cat.name}</span>
@@ -314,20 +305,12 @@ export function ZoneAttributePanel({
                                         className="ml-2 shrink-0"
                                     >
                                         <Badge
-                                            variant={
-                                                rule === "ALLOWED"
-                                                    ? "default"
-                                                    : rule === "PROHIBITED"
-                                                        ? "destructive"
-                                                        : "outline"
-                                            }
+                                            variant={rule === "PROHIBITED" ? "destructive" : "default"}
                                             className="cursor-pointer select-none text-[10px]"
                                         >
-                                            {rule === "NONE"
-                                                ? t("gis.zones.rule.NONE")
-                                                : rule === "ALLOWED"
-                                                    ? t("gis.zones.rule.ALLOWED")
-                                                    : t("gis.zones.rule.PROHIBITED")}
+                                            {rule === "PROHIBITED"
+                                                ? t("gis.zones.rule.PROHIBITED")
+                                                : t("gis.zones.rule.ALLOWED")}
                                         </Badge>
                                     </button>
                                 </div>

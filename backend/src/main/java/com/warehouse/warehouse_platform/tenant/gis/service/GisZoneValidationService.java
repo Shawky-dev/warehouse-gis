@@ -1,6 +1,6 @@
 package com.warehouse.warehouse_platform.tenant.gis.service;
 
-import com.warehouse.warehouse_platform.tenant.gis.GisZoneViolationException;
+import com.warehouse.warehouse_platform.tenant.gis.StorageRuleViolationException;
 import com.warehouse.warehouse_platform.tenant.gis.model.GisZone;
 import com.warehouse.warehouse_platform.tenant.gis.model.GisZoneCategoryRule;
 import com.warehouse.warehouse_platform.tenant.gis.repository.GisBlockRepository;
@@ -44,7 +44,7 @@ public class GisZoneValidationService {
      * carries the {@code X-Zone-Override: true} header</li>
      * </ul>
      *
-     * @throws GisZoneViolationException (HTTP 409) on unoverridable violation
+     * @throws StorageRuleViolationException on unoverridable violation
      */
     @Transactional(readOnly = true)
     public void assertLocationAllowsProduct(UUID locationId, UUID categoryId, boolean override) {
@@ -66,7 +66,7 @@ public class GisZoneValidationService {
                 if ("BLOCK".equals(action) || !override) {
                     List<GisZone> suggested = findSuggestedZones(categoryId, zones.stream()
                             .map(GisZone::getId).toList());
-                    throw GisZoneViolationException.categoryProhibited(zone, suggested);
+                    throw StorageRuleViolationException.zoneViolation(zone, suggested);
                 }
                 // WARN with override=true — allow through
             }

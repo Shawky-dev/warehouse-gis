@@ -1,6 +1,5 @@
 package com.warehouse.warehouse_platform.tenant.inventory;
 
-import com.warehouse.warehouse_platform.tenant.gis.GisZoneViolationException;
 import com.warehouse.warehouse_platform.tenant.gis.StorageRuleViolationException;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.ResponseEntity;
@@ -19,17 +18,6 @@ public class InventoryLedgerExceptionHandler {
     public ResponseEntity<ErrorResponse> handleInventoryException(InventoryLedgerException exception) {
         return ResponseEntity.status(Objects.requireNonNull(exception.getStatus()))
                 .body(new ErrorResponse(exception.getCode(), exception.getMessage()));
-    }
-
-    @ExceptionHandler(GisZoneViolationException.class)
-    public ResponseEntity<ZoneViolationResponse> handleZoneViolation(GisZoneViolationException exception) {
-        return ResponseEntity.status(Objects.requireNonNull(exception.getStatus()))
-                .body(new ZoneViolationResponse(
-                        exception.getCode(),
-                        exception.getMessage(),
-                        exception.getViolationAction(),
-                        exception.getViolatedZone(),
-                        exception.getSuggestedZones()));
     }
 
     @ExceptionHandler(StorageRuleViolationException.class)
@@ -63,14 +51,6 @@ public class InventoryLedgerExceptionHandler {
     }
 
     public record ErrorResponse(String code, String message) {
-    }
-
-    public record ZoneViolationResponse(
-            String error,
-            String message,
-            String violationAction,
-            GisZoneViolationException.ZoneSummary violatedZone,
-            List<GisZoneViolationException.ZoneSummary> suggestedZones) {
     }
 
     public record StorageRuleViolationResponse(
