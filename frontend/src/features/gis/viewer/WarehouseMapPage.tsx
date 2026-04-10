@@ -14,8 +14,10 @@ import { ViewerLayerPanel } from "./ViewerLayerPanel";
 import { LocationInspectPanel } from "./LocationInspectPanel";
 import { fetchZonesGeoJson } from "../zones/zonesApi";
 import { fetchHazardBuffersGeoJson } from "../hazardBuffers/hazardBuffersApi";
+import { listDataLayers } from "@/features/gis/dataLayers/dataLayersApi";
 import type { GeoJsonFeatureCollection, ZoneFeatureProps } from "../zones/zonesApi";
 import type { HazardBufferFeatureProps } from "@/features/tenant/types/gis";
+import type { DataLayerResult } from "@/features/gis/dataLayers/dataLayersApi";
 
 export default function WarehouseMapPage() {
     const { t } = useI18n();
@@ -40,6 +42,11 @@ export default function WarehouseMapPage() {
 
     const [zonesGeoJson, setZonesGeoJson] = useState<GeoJsonFeatureCollection<ZoneFeatureProps> | null>(null);
     const [hazardBuffersGeoJson, setHazardBuffersGeoJson] = useState<GeoJsonFeatureCollection<HazardBufferFeatureProps> | null>(null);
+    const [dataLayers, setDataLayers] = useState<DataLayerResult[]>([]);
+    const [visibleDataLayerIds, setVisibleDataLayerIds] = useState<Set<string>>(new Set());
+    const [dataLayerOpacity, setDataLayerOpacity] = useState<Record<string, number>>({});
+    const [dataLayerOffset, setDataLayerOffset] = useState<Record<string, { dx: number; dy: number }>>({});
+    const [activeMoveLayerId, setActiveMoveLayerId] = useState<string | null>(null);
     const [zonesVisible, setZonesVisible] = useState(true);
     const [hazardBuffersVisible, setHazardBuffersVisible] = useState(true);
 
@@ -47,13 +54,15 @@ export default function WarehouseMapPage() {
         let cancelled = false;
         void (async () => {
             try {
-                const [zones, buffers] = await Promise.all([
+                const [zones, buffers, layers] = await Promise.all([
                     fetchZonesGeoJson(slug),
                     fetchHazardBuffersGeoJson(slug),
+                    listDataLayers(slug),
                 ]);
                 if (!cancelled) {
                     setZonesGeoJson(zones);
                     setHazardBuffersGeoJson(buffers);
+                    setDataLayers(layers);
                 }
             } catch {
                 // overlay data is best-effort; don't block the map
@@ -83,6 +92,32 @@ export default function WarehouseMapPage() {
 
     function handleVisibilityToggle(templateName: string) {
         setVisibilityOverrides((prev) => ({ ...prev, [templateName]: !(prev[templateName] ?? true) }));
+    }
+
+    function handleDataLayerToggle(id: string) {
+        setVisibleDataLayerIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) {
+                next.delete(id);
+                // clear move mode if hiding the moving layer
+                setActiveMoveLayerId((cur) => cur === id ? null : cur);
+            } else {
+                next.add(id);
+            }
+            return next;
+        });
+    }
+
+    function handleDataLayerOpacityChange(id: string, value: number) {
+        setDataLayerOpacity((prev) => ({ ...prev, [id]: value }));
+    }
+
+    function handleMoveLayerToggle(id: string) {
+        setActiveMoveLayerId((cur) => cur === id ? null : id);
+    }
+
+    function handleLayerOffsetChange(id: string, offset: { dx: number; dy: number }) {
+        setDataLayerOffset((prev) => ({ ...prev, [id]: offset }));
     }
 
     function handleExport() {
@@ -185,6 +220,13 @@ export default function WarehouseMapPage() {
                                     onZonesVisibilityToggle={() => setZonesVisible((v) => !v)}
                                     hazardBuffersVisible={hazardBuffersVisible}
                                     onHazardBuffersVisibilityToggle={() => setHazardBuffersVisible((v) => !v)}
+                                    dataLayers={dataLayers}
+                                    visibleDataLayerIds={visibleDataLayerIds}
+                                    onDataLayerToggle={handleDataLayerToggle}
+                                    dataLayerOpacity={dataLayerOpacity}
+                                    onDataLayerOpacityChange={handleDataLayerOpacityChange}
+                                    activeMoveLayerId={activeMoveLayerId}
+                                    onMoveLayerToggle={handleMoveLayerToggle}
                                 />
                             </div>
                             <div className="relative flex-1">
@@ -209,6 +251,13 @@ export default function WarehouseMapPage() {
                                     highlightAreaIds={highlightAreaIds}
                                     zonesLayerVisible={zonesVisible}
                                     hazardBuffersLayerVisible={hazardBuffersVisible}
+                                    dataLayers={dataLayers}
+                                    visibleDataLayerIds={visibleDataLayerIds}
+                                    tenantSlug={slug}
+                                    dataLayerOpacity={dataLayerOpacity}
+                                    dataLayerOffset={dataLayerOffset}
+                                    activeMoveLayerId={activeMoveLayerId}
+                                    onLayerOffsetChange={handleLayerOffsetChange}
                                     onPolygonSelect={(gisBlockId, templateName, label) => {
                                         if (gisBlockId && templateName && label) {
                                             const ep = existingPolygons.find((p) => p.gisBlockId === gisBlockId);

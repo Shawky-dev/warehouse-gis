@@ -85,6 +85,8 @@ export const TENANT_PERMISSIONS = {
   ZONE_TYPES_HARD_DELETE: "tenant.zone_types.hard_delete",
   GIS_HAZARD_BUFFERS_VIEW: "gis.hazard_buffers.view",
   GIS_HAZARD_BUFFERS_MANAGE: "gis.hazard_buffers.manage",
+  GIS_DATA_LAYERS_VIEW: "gis.data_layers.view",
+  GIS_DATA_LAYERS_MANAGE: "gis.data_layers.manage",
 } as const;
 
 export type LandlordPermission = (typeof LANDLORD_PERMISSIONS)[keyof typeof LANDLORD_PERMISSIONS];

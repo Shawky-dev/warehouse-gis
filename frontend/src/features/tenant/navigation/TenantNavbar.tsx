@@ -23,6 +23,7 @@ import {
   ScanBarcode,
   ShieldAlert,
   Hexagon,
+  Database,
 } from "lucide-react";
 import { CameraScanner } from "@/shared/components/CameraScanner";
 import { useScanNavigation } from "@/features/tenant/scan/useScanNavigation";
@@ -98,6 +99,7 @@ export function TenantNavbar() {
   const canViewHazardTypes = hasPermission(TENANT_PERMISSIONS.HAZARD_TYPES_VIEW);
   const canViewZoneTypes = hasPermission(TENANT_PERMISSIONS.ZONE_TYPES_VIEW);
   const canViewHazardBuffers = hasPermission(TENANT_PERMISSIONS.GIS_HAZARD_BUFFERS_VIEW);
+  const canViewDataLayers = hasPermission(TENANT_PERMISSIONS.GIS_DATA_LAYERS_VIEW);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const { navigateFromResult } = useScanNavigation(normalizedSlug);
   const canViewReceipts = hasPermission(TENANT_PERMISSIONS.RECEIPTS_VIEW);
@@ -210,6 +212,15 @@ export function TenantNavbar() {
                     },
                   ]
                   : []),
+                ...(canViewDataLayers
+                  ? [
+                    {
+                      to: PATHS.TENANT.gisDataLayers(normalizedSlug),
+                      label: t("tenant.nav.gisDataLayers"),
+                      icon: Database,
+                    },
+                  ]
+                  : []),
               ],
             },
           ]
@@ -319,6 +330,7 @@ export function TenantNavbar() {
       canViewHazardTypes,
       canViewZoneTypes,
       canViewHazardBuffers,
+      canViewDataLayers,
       canViewWarehouse,
       normalizedSlug,
       t,

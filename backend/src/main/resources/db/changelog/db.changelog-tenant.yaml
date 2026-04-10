@@ -265,3 +265,17 @@ databaseChangeLog:
         - sqlFile:
             path: db/migration/tenant/V38__create_hazard_buffers_and_seed_permissions.sql
             relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-data-layers-39
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V39__create_gis_data_layers_and_seed_permissions.sql
+            relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-data-layers-simplify-40
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V40__simplify_gis_data_layers_remove_geoserver_column.sql
+            relativeToChangelogFile: false

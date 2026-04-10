@@ -14,9 +14,11 @@ import MapView from "@arcgis/core/views/MapView.js";
 import Sketch from "@arcgis/core/widgets/Sketch.js";
 import { getTemplateColor } from "./templateColors";
 import { resolveZoneDisplayColor } from "../zones/zoneTypeColors";
+import { fetchDataLayerImageBlob } from "@/features/gis/dataLayers/dataLayersApi";
 import type { ExistingPolygon, EditorTemplate } from "./useEditorState";
 import type { GeoJsonFeatureCollection, ZoneFeatureProps } from "../zones/zonesApi";
 import type { HazardBufferFeatureProps } from "@/features/tenant/types/gis";
+import type { DataLayerResult } from "@/features/gis/dataLayers/dataLayersApi";
 
 esriConfig.assetsPath = `${import.meta.env.BASE_URL}assets`;
 
@@ -66,6 +68,13 @@ interface WarehouseMapViewProps {
     highlightAreaIds?: string[];
     zonesLayerVisible?: boolean;
     hazardBuffersLayerVisible?: boolean;
+    dataLayers?: DataLayerResult[];
+    visibleDataLayerIds?: Set<string>;
+    tenantSlug?: string;
+    dataLayerOpacity?: Record<string, number>;
+    dataLayerOffset?: Record<string, { dx: number; dy: number }>;
+    activeMoveLayerId?: string | null;
+    onLayerOffsetChange?: (id: string, offset: { dx: number; dy: number }) => void;
 }
 
 export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapViewProps>(
@@ -93,6 +102,13 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
             highlightAreaIds,
             zonesLayerVisible,
             hazardBuffersLayerVisible,
+            dataLayers,
+            visibleDataLayerIds,
+            tenantSlug,
+            dataLayerOpacity,
+            dataLayerOffset,
+            activeMoveLayerId,
+            onLayerOffsetChange,
         },
         ref
     ) {
@@ -103,6 +119,7 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
         const layersByTemplateRef = useRef<Map<string, GraphicsLayer>>(new Map());
         const viewerZonesLayerRef = useRef<GraphicsLayer | null>(null);
         const viewerHazardBuffersLayerRef = useRef<GraphicsLayer | null>(null);
+        const mediaLayersRef = useRef<Map<string, { layer: MediaLayer; blobUrl: string; imageElement: ImageElement; baseExtent: Extent }>>(new Map());
         const viewerHighlightLayerRef = useRef<GraphicsLayer | null>(null);
         const svgLayerRef = useRef<MediaLayer | null>(null);
 
@@ -343,6 +360,7 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
                 viewerZonesLayerRef.current = null;
                 viewerHazardBuffersLayerRef.current = null;
                 viewerHighlightLayerRef.current = null;
+                mediaLayersRef.current.clear();
                 mapView.destroy();
                 mapViewRef.current = null;
             };
@@ -550,12 +568,131 @@ export const WarehouseMapView = forwardRef<WarehouseMapViewHandle, WarehouseMapV
             }
         }, [hazardBuffersLayerVisible]);
 
+        useEffect(() => {
+            const esriMap = mapViewRef.current?.map;
+            if (!esriMap || !tenantSlug) return;
+
+            const lonSpan = widthMeters / 111_000;
+            const latSpan = lengthMeters / 111_000;
+            const warehouseExtent = new Extent({
+                xmin: anchorLon,
+                ymin: anchorLat,
+                xmax: anchorLon + lonSpan,
+                ymax: anchorLat + latSpan,
+                spatialReference: { wkid: 4326 },
+            });
+
+            const currentIds = new Set(visibleDataLayerIds ?? []);
+            const slug = tenantSlug;
+
+            // Add newly visible layers
+            for (const layer of dataLayers ?? []) {
+                if (currentIds.has(layer.id) && !mediaLayersRef.current.has(layer.id)) {
+                    void (async () => {
+                        try {
+                            const blobUrl = await fetchDataLayerImageBlob(slug, layer.id);
+                            const imageElement = new ImageElement({
+                                image: blobUrl,
+                                georeference: new ExtentAndRotationGeoreference({
+                                    extent: warehouseExtent,
+                                }),
+                            });
+                            const mediaLayer = new MediaLayer({ source: [imageElement] });
+                            mediaLayersRef.current.set(layer.id, { layer: mediaLayer, blobUrl, imageElement, baseExtent: warehouseExtent });
+                            esriMap.layers.add(mediaLayer);
+                        } catch (err) {
+                            console.error("Failed to load data layer image:", err);
+                        }
+                    })();
+                }
+            }
+
+            // Remove layers that are no longer visible
+            for (const [id, entry] of mediaLayersRef.current.entries()) {
+                if (!currentIds.has(id)) {
+                    esriMap.layers.remove(entry.layer);
+                    URL.revokeObjectURL(entry.blobUrl);
+                    mediaLayersRef.current.delete(id);
+                }
+            }
+        }, [dataLayers, visibleDataLayerIds, tenantSlug, anchorLon, anchorLat, widthMeters, lengthMeters]);
+
+        // Sync opacity changes to existing MediaLayers
+        useEffect(() => {
+            for (const [id, entry] of mediaLayersRef.current) {
+                entry.layer.opacity = ((dataLayerOpacity?.[id] ?? 100) / 100);
+            }
+        }, [dataLayerOpacity]);
+
+        // Sync offset changes to existing ImageElement georeferences
+        useEffect(() => {
+            for (const [id, entry] of mediaLayersRef.current) {
+                const off = dataLayerOffset?.[id] ?? { dx: 0, dy: 0 };
+                const b = entry.baseExtent;
+                entry.imageElement.georeference = new ExtentAndRotationGeoreference({
+                    extent: new Extent({
+                        xmin: b.xmin + off.dx,
+                        ymin: b.ymin + off.dy,
+                        xmax: b.xmax + off.dx,
+                        ymax: b.ymax + off.dy,
+                        spatialReference: { wkid: 4326 },
+                    }),
+                });
+            }
+        }, [dataLayerOffset]);
+
+        // Drag-to-reposition when activeMoveLayerId is set
+        useEffect(() => {
+            const mapView = mapViewRef.current;
+            if (!activeMoveLayerId || !mapView) return;
+            const entry = mediaLayersRef.current.get(activeMoveLayerId);
+            if (!entry) return;
+
+            let startMapPoint: { x: number; y: number } | null = null;
+            let startOffset = { ...(dataLayerOffset?.[activeMoveLayerId] ?? { dx: 0, dy: 0 }) };
+
+            const dragHandle = mapView.on("drag", (evt) => {
+                evt.stopPropagation(); // prevent map panning
+
+                if (evt.action === "start") {
+                    const pt = mapView.toMap({ x: evt.x, y: evt.y });
+                    startMapPoint = { x: pt.x, y: pt.y };
+                    startOffset = { ...(dataLayerOffset?.[activeMoveLayerId] ?? { dx: 0, dy: 0 }) };
+                } else if (evt.action === "update" && startMapPoint) {
+                    const pt = mapView.toMap({ x: evt.x, y: evt.y });
+                    const dx = startOffset.dx + (pt.x - startMapPoint.x);
+                    const dy = startOffset.dy + (pt.y - startMapPoint.y);
+                    const b = entry.baseExtent;
+                    entry.imageElement.georeference = new ExtentAndRotationGeoreference({
+                        extent: new Extent({
+                            xmin: b.xmin + dx,
+                            ymin: b.ymin + dy,
+                            xmax: b.xmax + dx,
+                            ymax: b.ymax + dy,
+                            spatialReference: { wkid: 4326 },
+                        }),
+                    });
+                } else if (evt.action === "end" && startMapPoint) {
+                    const pt = mapView.toMap({ x: evt.x, y: evt.y });
+                    const dx = startOffset.dx + (pt.x - startMapPoint.x);
+                    const dy = startOffset.dy + (pt.y - startMapPoint.y);
+                    onLayerOffsetChange?.(activeMoveLayerId, { dx, dy });
+                    startMapPoint = null;
+                }
+            });
+
+            return () => {
+                dragHandle.remove();
+            };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        }, [activeMoveLayerId, onLayerOffsetChange]);
+
         return (
             <div className="relative">
                 <div
                     ref={containerRef}
                     className="w-full overflow-hidden rounded-md border"
-                    style={{ height: "600px" }}
+                    style={{ height: "600px", cursor: activeMoveLayerId ? "move" : undefined }}
                 />
                 {renderError ? (
                     <div className="absolute inset-x-4 top-4 rounded-md border bg-background/95 px-3 py-2 text-sm text-destructive shadow-sm">

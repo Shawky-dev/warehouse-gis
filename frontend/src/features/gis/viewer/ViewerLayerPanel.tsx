@@ -1,6 +1,6 @@
 import type { ComponentType } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Box, Eye, EyeOff, ImageIcon, Layers, MapPin, ShieldAlert, X } from "lucide-react";
+import { Box, Eye, EyeOff, ImageIcon, Layers, MapPin, ShieldAlert, Database, X, Move } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
@@ -9,6 +9,7 @@ import { PATHS } from "@/shared/consts/paths";
 import { normalizeTenantSlug } from "@/features/auth/shared/scope";
 import { getTemplateStroke } from "../floorplans/templateColors";
 import type { EditorTemplate } from "../floorplans/useEditorState";
+import type { DataLayerResult } from "@/features/gis/dataLayers/dataLayersApi";
 
 interface ViewerLayerPanelProps {
     templates: EditorTemplate[];
@@ -23,6 +24,13 @@ interface ViewerLayerPanelProps {
     onZonesVisibilityToggle?: () => void;
     hazardBuffersVisible?: boolean;
     onHazardBuffersVisibilityToggle?: () => void;
+    dataLayers?: DataLayerResult[];
+    visibleDataLayerIds?: Set<string>;
+    onDataLayerToggle?: (id: string) => void;
+    dataLayerOpacity?: Record<string, number>;
+    onDataLayerOpacityChange?: (id: string, value: number) => void;
+    activeMoveLayerId?: string | null;
+    onMoveLayerToggle?: (id: string) => void;
 }
 
 export function ViewerLayerPanel({
@@ -38,6 +46,13 @@ export function ViewerLayerPanel({
     onZonesVisibilityToggle,
     hazardBuffersVisible,
     onHazardBuffersVisibilityToggle,
+    dataLayers,
+    visibleDataLayerIds,
+    onDataLayerToggle,
+    dataLayerOpacity,
+    onDataLayerOpacityChange,
+    activeMoveLayerId,
+    onMoveLayerToggle,
 }: ViewerLayerPanelProps) {
     const { t } = useI18n();
     const navigate = useNavigate();
@@ -118,6 +133,65 @@ export function ViewerLayerPanel({
                         )}
                     </button>
                 </div>
+            )}
+
+            {dataLayers && dataLayers.length > 0 && onDataLayerToggle && (
+                <>
+                    <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-1">
+                        {t("gis.viewer.dataLayersSection")}
+                    </p>
+                    {dataLayers.map((layer) => {
+                        const isVisible = visibleDataLayerIds?.has(layer.id) ?? false;
+                        const isMoving = activeMoveLayerId === layer.id;
+                        const opacity = dataLayerOpacity?.[layer.id] ?? 100;
+                        return (
+                            <div key={layer.id} className={`flex w-full flex-col rounded-sm transition-colors hover:bg-accent/50 ${!isVisible ? "opacity-40" : ""}`}>
+                                <div className="flex w-full items-center">
+                                    <div className="flex min-w-0 flex-1 items-center gap-1.5 px-2 py-1.5">
+                                        <Database className="h-3.5 w-3.5 shrink-0 text-blue-500" />
+                                        <span className="flex-1 truncate text-sm font-medium">{layer.name}</span>
+                                    </div>
+                                    {isVisible && onMoveLayerToggle && (
+                                        <button
+                                            type="button"
+                                            title={isMoving ? t("gis.viewer.stopMovingLayer") : t("gis.viewer.moveLayer")}
+                                            onClick={() => onMoveLayerToggle(layer.id)}
+                                            className={`mr-0.5 shrink-0 rounded p-0.5 transition-colors hover:bg-accent/50 ${isMoving ? "text-blue-500" : "text-muted-foreground"}`}
+                                        >
+                                            <Move className="h-3.5 w-3.5" />
+                                        </button>
+                                    )}
+                                    <button
+                                        type="button"
+                                        title={isVisible ? t("gis.editor.layerVisible") : t("gis.editor.layerHidden")}
+                                        onClick={() => onDataLayerToggle(layer.id)}
+                                        className="mr-1 shrink-0 rounded p-0.5 transition-colors hover:bg-accent/50"
+                                    >
+                                        {isVisible ? (
+                                            <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+                                        ) : (
+                                            <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
+                                        )}
+                                    </button>
+                                </div>
+                                {isVisible && onDataLayerOpacityChange && (
+                                    <div className="flex items-center gap-2 px-2 pb-1.5">
+                                        <span className="text-[10px] text-muted-foreground w-12 shrink-0">{t("gis.viewer.opacity")}</span>
+                                        <input
+                                            type="range"
+                                            min={0}
+                                            max={100}
+                                            value={opacity}
+                                            onChange={(e) => onDataLayerOpacityChange(layer.id, Number(e.target.value))}
+                                            className="h-1 flex-1 cursor-pointer accent-blue-500"
+                                        />
+                                        <span className="text-[10px] text-muted-foreground w-7 text-right shrink-0">{opacity}%</span>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </>
             )}
 
             {templates.length === 0 ? (

@@ -18,6 +18,7 @@ import FloorPlansPage from "@/features/gis/floorplans/FloorPlansPage";
 import WarehouseMapPage from "@/features/gis/viewer/WarehouseMapPage";
 import ZoneManagementPage from "@/features/gis/zones/ZoneManagementPage";
 import HazardBuffersPage from "@/features/gis/hazardBuffers/HazardBuffersPage";
+import DataLayersPage from "@/features/gis/dataLayers/DataLayersPage";
 import { RequirePermission } from "@/features/auth/guards/RequirePermission";
 import { RequireAnyPermission } from "@/features/auth/guards/RequireAnyPermission";
 import { TENANT_PERMISSIONS } from "@/features/auth/shared/permissions";
@@ -207,6 +208,14 @@ export const tenantRoutes = [
     element: (
       <RequirePermission permission={TENANT_PERMISSIONS.GIS_HAZARD_BUFFERS_VIEW}>
         <HazardBuffersPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: PATHS.TENANT.GIS_DATA_LAYERS_PATTERN,
+    element: (
+      <RequirePermission permission={TENANT_PERMISSIONS.GIS_DATA_LAYERS_VIEW}>
+        <DataLayersPage />
       </RequirePermission>
     ),
   },
