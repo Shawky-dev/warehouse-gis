@@ -45,6 +45,7 @@ import com.warehouse.warehouse_platform.tenant.gis.repository.GisHazardBufferRep
 import com.warehouse.warehouse_platform.tenant.gis.repository.GisZoneRepository;
 import com.warehouse.warehouse_platform.tenant.hazardtype.HazardTypeRepository;
 import com.warehouse.warehouse_platform.tenant.zonetype.ZoneTypeRepository;
+import com.warehouse.warehouse_platform.tenant.ifc.IfcModelRepository;
 import com.warehouse.warehouse_platform.user.UserRepository;
 
 import jakarta.persistence.EntityManagerFactory;
@@ -74,7 +75,8 @@ import jakarta.persistence.EntityManagerFactory;
                 GisZoneRepository.class,
                 GisHazardBufferRepository.class,
                 HazardTypeRepository.class,
-                ZoneTypeRepository.class
+                ZoneTypeRepository.class,
+                IfcModelRepository.class
 }, entityManagerFactoryRef = "tenantEntityManagerFactory", transactionManagerRef = "tenantTransactionManager")
 @EnableConfigurationProperties(JpaProperties.class)
 public class TenantPersistenceConfig {

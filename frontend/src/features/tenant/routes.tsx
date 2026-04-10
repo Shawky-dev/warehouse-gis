@@ -19,6 +19,7 @@ import WarehouseMapPage from "@/features/gis/viewer/WarehouseMapPage";
 import ZoneManagementPage from "@/features/gis/zones/ZoneManagementPage";
 import HazardBuffersPage from "@/features/gis/hazardBuffers/HazardBuffersPage";
 import DataLayersPage from "@/features/gis/dataLayers/DataLayersPage";
+import IfcViewerPage from "@/features/ifc/IfcViewerPage";
 import { RequirePermission } from "@/features/auth/guards/RequirePermission";
 import { RequireAnyPermission } from "@/features/auth/guards/RequireAnyPermission";
 import { TENANT_PERMISSIONS } from "@/features/auth/shared/permissions";
@@ -216,6 +217,14 @@ export const tenantRoutes = [
     element: (
       <RequirePermission permission={TENANT_PERMISSIONS.GIS_DATA_LAYERS_VIEW}>
         <DataLayersPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: PATHS.TENANT.IFC_VIEWER_PATTERN,
+    element: (
+      <RequirePermission permission={TENANT_PERMISSIONS.IFC_VIEW}>
+        <IfcViewerPage />
       </RequirePermission>
     ),
   },

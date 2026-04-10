@@ -48,6 +48,7 @@ export const PATHS = {
     ZONE_TYPES_PATTERN: "/:tenantSlug/zone-types",
     GIS_HAZARD_BUFFERS_PATTERN: "/:tenantSlug/gis/hazard-buffers",
     GIS_DATA_LAYERS_PATTERN: "/:tenantSlug/gis/data-layers",
+    IFC_VIEWER_PATTERN: "/:tenantSlug/ifc/viewer",
     root: (tenantSlug: string) => `/${tenantSlug}`,
     authLogin: (tenantSlug: string) => `/${tenantSlug}/auth/login`,
     products: (tenantSlug: string) => `/${tenantSlug}/products`,
@@ -76,5 +77,6 @@ export const PATHS = {
     zoneTypes: (tenantSlug: string) => `/${tenantSlug}/zone-types`,
     gisHazardBuffers: (tenantSlug: string) => `/${tenantSlug}/gis/hazard-buffers`,
     gisDataLayers: (tenantSlug: string) => `/${tenantSlug}/gis/data-layers`,
+    ifcViewer: (tenantSlug: string) => `/${tenantSlug}/ifc/viewer`,
   },
 };

@@ -80,6 +80,8 @@ public final class TenantPermissions {
     public static final String GIS_HAZARD_BUFFERS_MANAGE = "gis.hazard_buffers.manage";
     public static final String GIS_DATA_LAYERS_VIEW = "gis.data_layers.view";
     public static final String GIS_DATA_LAYERS_MANAGE = "gis.data_layers.manage";
+    public static final String IFC_VIEW = "tenant.ifc.view";
+    public static final String IFC_MANAGE = "tenant.ifc.manage";
 
     private TenantPermissions() {
     }

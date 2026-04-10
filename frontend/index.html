@@ -8,6 +8,14 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Polyfill WebGPU constants for browsers without WebGPU support.
+         @thatopen/components bundles three.js which accesses self.GPUShaderStage
+         unconditionally when self is defined, throwing in non-WebGPU browsers. -->
+    <script>
+      if (typeof self !== 'undefined' && typeof self.GPUShaderStage === 'undefined') {
+        self.GPUShaderStage = { VERTEX: 1, FRAGMENT: 2, COMPUTE: 4 };
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

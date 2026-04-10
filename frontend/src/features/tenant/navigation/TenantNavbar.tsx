@@ -100,6 +100,7 @@ export function TenantNavbar() {
   const canViewZoneTypes = hasPermission(TENANT_PERMISSIONS.ZONE_TYPES_VIEW);
   const canViewHazardBuffers = hasPermission(TENANT_PERMISSIONS.GIS_HAZARD_BUFFERS_VIEW);
   const canViewDataLayers = hasPermission(TENANT_PERMISSIONS.GIS_DATA_LAYERS_VIEW);
+  const canViewIfcViewer = hasPermission(TENANT_PERMISSIONS.IFC_VIEW);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const { navigateFromResult } = useScanNavigation(normalizedSlug);
   const canViewReceipts = hasPermission(TENANT_PERMISSIONS.RECEIPTS_VIEW);
@@ -221,6 +222,15 @@ export function TenantNavbar() {
                     },
                   ]
                   : []),
+                ...(canViewIfcViewer
+                  ? [
+                    {
+                      to: PATHS.TENANT.ifcViewer(normalizedSlug),
+                      label: t("tenant.nav.ifcViewer"),
+                      icon: Box,
+                    },
+                  ]
+                  : []),
               ],
             },
           ]
@@ -331,6 +341,7 @@ export function TenantNavbar() {
       canViewZoneTypes,
       canViewHazardBuffers,
       canViewDataLayers,
+      canViewIfcViewer,
       canViewWarehouse,
       normalizedSlug,
       t,

@@ -279,3 +279,10 @@ databaseChangeLog:
         - sqlFile:
             path: db/migration/tenant/V40__simplify_gis_data_layers_remove_geoserver_column.sql
             relativeToChangelogFile: false
+  - changeSet:
+      id: tenant-ifc-models-41
+      author: codex
+      changes:
+        - sqlFile:
+            path: db/migration/tenant/V41__create_ifc_models_and_seed_permissions.sql
+            relativeToChangelogFile: false

@@ -87,6 +87,8 @@ export const TENANT_PERMISSIONS = {
   GIS_HAZARD_BUFFERS_MANAGE: "gis.hazard_buffers.manage",
   GIS_DATA_LAYERS_VIEW: "gis.data_layers.view",
   GIS_DATA_LAYERS_MANAGE: "gis.data_layers.manage",
+  IFC_VIEW: "tenant.ifc.view",
+  IFC_MANAGE: "tenant.ifc.manage",
 } as const;
 
 export type LandlordPermission = (typeof LANDLORD_PERMISSIONS)[keyof typeof LANDLORD_PERMISSIONS];
