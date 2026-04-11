@@ -1,0 +1,19 @@
+meta {
+  name: seed-dashboard-showcase
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{URL}}/{{TENANT_SLUG}}/dev/seed-showcase?withGis=true
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+headers {
+  X-TENANT-ID: {{TENANT_SLUG}}
+}

@@ -23,6 +23,7 @@ import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
 import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
 
 import com.warehouse.warehouse_platform.auth.session.RefreshTokenSessionRepository;
+import com.warehouse.warehouse_platform.tenant.dashboard.DashboardRepository;
 import com.warehouse.warehouse_platform.tenant.audit.AuditLogRepository;
 import com.warehouse.warehouse_platform.tenant.category.ProductCategoryRepository;
 import com.warehouse.warehouse_platform.tenant.product.ProductRepository;
@@ -65,6 +66,7 @@ import jakarta.persistence.EntityManagerFactory;
                 BlockTemplateRepository.class,
                 WarehouseLocationKindRepository.class,
                 StockMovementRepository.class,
+                DashboardRepository.class,
                 ReceiptDocumentRepository.class,
                 ReceiptLineRepository.class,
                 DispatchDocumentRepository.class,

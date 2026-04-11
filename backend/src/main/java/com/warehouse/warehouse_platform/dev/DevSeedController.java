@@ -1,17 +1,45 @@
 package com.warehouse.warehouse_platform.dev;
 
 import com.warehouse.warehouse_platform.tenant.access.TenantAccessPolicy;
+import com.warehouse.warehouse_platform.tenant.audit.AuditLog;
+import com.warehouse.warehouse_platform.tenant.audit.AuditLogRepository;
 import com.warehouse.warehouse_platform.tenant.category.ProductCategory;
 import com.warehouse.warehouse_platform.tenant.category.ProductCategoryRepository;
+import com.warehouse.warehouse_platform.tenant.counting.CountLine;
+import com.warehouse.warehouse_platform.tenant.counting.CountLineRepository;
+import com.warehouse.warehouse_platform.tenant.counting.CountSession;
+import com.warehouse.warehouse_platform.tenant.counting.CountSessionRepository;
+import com.warehouse.warehouse_platform.tenant.counting.CountStatus;
+import com.warehouse.warehouse_platform.tenant.dispatch.DispatchDocument;
+import com.warehouse.warehouse_platform.tenant.dispatch.DispatchDocumentRepository;
+import com.warehouse.warehouse_platform.tenant.dispatch.DispatchLine;
+import com.warehouse.warehouse_platform.tenant.dispatch.DispatchLineRepository;
+import com.warehouse.warehouse_platform.tenant.dispatch.DispatchStatus;
 import com.warehouse.warehouse_platform.tenant.gis.model.GisBlock;
+import com.warehouse.warehouse_platform.tenant.gis.model.GisHazardBuffer;
+import com.warehouse.warehouse_platform.tenant.gis.model.GisZone;
+import com.warehouse.warehouse_platform.tenant.gis.model.GisZoneCategoryRule;
+import com.warehouse.warehouse_platform.tenant.gis.repository.GisHazardBufferRepository;
 import com.warehouse.warehouse_platform.tenant.gis.repository.GisBlockRepository;
+import com.warehouse.warehouse_platform.tenant.gis.repository.GisZoneCategoryRuleRepository;
+import com.warehouse.warehouse_platform.tenant.gis.repository.GisZoneRepository;
 import com.warehouse.warehouse_platform.tenant.hazardtype.HazardType;
 import com.warehouse.warehouse_platform.tenant.hazardtype.HazardTypeRepository;
 import com.warehouse.warehouse_platform.tenant.inventory.MovementType;
 import com.warehouse.warehouse_platform.tenant.inventory.StockMovement;
 import com.warehouse.warehouse_platform.tenant.inventory.StockMovementRepository;
 import com.warehouse.warehouse_platform.tenant.product.Product;
+import com.warehouse.warehouse_platform.tenant.product.ProductSupplier;
+import com.warehouse.warehouse_platform.tenant.product.ProductSupplierId;
+import com.warehouse.warehouse_platform.tenant.product.ProductSupplierRepository;
 import com.warehouse.warehouse_platform.tenant.product.ProductRepository;
+import com.warehouse.warehouse_platform.tenant.receipt.ReceiptDocument;
+import com.warehouse.warehouse_platform.tenant.receipt.ReceiptDocumentRepository;
+import com.warehouse.warehouse_platform.tenant.receipt.ReceiptLine;
+import com.warehouse.warehouse_platform.tenant.receipt.ReceiptLineRepository;
+import com.warehouse.warehouse_platform.tenant.receipt.ReceiptStatus;
+import com.warehouse.warehouse_platform.tenant.supplier.Supplier;
+import com.warehouse.warehouse_platform.tenant.supplier.SupplierRepository;
 import com.warehouse.warehouse_platform.tenant.uom.UnitOfMeasure;
 import com.warehouse.warehouse_platform.tenant.uom.UnitOfMeasureRepository;
 import com.warehouse.warehouse_platform.tenant.warehouse.block.BlockTemplate;
@@ -42,10 +70,17 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -61,10 +96,14 @@ import java.util.UUID;
  *   ?withGis=false — skips gis_blocks generation while keeping the rest of the
  *                    demo data available for non-GIS flows
  *
+ * POST   /{tenantSlug}/dev/seed-showcase?withGis=true
+ *   Wipes previous demo/showcase rows, re-seeds the demo warehouse, then adds
+ *   receipts, dispatches, count sessions, zone rules, hazard buffers, audit
+ *   rows, and extra stock movements tuned to populate dashboard widgets.
+ *
  * DELETE /{tenantSlug}/dev/seed
- *   Wipes only demo data (stock movements for demo locations, the Demo Warehouse
- *   layout, block templates, DEV- products, DEV_ categories). UOMs, hazard
- *   types, location kinds, and permissions are never touched.
+ *   Wipes demo and showcase data. UOMs, hazard types, location kinds, and
+ *   permissions are never touched.
  * </pre>
  *
  * <p>
@@ -125,6 +164,18 @@ public class DevSeedController {
     private final WarehouseLocationKindRepository locationKindRepo;
     private final GisBlockRepository gisBlockRepo;
     private final StockMovementRepository movementRepo;
+    private final SupplierRepository supplierRepo;
+    private final ProductSupplierRepository productSupplierRepo;
+    private final ReceiptDocumentRepository receiptDocumentRepo;
+    private final ReceiptLineRepository receiptLineRepo;
+    private final DispatchDocumentRepository dispatchDocumentRepo;
+    private final DispatchLineRepository dispatchLineRepo;
+    private final CountSessionRepository countSessionRepo;
+    private final CountLineRepository countLineRepo;
+    private final GisZoneRepository gisZoneRepo;
+    private final GisZoneCategoryRuleRepository gisZoneCategoryRuleRepo;
+    private final GisHazardBufferRepository gisHazardBufferRepo;
+    private final AuditLogRepository auditLogRepo;
 
     // ── Response DTO ──────────────────────────────────────────────────────────
 
@@ -139,6 +190,62 @@ public class DevSeedController {
             int stockMovements,
             boolean layoutActive,
             boolean skipped) {
+    }
+
+    public record ShowcaseSeedResult(
+            int uoms,
+            int categories,
+            int products,
+            int suppliers,
+            int productSuppliers,
+            int blockTemplates,
+            int layoutBlocks,
+            int leafLocations,
+            int gisBlocks,
+            int zones,
+            int zoneRules,
+            int hazardBuffers,
+            int stockMovements,
+            int receiptDocuments,
+            int dispatchDocuments,
+            int countSessions,
+            int countLines,
+            int auditLogs,
+            boolean layoutActive) {
+    }
+
+    private record BaseSeedData(
+            Map<String, UnitOfMeasure> uoms,
+            Map<String, ProductCategory> categories,
+            Map<String, HazardType> hazards,
+            List<Product> products,
+            Map<String, BlockTemplate> templates,
+            LayoutSeedData layoutData,
+            int gisCount,
+            int stockMovementCount) {
+    }
+
+    private record ShowcaseExtras(
+            int suppliers,
+            int productSuppliers,
+            int zones,
+            int zoneRules,
+            int hazardBuffers,
+            int stockMovements,
+            int receiptDocuments,
+            int dispatchDocuments,
+            int countSessions,
+            int countLines,
+            int auditLogs) {
+    }
+
+    private record SupplierSeedResult(int suppliers, int links) {
+    }
+
+    private record ZoneSeedResult(int zones, int rules) {
+    }
+
+    private record CountSeedResult(int sessions, int lines) {
     }
 
     // ── Endpoints ─────────────────────────────────────────────────────────────
@@ -158,36 +265,64 @@ public class DevSeedController {
         if (exists && !reset) {
             return ResponseEntity.ok(new SeedResult(0, 0, 0, 0, 0, 0, 0, 0, false, true));
         }
+        if (reset) {
+            doWipeShowcase();
+        }
         if (exists) {
             doWipe();
         }
 
-        Map<String, UnitOfMeasure> uoms = seedUoms();
-        Map<String, ProductCategory> categories = seedCategories();
-        Map<String, HazardType> hazards = loadHazardTypes();
-        List<Product> products = seedProducts(uoms, categories, hazards);
-        Map<String, BlockTemplate> templates = seedBlockTemplates();
-
-        WarehouseLocationKind storageKind = locationKindRepo.findByNameIgnoreCase("Storage")
-                .orElseGet(() -> locationKindRepo.findFirstByOrderBySortOrderAscIdAsc()
-                        .orElseThrow(() -> new IllegalStateException(
-                                "No warehouse_location_kinds rows found — is the DB migrated?")));
-
-        LayoutSeedData layoutData = seedLayout(templates, storageKind);
-        int gisCount = withGis ? seedGisBlocks(layoutData) : 0;
-        int movCount = seedStock(layoutData.leafBlocks(), products);
+        BaseSeedData base = seedBaseData(withGis, false);
 
         return ResponseEntity.ok(new SeedResult(
-                uoms.size(),
-                categories.size(),
-                products.size(),
-                templates.size(),
-                layoutData.allBlocks().size(),
-                layoutData.leafBlocks().size(),
-                gisCount,
-                movCount,
-                layoutData.layoutActive(),
+                base.uoms().size(),
+                base.categories().size(),
+                base.products().size(),
+                base.templates().size(),
+                base.layoutData().allBlocks().size(),
+                base.layoutData().leafBlocks().size(),
+                base.gisCount(),
+                base.stockMovementCount(),
+                base.layoutData().layoutActive(),
                 false));
+    }
+
+    @PostMapping("/seed-showcase")
+    @Transactional
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ShowcaseSeedResult> seedShowcase(
+            @PathVariable String tenantSlug,
+            @RequestParam(defaultValue = "true") boolean withGis,
+            Authentication authentication) {
+
+        tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
+
+        doWipeShowcase();
+        doWipe();
+
+        BaseSeedData base = seedBaseData(withGis, true);
+        ShowcaseExtras extras = seedShowcaseExtras(base, withGis, tenantSlug);
+
+        return ResponseEntity.ok(new ShowcaseSeedResult(
+                base.uoms().size(),
+                base.categories().size(),
+                base.products().size(),
+                extras.suppliers(),
+                extras.productSuppliers(),
+                base.templates().size(),
+                base.layoutData().allBlocks().size(),
+                base.layoutData().leafBlocks().size(),
+                base.gisCount(),
+                extras.zones(),
+                extras.zoneRules(),
+                extras.hazardBuffers(),
+                base.stockMovementCount() + extras.stockMovements(),
+                extras.receiptDocuments(),
+                extras.dispatchDocuments(),
+                extras.countSessions(),
+                extras.countLines(),
+                extras.auditLogs(),
+                base.layoutData().layoutActive()));
     }
 
     @DeleteMapping("/seed")
@@ -198,6 +333,7 @@ public class DevSeedController {
             Authentication authentication) {
 
         tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
+        doWipeShowcase();
         doWipe();
         return ResponseEntity.noContent().build();
     }
@@ -251,6 +387,145 @@ public class DevSeedController {
                 }
             });
         }
+    }
+
+    private void doWipeShowcase() {
+        List<CountSession> showcaseSessions = countSessionRepo.findAll().stream()
+                .filter(session -> session.getName() != null && session.getName().startsWith("SHOWCASE "))
+                .toList();
+        for (CountSession session : showcaseSessions) {
+            countLineRepo.deleteBySessionId(session.getId());
+        }
+        if (!showcaseSessions.isEmpty()) {
+            countSessionRepo.deleteAll(showcaseSessions);
+        }
+
+        List<ReceiptDocument> showcaseReceipts = receiptDocumentRepo.findAll().stream()
+                .filter(receipt -> receipt.getReference() != null && receipt.getReference().startsWith("SHOWCASE-RCV-"))
+                .toList();
+        for (ReceiptDocument receipt : showcaseReceipts) {
+            receiptLineRepo.deleteByReceiptId(receipt.getId());
+        }
+        if (!showcaseReceipts.isEmpty()) {
+            receiptDocumentRepo.deleteAll(showcaseReceipts);
+        }
+
+        List<DispatchDocument> showcaseDispatches = dispatchDocumentRepo.findAll().stream()
+                .filter(dispatch -> dispatch.getReference() != null && dispatch.getReference().startsWith("SHOWCASE-DSP-"))
+                .toList();
+        for (DispatchDocument dispatch : showcaseDispatches) {
+            dispatchLineRepo.deleteByDispatchId(dispatch.getId());
+        }
+        if (!showcaseDispatches.isEmpty()) {
+            dispatchDocumentRepo.deleteAll(showcaseDispatches);
+        }
+
+        List<Supplier> showcaseSuppliers = supplierRepo.findAll().stream()
+                .filter(supplier -> supplier.getCode() != null && supplier.getCode().startsWith("SHOWCASE-"))
+                .toList();
+        if (!showcaseSuppliers.isEmpty()) {
+            Set<UUID> supplierIds = showcaseSuppliers.stream().map(Supplier::getId).collect(java.util.stream.Collectors.toSet());
+            List<ProductSupplier> links = productSupplierRepo.findAll().stream()
+                    .filter(link -> supplierIds.contains(link.getSupplier().getId()))
+                    .toList();
+            if (!links.isEmpty()) {
+                productSupplierRepo.deleteAll(links);
+            }
+            supplierRepo.deleteAll(showcaseSuppliers);
+        }
+
+        List<GisZone> showcaseZones = gisZoneRepo.findAllByOrderByCreatedAtAsc().stream()
+                .filter(zone -> zone.getName() != null && zone.getName().startsWith("Showcase "))
+                .toList();
+        for (GisZone zone : showcaseZones) {
+            gisZoneCategoryRuleRepo.deleteAll(gisZoneCategoryRuleRepo.findByZoneId(zone.getId()));
+        }
+        if (!showcaseZones.isEmpty()) {
+            gisZoneRepo.deleteAll(showcaseZones);
+        }
+
+        List<GisHazardBuffer> showcaseBuffers = gisHazardBufferRepo.findAllByOrderByNameAscIdAsc().stream()
+                .filter(buffer -> buffer.getName() != null && buffer.getName().startsWith("Showcase "))
+                .toList();
+        if (!showcaseBuffers.isEmpty()) {
+            gisHazardBufferRepo.deleteAll(showcaseBuffers);
+        }
+
+        List<AuditLog> showcaseAuditLogs = auditLogRepo.findAll().stream()
+                .filter(log -> (log.getActorEmail() != null && log.getActorEmail().endsWith("@showcase.dev"))
+                        || (log.getRequestPath() != null && log.getRequestPath().startsWith("/dev/showcase/")))
+                .toList();
+        if (!showcaseAuditLogs.isEmpty()) {
+            auditLogRepo.deleteAllInBatch(showcaseAuditLogs);
+        }
+    }
+
+    private BaseSeedData seedBaseData(boolean withGis, boolean spreadMovementsAcrossHistory) {
+        Map<String, UnitOfMeasure> uoms = seedUoms();
+        Map<String, ProductCategory> categories = seedCategories();
+        Map<String, HazardType> hazards = loadHazardTypes();
+        List<Product> products = seedProducts(uoms, categories, hazards);
+        Map<String, BlockTemplate> templates = seedBlockTemplates();
+
+        WarehouseLocationKind storageKind = locationKindRepo.findByNameIgnoreCase("Storage")
+                .orElseGet(() -> locationKindRepo.findFirstByOrderBySortOrderAscIdAsc()
+                        .orElseThrow(() -> new IllegalStateException(
+                                "No warehouse_location_kinds rows found — is the DB migrated?")));
+
+        LayoutSeedData layoutData = seedLayout(templates, storageKind);
+        int gisCount = withGis ? seedGisBlocks(layoutData) : 0;
+        int stockMovementCount = spreadMovementsAcrossHistory
+                ? seedShowcaseBaseStock(layoutData.leafBlocks(), products)
+                : seedStock(layoutData.leafBlocks(), products);
+
+        return new BaseSeedData(
+                uoms,
+                categories,
+                hazards,
+                products,
+                templates,
+                layoutData,
+                gisCount,
+                stockMovementCount);
+    }
+
+    private ShowcaseExtras seedShowcaseExtras(BaseSeedData base, boolean withGis, String tenantSlug) {
+        Instant now = Instant.now();
+        Map<String, Product> productsBySku = base.products().stream()
+                .collect(java.util.stream.Collectors.toMap(Product::getSku, product -> product, (left, right) -> left, LinkedHashMap::new));
+        applyShowcaseProductFlags(productsBySku, now);
+        SupplierSeedResult supplierSeed = seedShowcaseSuppliers(base.products());
+        int receiptCount = seedShowcaseReceipts(base.layoutData().leafBlocks(), productsBySku, now);
+        int dispatchCount = seedShowcaseDispatches(base.layoutData().leafBlocks(), productsBySku, now);
+        int stockMovementCount = seedShowcaseMovements(base.layoutData().leafBlocks(), productsBySku, now);
+        int countSessionCount;
+        int countLineCount;
+        int zoneCount = 0;
+        int zoneRuleCount = 0;
+        int hazardBufferCount = 0;
+        if (withGis) {
+            ZoneSeedResult zoneSeed = seedShowcaseZones(base.categories());
+            zoneCount = zoneSeed.zones();
+            zoneRuleCount = zoneSeed.rules();
+            hazardBufferCount = seedShowcaseHazardBuffers(base.hazards(), base.layoutData());
+        }
+        CountSeedResult countSeed = seedShowcaseCounts(base.layoutData().leafBlocks(), productsBySku, now);
+        countSessionCount = countSeed.sessions();
+        countLineCount = countSeed.lines();
+        int auditCount = seedShowcaseAuditLogs(tenantSlug, now);
+
+        return new ShowcaseExtras(
+                supplierSeed.suppliers(),
+                supplierSeed.links(),
+                zoneCount,
+                zoneRuleCount,
+                hazardBufferCount,
+                stockMovementCount,
+                receiptCount,
+                dispatchCount,
+                countSessionCount,
+                countLineCount,
+                auditCount);
     }
 
     // ── Seed helpers ──────────────────────────────────────────────────────────
@@ -582,6 +857,590 @@ public class DevSeedController {
 
         gisBlockRepo.saveAll(gisBlocks);
         return gisBlocks.size();
+    }
+
+    private void applyShowcaseProductFlags(Map<String, Product> productsBySku, Instant now) {
+        List<Product> updatedProducts = new ArrayList<>();
+        for (String sku : List.of("DEV-PRD-001", "DEV-PRD-002", "DEV-PRD-003", "DEV-PRD-004", "DEV-PRD-005")) {
+            Product product = productsBySku.get(sku);
+            if (product != null) {
+                product.setTrackLot(true);
+                product.setTrackExpiry(true);
+                updatedProducts.add(product);
+            }
+        }
+
+        Product inactive = productsBySku.get("DEV-STD-004");
+        if (inactive != null) {
+            inactive.setActive(false);
+            inactive.setDeactivatedAt(now.minus(Duration.ofDays(5)));
+            updatedProducts.add(inactive);
+        }
+
+        if (!updatedProducts.isEmpty()) {
+            productRepo.saveAll(updatedProducts.stream().distinct().toList());
+        }
+    }
+
+    private SupplierSeedResult seedShowcaseSuppliers(List<Product> products) {
+        record SupplierSpec(String code, String name, String email) {
+        }
+
+        List<SupplierSpec> specs = List.of(
+                new SupplierSpec("SHOWCASE-SUP-001", "Showcase Industrial Supply", "ops-a@showcase.dev"),
+                new SupplierSpec("SHOWCASE-SUP-002", "Showcase Cold Chain Partners", "ops-b@showcase.dev"),
+                new SupplierSpec("SHOWCASE-SUP-003", "Showcase Retail Goods", "ops-c@showcase.dev"));
+
+        List<Supplier> suppliers = new ArrayList<>();
+        for (SupplierSpec spec : specs) {
+            Supplier supplier = supplierRepo.findByCodeIgnoreCase(spec.code())
+                    .orElseGet(() -> supplierRepo.save(Supplier.builder()
+                            .code(spec.code())
+                            .name(spec.name())
+                            .contactName(spec.name() + " Ops")
+                            .contactEmail(spec.email())
+                            .contactPhone("+1-555-0100")
+                            .notes("Dashboard showcase supplier")
+                            .build()));
+            suppliers.add(supplier);
+        }
+
+        List<Product> sortedProducts = products.stream()
+                .sorted(Comparator.comparing(Product::getSku))
+                .toList();
+        List<ProductSupplier> links = new ArrayList<>();
+        int limit = Math.min(12, sortedProducts.size());
+        for (int index = 0; index < limit; index++) {
+            Product product = sortedProducts.get(index);
+            Supplier supplier = suppliers.get(index % suppliers.size());
+            links.add(ProductSupplier.builder()
+                    .id(new ProductSupplierId(product.getId(), supplier.getId()))
+                    .product(product)
+                    .supplier(supplier)
+                    .primary(true)
+                    .build());
+        }
+
+        productSupplierRepo.saveAll(links);
+        return new SupplierSeedResult(suppliers.size(), links.size());
+    }
+
+    private int seedShowcaseReceipts(List<LayoutBlock> leafBlocks, Map<String, Product> productsBySku, Instant now) {
+        List<Supplier> suppliers = supplierRepo.findAll().stream()
+                .filter(supplier -> supplier.getCode() != null && supplier.getCode().startsWith("SHOWCASE-"))
+                .sorted(Comparator.comparing(Supplier::getCode))
+                .toList();
+        if (suppliers.isEmpty() || leafBlocks.isEmpty()) {
+            return 0;
+        }
+
+        List<ReceiptDocument> documents = List.of(
+                buildReceiptDocument("SHOWCASE-RCV-001", suppliers.get(0), ReceiptStatus.POSTED, now.minus(Duration.ofHours(2)), now.minus(Duration.ofHours(3))),
+                buildReceiptDocument("SHOWCASE-RCV-002", suppliers.get(1), ReceiptStatus.POSTED, now.minus(Duration.ofHours(4)), now.minus(Duration.ofHours(5))),
+                buildReceiptDocument("SHOWCASE-RCV-003", suppliers.get(2), ReceiptStatus.POSTED, now.minus(Duration.ofHours(7)), now.minus(Duration.ofHours(8))),
+                buildReceiptDocument("SHOWCASE-RCV-004", suppliers.get(0), ReceiptStatus.POSTED, now.minus(Duration.ofDays(1)), now.minus(Duration.ofDays(1)).minus(Duration.ofHours(1))),
+                buildReceiptDocument("SHOWCASE-RCV-005", suppliers.get(1), ReceiptStatus.DRAFT, null, now.minus(Duration.ofHours(6))),
+                buildReceiptDocument("SHOWCASE-RCV-006", suppliers.get(2), ReceiptStatus.DRAFT, null, now.minus(Duration.ofHours(1))));
+        receiptDocumentRepo.saveAll(documents);
+
+        List<ReceiptLine> lines = new ArrayList<>();
+        Product milk = productsBySku.get("DEV-PRD-001");
+        Product drill = productsBySku.get("DEV-TLS-002");
+        Product pens = productsBySku.get("DEV-STD-001");
+        Product cable = productsBySku.get("DEV-ELX-004");
+        Product yogurt = productsBySku.get("DEV-PRD-004");
+        List<Product> lineProducts = List.of(milk, drill, pens, cable, yogurt).stream().filter(java.util.Objects::nonNull).toList();
+        for (int index = 0; index < Math.min(documents.size(), lineProducts.size()); index++) {
+            ReceiptDocument document = documents.get(index);
+            Product product = lineProducts.get(index);
+            LayoutBlock location = leafBlocks.get(index % leafBlocks.size());
+            lines.add(ReceiptLine.builder()
+                    .receiptId(document.getId())
+                    .productId(product.getId())
+                    .destinationLocationId(location.getId())
+                    .qty(BigDecimal.valueOf(12 + index * 4L))
+                    .lotNumber(product.getTrackLot() ? "SHOW-LOT-" + (index + 1) : null)
+                    .expiryDate(product.getTrackExpiry() ? LocalDate.now().plusDays(4 + index) : null)
+                    .notes("Showcase inbound line")
+                    .position(index)
+                    .build());
+        }
+        receiptLineRepo.saveAll(lines);
+        return documents.size();
+    }
+
+    private ReceiptDocument buildReceiptDocument(
+            String reference,
+            Supplier supplier,
+            ReceiptStatus status,
+            Instant postedAt,
+            Instant createdAt) {
+        return ReceiptDocument.builder()
+                .supplier(supplier)
+                .reference(reference)
+                .notes("Dashboard showcase receipt")
+                .status(status)
+                .createdBy("dev-showcase")
+                .createdAt(createdAt)
+                .postedAt(postedAt)
+                .postedBy(postedAt != null ? "dev-showcase" : null)
+                .build();
+    }
+
+    private int seedShowcaseDispatches(List<LayoutBlock> leafBlocks, Map<String, Product> productsBySku, Instant now) {
+        if (leafBlocks.isEmpty()) {
+            return 0;
+        }
+
+        List<DispatchDocument> documents = List.of(
+                buildDispatchDocument("SHOWCASE-DSP-001", "North Hub", DispatchStatus.POSTED, now.minus(Duration.ofHours(3)), now.minus(Duration.ofHours(4))),
+                buildDispatchDocument("SHOWCASE-DSP-002", "West Hub", DispatchStatus.POSTED, now.minus(Duration.ofHours(6)), now.minus(Duration.ofHours(7))),
+                buildDispatchDocument("SHOWCASE-DSP-003", "Retail Outlet", DispatchStatus.POSTED, now.minus(Duration.ofHours(9)), now.minus(Duration.ofHours(10))),
+                buildDispatchDocument("SHOWCASE-DSP-004", "Airport Depot", DispatchStatus.POSTED, now.minus(Duration.ofDays(1)).minus(Duration.ofHours(2)), now.minus(Duration.ofDays(1)).minus(Duration.ofHours(3))),
+                buildDispatchDocument("SHOWCASE-DSP-005", "Overflow Yard", DispatchStatus.DRAFT, null, now.minus(Duration.ofHours(5))),
+                buildDispatchDocument("SHOWCASE-DSP-006", "Maintenance Van", DispatchStatus.DRAFT, null, now.minus(Duration.ofHours(2))));
+        dispatchDocumentRepo.saveAll(documents);
+
+        List<DispatchLine> lines = new ArrayList<>();
+        List<Product> lineProducts = List.of(
+                productsBySku.get("DEV-ELX-001"),
+                productsBySku.get("DEV-TLS-001"),
+                productsBySku.get("DEV-PRD-002"),
+                productsBySku.get("DEV-STD-003"),
+                productsBySku.get("DEV-TLS-005")).stream().filter(java.util.Objects::nonNull).toList();
+        for (int index = 0; index < Math.min(documents.size(), lineProducts.size()); index++) {
+            DispatchDocument document = documents.get(index);
+            Product product = lineProducts.get(index);
+            LayoutBlock location = leafBlocks.get((index + 7) % leafBlocks.size());
+            lines.add(DispatchLine.builder()
+                    .dispatchId(document.getId())
+                    .productId(product.getId())
+                    .sourceLocationId(location.getId())
+                    .qty(BigDecimal.valueOf(4 + index * 2L))
+                    .lotNumber(product.getTrackLot() ? "SHOW-LOT-" + (index + 11) : null)
+                    .notes("Showcase outbound line")
+                    .position(index)
+                    .build());
+        }
+        dispatchLineRepo.saveAll(lines);
+        return documents.size();
+    }
+
+    private DispatchDocument buildDispatchDocument(
+            String reference,
+            String destination,
+            DispatchStatus status,
+            Instant postedAt,
+            Instant createdAt) {
+        return DispatchDocument.builder()
+                .destination(destination)
+                .reference(reference)
+                .notes("Dashboard showcase dispatch")
+                .status(status)
+                .createdBy("dev-showcase")
+                .createdAt(createdAt)
+                .postedAt(postedAt)
+                .postedBy(postedAt != null ? "dev-showcase" : null)
+                .build();
+    }
+
+    private ZoneSeedResult seedShowcaseZones(Map<String, ProductCategory> categories) {
+        List<GisZone> zones = List.of(
+                GisZone.builder()
+                        .name("Showcase Electronics Zone")
+                        .description("Electronics-heavy picking and put-away zone.")
+                        .geometry(gridPolygon(0, 2, 0, 1))
+                        .violationAction("WARN")
+                        .source("MANUAL")
+                        .displayColor("#2563EB")
+                        .build(),
+                GisZone.builder()
+                        .name("Showcase Tools Zone")
+                        .description("Tools and equipment lane.")
+                        .geometry(gridPolygon(3, 5, 0, 1))
+                        .violationAction("WARN")
+                        .source("MANUAL")
+                        .displayColor("#F97316")
+                        .build(),
+                GisZone.builder()
+                        .name("Showcase Perishables Zone")
+                        .description("Cold-chain and expiry-sensitive storage.")
+                        .geometry(gridPolygon(6, 8, 0, 1))
+                        .violationAction("WARN")
+                        .source("MANUAL")
+                        .displayColor("#10B981")
+                        .build(),
+                GisZone.builder()
+                        .name("Showcase Reserve Zone")
+                        .description("Empty reserve footprint for dashboard empty-zone warnings.")
+                        .geometry(boundsPolygon(
+                                BASE_LON + 9 * (CELL_LON + GAP_LON),
+                                BASE_LON + 10 * (CELL_LON + GAP_LON) + CELL_LON,
+                                BASE_LAT,
+                                BASE_LAT + CELL_LAT))
+                        .violationAction("WARN")
+                        .source("MANUAL")
+                        .displayColor("#A855F7")
+                        .build());
+        gisZoneRepo.saveAll(zones);
+
+        List<GisZoneCategoryRule> rules = new ArrayList<>();
+        ProductCategory electronics = categories.get("DEV_ELECTRONICS");
+        ProductCategory tools = categories.get("DEV_TOOLS");
+        ProductCategory perishables = categories.get("PERISHABLE");
+        if (electronics != null) {
+            rules.add(GisZoneCategoryRule.builder()
+                    .zone(zones.get(0))
+                    .categoryId(electronics.getId())
+                    .ruleType("ALLOWED")
+                    .build());
+        }
+        if (tools != null) {
+            rules.add(GisZoneCategoryRule.builder()
+                    .zone(zones.get(1))
+                    .categoryId(tools.getId())
+                    .ruleType("ALLOWED")
+                    .build());
+        }
+        if (perishables != null) {
+            rules.add(GisZoneCategoryRule.builder()
+                    .zone(zones.get(2))
+                    .categoryId(perishables.getId())
+                    .ruleType("ALLOWED")
+                    .build());
+        }
+        gisZoneCategoryRuleRepo.saveAll(rules);
+        return new ZoneSeedResult(zones.size(), rules.size());
+    }
+
+    private int seedShowcaseHazardBuffers(Map<String, HazardType> hazards, LayoutSeedData layoutData) {
+        HazardType flammable = hazards.get("FLAMMABLE");
+        if (flammable == null || layoutData.leafBlocks().isEmpty()) {
+            return 0;
+        }
+
+        LayoutBlock target = layoutData.leafBlocks().getFirst();
+        double[] bounds = layoutData.boundsByBlockId().get(target.getId());
+        if (bounds == null) {
+            return 0;
+        }
+
+        GisHazardBuffer buffer = GisHazardBuffer.builder()
+                .name("Showcase Flammable Buffer")
+                .source("ARCGIS_IMPORT")
+                .geometry(boundsPolygon(bounds[0] - 0.000004, bounds[1] + 0.000004, bounds[2] - 0.000004, bounds[3] + 0.000004))
+                .notes("Dashboard showcase hazard overlap")
+                .sourceFilename("showcase.geojson")
+                .restrictedHazardTypes(new ArrayList<>(List.of(flammable)))
+                .build();
+        gisHazardBufferRepo.save(buffer);
+        return 1;
+    }
+
+    private CountSeedResult seedShowcaseCounts(List<LayoutBlock> leafBlocks, Map<String, Product> productsBySku, Instant now) {
+        if (leafBlocks.size() < 6) {
+            return new CountSeedResult(0, 0);
+        }
+
+        CountSession openStale = CountSession.builder()
+                .name("SHOWCASE Cycle Count - Stale")
+                .status(CountStatus.OPEN)
+                .createdBy("dev-showcase")
+                .createdAt(now.minus(Duration.ofDays(4)))
+                .locationIds(new HashSet<>(Set.of(leafBlocks.get(0).getId(), leafBlocks.get(1).getId())))
+                .build();
+        CountSession openFresh = CountSession.builder()
+                .name("SHOWCASE Cycle Count - Active")
+                .status(CountStatus.OPEN)
+                .createdBy("dev-showcase")
+                .createdAt(now.minus(Duration.ofHours(10)))
+                .locationIds(new HashSet<>(Set.of(leafBlocks.get(2).getId(), leafBlocks.get(3).getId())))
+                .build();
+        CountSession postedA = CountSession.builder()
+                .name("SHOWCASE Cycle Count - Posted A")
+                .status(CountStatus.POSTED)
+                .createdBy("dev-showcase")
+                .createdAt(now.minus(Duration.ofDays(6)))
+                .postedAt(now.minus(Duration.ofDays(5)))
+                .postedBy("dev-showcase")
+                .locationIds(new HashSet<>(Set.of(leafBlocks.get(0).getId(), leafBlocks.get(1).getId(), leafBlocks.get(2).getId())))
+                .build();
+        CountSession postedB = CountSession.builder()
+                .name("SHOWCASE Cycle Count - Posted B")
+                .status(CountStatus.POSTED)
+                .createdBy("dev-showcase")
+                .createdAt(now.minus(Duration.ofDays(3)))
+                .postedAt(now.minus(Duration.ofDays(2)))
+                .postedBy("dev-showcase")
+                .locationIds(new HashSet<>(Set.of(leafBlocks.get(3).getId(), leafBlocks.get(4).getId(), leafBlocks.get(5).getId())))
+                .build();
+        CountSession voided = CountSession.builder()
+                .name("SHOWCASE Cycle Count - Void")
+                .status(CountStatus.VOID)
+                .createdBy("dev-showcase")
+                .createdAt(now.minus(Duration.ofDays(2)))
+                .voidedAt(now.minus(Duration.ofDays(1)))
+                .voidedBy("dev-showcase")
+                .locationIds(new HashSet<>(Set.of(leafBlocks.get(5).getId())))
+                .build();
+
+        countSessionRepo.saveAll(List.of(openStale, openFresh, postedA, postedB, voided));
+
+        List<Product> countProducts = List.of(
+                productsBySku.get("DEV-ELX-001"),
+                productsBySku.get("DEV-TLS-001"),
+                productsBySku.get("DEV-PRD-001"),
+                productsBySku.get("DEV-STD-001"),
+                productsBySku.get("DEV-TLS-005"),
+                productsBySku.get("DEV-PRD-002")).stream().filter(java.util.Objects::nonNull).toList();
+
+        List<CountLine> lines = new ArrayList<>();
+        lines.add(buildCountLine(postedA, leafBlocks.get(0), countProducts.get(0), "SHOW-LOT-1", 120, 120));
+        lines.add(buildCountLine(postedA, leafBlocks.get(1), countProducts.get(1), null, 75, 72));
+        lines.add(buildCountLine(postedA, leafBlocks.get(2), countProducts.get(2), "SHOW-LOT-2", 58, 58));
+        lines.add(buildCountLine(postedA, leafBlocks.get(0), countProducts.get(3), null, 96, 96));
+        lines.add(buildCountLine(postedB, leafBlocks.get(3), countProducts.get(4), null, 30, 33));
+        lines.add(buildCountLine(postedB, leafBlocks.get(4), countProducts.get(5), "SHOW-LOT-3", 42, 42));
+        lines.add(buildCountLine(postedB, leafBlocks.get(5), countProducts.get(0), null, 64, 60));
+        lines.add(buildCountLine(postedB, leafBlocks.get(4), countProducts.get(1), null, 27, 27));
+
+        countLineRepo.saveAll(lines);
+        return new CountSeedResult(5, lines.size());
+    }
+
+    private CountLine buildCountLine(
+            CountSession session,
+            LayoutBlock location,
+            Product product,
+            String lotNumber,
+            long expectedQty,
+            long countedQty) {
+        return CountLine.builder()
+                .sessionId(session.getId())
+                .locationId(location.getId())
+                .productId(product.getId())
+                .lotNumber(lotNumber)
+                .expectedQty(BigDecimal.valueOf(expectedQty))
+                .countedQty(BigDecimal.valueOf(countedQty))
+                .build();
+    }
+
+    private int seedShowcaseAuditLogs(String tenantSlug, Instant now) {
+        List<AuditLog> logs = List.of(
+                buildAuditLog(now.minus(Duration.ofHours(2)), "ops@showcase.dev", "POST", "RECEIPT_DOCUMENT", "SHOWCASE-RCV-001", tenantSlug, "/dev/showcase/receipts", "POST", "{\"reference\":\"SHOWCASE-RCV-001\"}"),
+                buildAuditLog(now.minus(Duration.ofHours(4)), "warehouse@showcase.dev", "POST", "DISPATCH_DOCUMENT", "SHOWCASE-DSP-001", tenantSlug, "/dev/showcase/dispatches", "POST", "{\"reference\":\"SHOWCASE-DSP-001\"}"),
+                buildAuditLog(now.minus(Duration.ofHours(6)), "safety@showcase.dev", "CREATE", "GIS_ZONE", "showcase-electronics", tenantSlug, "/dev/showcase/zones", "POST", "{\"name\":\"Showcase Electronics Zone\"}"),
+                buildAuditLog(now.minus(Duration.ofHours(10)), "ops@showcase.dev", "UPDATE", "COUNT_SESSION", "SHOWCASE Cycle Count - Active", tenantSlug, "/dev/showcase/counting", "PATCH", "{\"status\":\"OPEN\"}"),
+                buildAuditLog(now.minus(Duration.ofDays(1)), "planner@showcase.dev", "POST", "COUNT_SESSION", "SHOWCASE Cycle Count - Posted B", tenantSlug, "/dev/showcase/counting", "POST", "{\"status\":\"POSTED\"}"),
+                buildAuditLog(now.minus(Duration.ofDays(1)).minus(Duration.ofHours(3)), "warehouse@showcase.dev", "ADJUST", "STOCK_MOVEMENT", "count-adjustment", tenantSlug, "/dev/showcase/movements", "POST", "{\"reason\":\"COUNT_ADJUSTMENT\"}"),
+                buildAuditLog(now.minus(Duration.ofDays(2)), "ops@showcase.dev", "CREATE", "SUPPLIER", "SHOWCASE-SUP-001", tenantSlug, "/dev/showcase/suppliers", "POST", "{\"code\":\"SHOWCASE-SUP-001\"}"),
+                buildAuditLog(now.minus(Duration.ofDays(2)).minus(Duration.ofHours(2)), "ops@showcase.dev", "LINK", "PRODUCT_SUPPLIER", "SHOWCASE-LINK-01", tenantSlug, "/dev/showcase/product-suppliers", "POST", "{\"primary\":true}"),
+                buildAuditLog(now.minus(Duration.ofDays(3)), "planner@showcase.dev", "VOID", "COUNT_SESSION", "SHOWCASE Cycle Count - Void", tenantSlug, "/dev/showcase/counting", "POST", "{\"status\":\"VOID\"}"),
+                buildAuditLog(now.minus(Duration.ofDays(3)).minus(Duration.ofHours(4)), "safety@showcase.dev", "CREATE", "HAZARD_BUFFER", "showcase-flammable-buffer", tenantSlug, "/dev/showcase/hazard-buffers", "POST", "{\"name\":\"Showcase Flammable Buffer\"}"),
+                buildAuditLog(now.minus(Duration.ofDays(4)), "warehouse@showcase.dev", "PICK", "STOCK_MOVEMENT", "pick-01", tenantSlug, "/dev/showcase/movements", "POST", "{\"type\":\"PICK\"}"),
+                buildAuditLog(now.minus(Duration.ofDays(4)).minus(Duration.ofHours(6)), "ops@showcase.dev", "TRANSFER", "STOCK_MOVEMENT", "transfer-01", tenantSlug, "/dev/showcase/movements", "POST", "{\"type\":\"TRANSFER\"}"),
+                buildAuditLog(now.minus(Duration.ofDays(5)), "ops@showcase.dev", "UPDATE", "PRODUCT", "DEV-STD-004", tenantSlug, "/dev/showcase/products", "PATCH", "{\"active\":false}"),
+                buildAuditLog(now.minus(Duration.ofDays(5)).minus(Duration.ofHours(2)), "planner@showcase.dev", "RECEIVE", "STOCK_MOVEMENT", "receive-01", tenantSlug, "/dev/showcase/movements", "POST", "{\"type\":\"RECEIVE\"}"),
+                buildAuditLog(now.minus(Duration.ofDays(6)), "safety@showcase.dev", "WARN", "GIS_ZONE", "showcase-perishables", tenantSlug, "/dev/showcase/zones", "POST", "{\"ruleType\":\"ALLOWED\"}"),
+                buildAuditLog(now.minus(Duration.ofDays(6)).minus(Duration.ofHours(3)), "warehouse@showcase.dev", "CREATE", "RECEIPT_DOCUMENT", "SHOWCASE-RCV-004", tenantSlug, "/dev/showcase/receipts", "POST", "{\"status\":\"POSTED\"}"));
+        auditLogRepo.saveAll(logs);
+        return logs.size();
+    }
+
+    private AuditLog buildAuditLog(
+            Instant occurredAt,
+            String actorEmail,
+            String action,
+            String entityType,
+            String entityId,
+            String tenantSlug,
+            String requestPath,
+            String requestMethod,
+            String afterState) {
+        return AuditLog.builder()
+                .occurredAt(occurredAt)
+                .actorEmail(actorEmail)
+                .actorRoles("[\"TENANT_ADMIN\"]")
+                .action(action)
+                .entityType(entityType)
+                .entityId(entityId)
+                .beforeState(null)
+                .afterState(afterState)
+                .tenantId(tenantSlug)
+                .requestPath(requestPath)
+                .requestMethod(requestMethod)
+                .build();
+    }
+
+    private int seedShowcaseBaseStock(List<LayoutBlock> leafBlocks, List<Product> products) {
+        List<StockMovement> movements = new ArrayList<>();
+        Instant now = Instant.now();
+
+        for (int i = 0; i < leafBlocks.size(); i++) {
+            UUID locationId = leafBlocks.get(i).getId();
+            int[] pidx = { i % products.size(), (i + 7) % products.size(), (i + 13) % products.size() };
+
+            for (int slot = 0; slot < pidx.length; slot++) {
+                int p = pidx[slot];
+                int qty = 12 + (i * 17 + p * 11 + 43) % 260;
+                int dayOffset = (i + slot * 3) % 14;
+
+                movements.add(StockMovement.builder()
+                        .locationId(locationId)
+                        .productId(products.get(p).getId())
+                        .qty(BigDecimal.valueOf(qty))
+                        .type(MovementType.RECEIVE)
+                        .notes("dev-showcase-base")
+                        .createdBy("dev-showcase")
+                        .createdAt(now.minus(Duration.ofDays(dayOffset)).minus(Duration.ofHours((i + slot) % 12)))
+                        .build());
+            }
+        }
+
+        movementRepo.saveAll(movements);
+        return movements.size();
+    }
+
+    private int seedShowcaseMovements(List<LayoutBlock> leafBlocks, Map<String, Product> productsBySku, Instant now) {
+        if (leafBlocks.size() < 8) {
+            return 0;
+        }
+
+        List<StockMovement> movements = new ArrayList<>();
+        Product perishMilk = productsBySku.get("DEV-PRD-001");
+        Product perishCheese = productsBySku.get("DEV-PRD-002");
+        Product electronics = productsBySku.get("DEV-ELX-001");
+        Product tools = productsBySku.get("DEV-TLS-001");
+        Product flammable = productsBySku.get("DEV-TLS-005");
+        Product standard = productsBySku.get("DEV-STD-001");
+        Product inactive = productsBySku.get("DEV-STD-004");
+
+        for (int day = 0; day < 7; day++) {
+            Instant createdAt = now.minus(Duration.ofDays(6L - day)).minus(Duration.ofHours(2));
+            LayoutBlock receiveLocation = leafBlocks.get(day % leafBlocks.size());
+            LayoutBlock pickLocation = leafBlocks.get((day + 2) % leafBlocks.size());
+            LayoutBlock transferFrom = leafBlocks.get((day + 4) % leafBlocks.size());
+            LayoutBlock transferTo = leafBlocks.get((day + 5) % leafBlocks.size());
+            LayoutBlock adjustLocation = leafBlocks.get((day + 6) % leafBlocks.size());
+
+            if (perishMilk != null) {
+                movements.add(StockMovement.builder()
+                        .locationId(receiveLocation.getId())
+                        .productId(perishMilk.getId())
+                        .qty(BigDecimal.valueOf(9 + day))
+                        .type(MovementType.RECEIVE)
+                        .lotNumber("SHOW-LOT-M" + day)
+                        .expiryDate(LocalDate.now().plusDays(3 + day))
+                        .notes("dev-showcase")
+                        .createdBy("dev-showcase")
+                        .createdAt(createdAt)
+                        .build());
+            }
+            if (standard != null) {
+                movements.add(StockMovement.builder()
+                        .locationId(pickLocation.getId())
+                        .productId(standard.getId())
+                        .qty(BigDecimal.valueOf(-(4 + day)))
+                        .type(MovementType.PICK)
+                        .notes("dev-showcase")
+                        .createdBy("dev-showcase")
+                        .createdAt(createdAt.plus(Duration.ofMinutes(10)))
+                        .build());
+            }
+            if (electronics != null) {
+                UUID referenceId = UUID.randomUUID();
+                BigDecimal qty = BigDecimal.valueOf(5 + day);
+                movements.add(StockMovement.builder()
+                        .locationId(transferFrom.getId())
+                        .productId(electronics.getId())
+                        .qty(qty.negate())
+                        .type(MovementType.TRANSFER_OUT)
+                        .referenceId(referenceId)
+                        .notes("dev-showcase")
+                        .createdBy("dev-showcase")
+                        .createdAt(createdAt.plus(Duration.ofMinutes(20)))
+                        .build());
+                movements.add(StockMovement.builder()
+                        .locationId(transferTo.getId())
+                        .productId(electronics.getId())
+                        .qty(qty)
+                        .type(MovementType.TRANSFER_IN)
+                        .referenceId(referenceId)
+                        .notes("dev-showcase")
+                        .createdBy("dev-showcase")
+                        .createdAt(createdAt.plus(Duration.ofMinutes(21)))
+                        .build());
+            }
+            if (tools != null) {
+                movements.add(StockMovement.builder()
+                        .locationId(adjustLocation.getId())
+                        .productId(tools.getId())
+                        .qty(BigDecimal.valueOf(day % 2 == 0 ? 2 : -3))
+                        .type(MovementType.ADJUST)
+                        .reasonCode("SHOWCASE_REVIEW")
+                        .notes("dev-showcase")
+                        .createdBy("dev-showcase")
+                        .createdAt(createdAt.plus(Duration.ofMinutes(30)))
+                        .build());
+            }
+            if (perishCheese != null) {
+                movements.add(StockMovement.builder()
+                        .locationId(adjustLocation.getId())
+                        .productId(perishCheese.getId())
+                        .qty(BigDecimal.valueOf(day % 2 == 0 ? 1 : -2))
+                        .type(MovementType.ADJUST)
+                        .reasonCode("COUNT_ADJUSTMENT")
+                        .notes("dev-showcase")
+                        .createdBy("dev-showcase")
+                        .createdAt(createdAt.plus(Duration.ofMinutes(40)))
+                        .build());
+            }
+        }
+
+        LayoutBlock hazardLocation = leafBlocks.getFirst();
+        if (flammable != null) {
+            movements.add(StockMovement.builder()
+                    .locationId(hazardLocation.getId())
+                    .productId(flammable.getId())
+                    .qty(BigDecimal.valueOf(18))
+                    .type(MovementType.RECEIVE)
+                    .notes("dev-showcase")
+                    .createdBy("dev-showcase")
+                    .createdAt(now.minus(Duration.ofDays(1)).minus(Duration.ofHours(1)))
+                    .build());
+        }
+        if (inactive != null) {
+            movements.add(StockMovement.builder()
+                    .locationId(leafBlocks.get(1).getId())
+                    .productId(inactive.getId())
+                    .qty(BigDecimal.valueOf(7))
+                    .type(MovementType.RECEIVE)
+                    .notes("dev-showcase")
+                    .createdBy("dev-showcase")
+                    .createdAt(now.minus(Duration.ofDays(2)).minus(Duration.ofHours(2)))
+                    .build());
+        }
+
+        movementRepo.saveAll(movements);
+        return movements.size();
+    }
+
+    private Polygon gridPolygon(int startCol, int endColInclusive, int startRow, int endRowInclusive) {
+        double minLon = BASE_LON + startCol * (CELL_LON + GAP_LON);
+        double maxLon = BASE_LON + endColInclusive * (CELL_LON + GAP_LON) + CELL_LON;
+        double minLat = BASE_LAT + startRow * (CELL_LAT + GAP_LAT);
+        double maxLat = BASE_LAT + endRowInclusive * (CELL_LAT + GAP_LAT) + CELL_LAT;
+        return boundsPolygon(minLon, maxLon, minLat, maxLat);
+    }
+
+    private Polygon boundsPolygon(double minLon, double maxLon, double minLat, double maxLat) {
+        return geomFactory.createPolygon(new Coordinate[] {
+                new Coordinate(minLon, minLat),
+                new Coordinate(maxLon, minLat),
+                new Coordinate(maxLon, maxLat),
+                new Coordinate(minLon, maxLat),
+                new Coordinate(minLon, minLat)
+        });
     }
 
     // ── Stock seeding ─────────────────────────────────────────────────────────
