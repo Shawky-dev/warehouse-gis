@@ -547,8 +547,6 @@ export const arMessages: Record<keyof typeof enMessages, string> = {
   "tenant.dashboard.sections.warnings.description": "استثناءات السلامة والمخزون والعد التي تحتاج متابعة.",
   "tenant.dashboard.sections.masterData.title": "البيانات الأساسية",
   "tenant.dashboard.sections.masterData.description": "تغطية الكتالوج وفجوات الموردين وتوزيع الفئات.",
-  "tenant.dashboard.sections.stocktake.title": "الجرد",
-  "tenant.dashboard.sections.stocktake.description": "الدقة ومواقع التباين واتجاهات تسويات الجرد.",
   "tenant.dashboard.sections.activity.title": "النشاط",
   "tenant.dashboard.sections.activity.description": "نشاط التدقيق وأعلى المستخدمين وأحدث أحداث المستأجر.",
   "tenant.productsTitle": "المنتجات",

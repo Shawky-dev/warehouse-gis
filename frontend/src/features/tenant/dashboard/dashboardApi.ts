@@ -37,10 +37,6 @@ export function getMasterData(tenantSlug: string) {
   return getDashboardSection(tenantSlug, "master-data");
 }
 
-export function getStocktake(tenantSlug: string) {
-  return getDashboardSection(tenantSlug, "stocktake");
-}
-
 export function getActivity(tenantSlug: string) {
   return getDashboardSection(tenantSlug, "activity");
 }

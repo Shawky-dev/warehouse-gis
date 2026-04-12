@@ -5,7 +5,6 @@ export type DashboardEndpoint =
   | "inventory-ops"
   | "warnings"
   | "master-data"
-  | "stocktake"
   | "activity";
 
 export type DashboardSectionId =
@@ -13,7 +12,6 @@ export type DashboardSectionId =
   | "inventoryOps"
   | "warnings"
   | "masterData"
-  | "stocktake"
   | "activity";
 
 export interface DashboardStat {

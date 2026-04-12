@@ -137,8 +137,6 @@ function getSeriesColor(key: string, index: number) {
       return "var(--chart-4)";
     case "ADJUST":
       return "var(--chart-5)";
-    case "COUNT_ADJUSTMENT":
-      return "var(--chart-1)";
     default:
       return getChartColor(index);
   }

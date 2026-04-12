@@ -46,13 +46,6 @@ public class DashboardController {
             + "T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).UOMS_VIEW"
             + ")";
 
-    private static final String STOCKTAKE_ANY = "hasAnyAuthority("
-            + "T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).COUNTING_VIEW,"
-            + "T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).COUNTING_CREATE,"
-            + "T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).COUNTING_POST,"
-            + "T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).COUNTING_VOID"
-            + ")";
-
     private final TenantAccessPolicy tenantAccessPolicy;
     private final DashboardService dashboardService;
 
@@ -97,15 +90,6 @@ public class DashboardController {
             Authentication authentication) {
         tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
         return ResponseEntity.ok(dashboardService.getMasterData());
-    }
-
-    @GetMapping("/stocktake")
-    @PreAuthorize(STOCKTAKE_ANY)
-    public ResponseEntity<DashboardService.DashboardSectionResponse> getStocktake(
-            @PathVariable String tenantSlug,
-            Authentication authentication) {
-        tenantAccessPolicy.assertTenantAccess(authentication, tenantSlug);
-        return ResponseEntity.ok(dashboardService.getStocktake());
     }
 
     @GetMapping("/activity")

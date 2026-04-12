@@ -75,21 +75,6 @@ class DashboardControllerAuthorizationMetadataTest {
     }
 
     @Test
-    void getStocktake_shouldRequireAnyCountingPermission() throws Exception {
-        Method method = DashboardController.class.getMethod(
-                "getStocktake",
-                String.class,
-                Authentication.class);
-
-        assertPreAuthorizeValue(method, "hasAnyAuthority("
-                + "T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).COUNTING_VIEW,"
-                + "T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).COUNTING_CREATE,"
-                + "T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).COUNTING_POST,"
-                + "T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).COUNTING_VOID"
-                + ")");
-    }
-
-    @Test
     void getActivity_shouldRequireAuditViewPermission() throws Exception {
         Method method = DashboardController.class.getMethod(
                 "getActivity",

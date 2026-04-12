@@ -414,57 +414,6 @@ public interface DashboardRepository extends Repository<StockMovement, UUID> {
 
     @Query(value = """
             SELECT
-                (SELECT COUNT(*) FROM count_sessions WHERE status = 'POSTED') AS postedSessions,
-                (SELECT COUNT(*) FROM count_sessions WHERE status = 'OPEN') AS openSessions,
-                (SELECT COUNT(*) FROM count_sessions WHERE status = 'VOID') AS voidSessions,
-                (
-                    SELECT COUNT(*)
-                    FROM count_lines cl
-                    JOIN count_sessions cs ON cs.id = cl.session_id
-                    WHERE cs.status = 'POSTED'
-                ) AS postedLines,
-                (
-                    SELECT COUNT(*)
-                    FROM count_lines cl
-                    JOIN count_sessions cs ON cs.id = cl.session_id
-                    WHERE cs.status = 'POSTED'
-                      AND COALESCE(cl.variance, 0) = 0
-                ) AS exactLines
-            """, nativeQuery = true)
-    StocktakeSummaryProjection fetchStocktakeSummary();
-
-    @Query(value = """
-            SELECT
-                cl.location_id AS locationId,
-                COALESCE(lb.full_code, gb.label, cl.location_id::text) AS locationLabel,
-                COALESCE(SUM(ABS(cl.variance)), 0) AS varianceQty
-            FROM count_lines cl
-            JOIN count_sessions cs ON cs.id = cl.session_id
-            LEFT JOIN layout_blocks lb ON lb.id = cl.location_id
-            LEFT JOIN gis_blocks gb ON gb.layout_block_id = cl.location_id
-            WHERE cs.status = 'POSTED'
-            GROUP BY cl.location_id, COALESCE(lb.full_code, gb.label, cl.location_id::text)
-            HAVING COALESCE(SUM(ABS(cl.variance)), 0) > 0
-            ORDER BY varianceQty DESC, locationLabel ASC
-            LIMIT 10
-            """, nativeQuery = true)
-    List<VarianceLocationProjection> fetchVarianceByLocation();
-
-    @Query(value = """
-            SELECT
-                DATE(sm.created_at) AS bucketDate,
-                COALESCE(SUM(ABS(sm.qty)), 0) AS adjustmentQty
-            FROM stock_movements sm
-            WHERE sm.type = 'ADJUST'
-              AND sm.reason_code = 'COUNT_ADJUSTMENT'
-              AND sm.created_at >= :fromInclusive
-            GROUP BY DATE(sm.created_at)
-            ORDER BY DATE(sm.created_at) ASC
-            """, nativeQuery = true)
-    List<CountAdjustmentProjection> fetchCountAdjustmentVolume(@Param("fromInclusive") java.time.Instant fromInclusive);
-
-    @Query(value = """
-            SELECT
                 (SELECT COUNT(*) FROM audit_log WHERE occurred_at >= :dayAgo) AS events24h,
                 (SELECT COUNT(*) FROM audit_log WHERE occurred_at >= :weekAgo) AS events7d,
                 (SELECT COUNT(DISTINCT actor_email) FROM audit_log WHERE occurred_at >= :weekAgo) AS uniqueActors7d,
@@ -638,25 +587,6 @@ public interface DashboardRepository extends Repository<StockMovement, UUID> {
         UUID getUomId();
         String getCode();
         String getName();
-    }
-
-    interface StocktakeSummaryProjection {
-        long getPostedSessions();
-        long getOpenSessions();
-        long getVoidSessions();
-        long getPostedLines();
-        long getExactLines();
-    }
-
-    interface VarianceLocationProjection {
-        UUID getLocationId();
-        String getLocationLabel();
-        BigDecimal getVarianceQty();
-    }
-
-    interface CountAdjustmentProjection {
-        LocalDate getBucketDate();
-        BigDecimal getAdjustmentQty();
     }
 
     interface ActivitySummaryProjection {

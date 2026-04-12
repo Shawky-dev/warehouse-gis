@@ -152,7 +152,7 @@ public class DashboardService {
                                                 formatCount(session.getAgeDays().longValue()) + " days open",
                                                 session.getAgeDays(),
                                                 "medium",
-                                                "stocktake",
+                                                "count-session",
                                                 formatInstant(session.getCreatedAt())))
                                         .toList(),
                                 null)),
@@ -223,72 +223,6 @@ public class DashboardService {
                                         dashboardRepository.fetchProductsWithoutSuppliers(),
                                         dashboardRepository.fetchUnusedUoms()),
                                 null)),
-                Instant.now());
-    }
-
-    public DashboardSectionResponse getStocktake() {
-        DashboardRepository.StocktakeSummaryProjection summary = dashboardRepository.fetchStocktakeSummary();
-        long postedLines = summary.getPostedLines();
-        long exactLines = summary.getExactLines();
-        long accuracyPercent = postedLines == 0
-                ? 0
-                : Math.round((exactLines * 100.0f) / postedLines);
-        Instant fromInclusive = LocalDate.now().minusDays(6).atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
-
-        return new DashboardSectionResponse(
-                "stocktake",
-                List.of(
-                        new DashboardStat("accuracy-rate", "Inventory accuracy", accuracyPercent + "%", null),
-                        new DashboardStat("posted-sessions", "Posted sessions", formatCount(summary.getPostedSessions()), null),
-                        new DashboardStat("open-sessions", "Open sessions", formatCount(summary.getOpenSessions()), null),
-                        new DashboardStat("void-sessions", "Void sessions", formatCount(summary.getVoidSessions()), null)),
-                List.of(
-                        new DashboardHighlight(
-                                "stocktake-accuracy",
-                                "Accuracy is based on posted count lines",
-                                formatCount(exactLines) + " of " + formatCount(postedLines) + " posted lines matched expected stock exactly."),
-                        new DashboardHighlight(
-                                "stocktake-adjustments",
-                                "Count adjustments tracked separately",
-                                "Adjustment trend uses inventory ledger rows written with COUNT_ADJUSTMENT reason code.")),
-                List.of(
-                        new DashboardWidget(
-                                "metric-grid",
-                                "stocktake-metrics",
-                                "Stocktake performance",
-                                "Accuracy and count-session throughput from posted and open stocktakes.",
-                                List.of(
-                                        new DashboardMetric("stocktake-accuracy-rate", "Accuracy rate", accuracyPercent + "%", formatCount(exactLines) + " exact lines from posted sessions."),
-                                        new DashboardMetric("stocktake-posted", "Posted sessions", formatCount(summary.getPostedSessions()), "Completed sessions that already wrote adjustments if needed."),
-                                        new DashboardMetric("stocktake-open", "Open sessions", formatCount(summary.getOpenSessions()), "Sessions currently being counted."),
-                                        new DashboardMetric("stocktake-lines", "Posted lines", formatCount(postedLines), "Total counted lines across posted sessions.")),
-                                null,
-                                null),
-                        new DashboardWidget(
-                                "bar-list",
-                                "variance-by-location",
-                                "Variance by location",
-                                "Locations with the largest absolute variance across posted stocktakes.",
-                                null,
-                                dashboardRepository.fetchVarianceByLocation().stream()
-                                        .map(location -> new DashboardValueItem(
-                                                "variance-location-" + location.getLocationId(),
-                                                location.getLocationLabel(),
-                                                formatDecimal(location.getVarianceQty()),
-                                                location.getVarianceQty(),
-                                                null,
-                                                "variance",
-                                                null))
-                                        .toList(),
-                                null),
-                        new DashboardWidget(
-                                "timeline",
-                                "count-adjustments",
-                                "Count adjustment volume (7 day)",
-                                "Absolute quantity adjusted from stocktake posting activity.",
-                                null,
-                                null,
-                                buildCountAdjustmentTimeline(dashboardRepository.fetchCountAdjustmentVolume(fromInclusive)))),
                 Instant.now());
     }
 
@@ -408,21 +342,6 @@ public class DashboardService {
                         MOVEMENT_TYPES.stream()
                                 .map(type -> new DashboardSeriesValue(type, safeDecimal(entry.getValue().get(type))))
                                 .toList()))
-                .toList();
-    }
-
-    private List<DashboardTimelineBucket> buildCountAdjustmentTimeline(List<DashboardRepository.CountAdjustmentProjection> rows) {
-        Map<LocalDate, BigDecimal> byDay = new java.util.LinkedHashMap<>();
-        for (int offset = 6; offset >= 0; offset--) {
-            byDay.put(LocalDate.now().minusDays(offset), BigDecimal.ZERO);
-        }
-        for (DashboardRepository.CountAdjustmentProjection row : rows) {
-            byDay.put(row.getBucketDate(), safeDecimal(row.getAdjustmentQty()));
-        }
-        return byDay.entrySet().stream()
-                .map(entry -> new DashboardTimelineBucket(
-                        entry.getKey().toString(),
-                        List.of(new DashboardSeriesValue("COUNT_ADJUSTMENT", entry.getValue()))))
                 .toList();
     }
 

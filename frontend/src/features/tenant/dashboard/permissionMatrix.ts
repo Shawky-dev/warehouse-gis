@@ -107,24 +107,6 @@ export const DASHBOARD_PERMISSION_MATRIX: readonly DashboardPermissionMatrixEntr
     ],
   },
   {
-    id: "stocktake",
-    endpoint: "stocktake",
-    titleKey: "tenant.dashboard.sections.stocktake.title",
-    descriptionKey: "tenant.dashboard.sections.stocktake.description",
-    permissions: [
-      TENANT_PERMISSIONS.COUNTING_VIEW,
-      TENANT_PERMISSIONS.COUNTING_CREATE,
-      TENANT_PERMISSIONS.COUNTING_POST,
-      TENANT_PERMISSIONS.COUNTING_VOID,
-    ],
-    workspaces: [
-      {
-        permissions: [TENANT_PERMISSIONS.COUNTING_VIEW],
-        path: (tenantSlug: string) => PATHS.TENANT.countSessions(tenantSlug),
-      },
-    ],
-  },
-  {
     id: "activity",
     endpoint: "activity",
     titleKey: "tenant.dashboard.sections.activity.title",

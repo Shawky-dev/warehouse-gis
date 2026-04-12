@@ -35,9 +35,6 @@ class DashboardServiceTest {
     private DashboardRepository.MasterDataSummaryProjection masterDataSummary;
 
     @Mock
-    private DashboardRepository.StocktakeSummaryProjection stocktakeSummary;
-
-    @Mock
     private DashboardRepository.ActivitySummaryProjection activitySummary;
 
     private DashboardService dashboardService;
@@ -131,27 +128,6 @@ class DashboardServiceTest {
         assertEquals("Chemicals", response.widgets().get(1).items().getFirst().label());
         assertEquals("alert-list", response.widgets().get(2).type());
         assertEquals(2, response.widgets().get(2).items().size());
-    }
-
-    @Test
-    void getStocktake_shouldBuildAccuracyAndVarianceWidgets() {
-        when(stocktakeSummary.getPostedSessions()).thenReturn(4L);
-        when(stocktakeSummary.getOpenSessions()).thenReturn(2L);
-        when(stocktakeSummary.getVoidSessions()).thenReturn(1L);
-        when(stocktakeSummary.getPostedLines()).thenReturn(20L);
-        when(stocktakeSummary.getExactLines()).thenReturn(15L);
-        when(dashboardRepository.fetchStocktakeSummary()).thenReturn(stocktakeSummary);
-        when(dashboardRepository.fetchVarianceByLocation()).thenReturn(List.of(projectionVariance("A-01", new BigDecimal("9.5"))));
-        when(dashboardRepository.fetchCountAdjustmentVolume(org.mockito.ArgumentMatchers.any())).thenReturn(List.of(
-                projectionCountAdjustment(LocalDate.now().minusDays(1), new BigDecimal("6"))));
-
-        DashboardService.DashboardSectionResponse response = dashboardService.getStocktake();
-
-        assertEquals("stocktake", response.section());
-        assertEquals(3, response.widgets().size());
-        assertEquals("75%", response.widgets().getFirst().metrics().getFirst().value());
-        assertEquals("A-01", response.widgets().get(1).items().getFirst().label());
-        assertEquals("timeline", response.widgets().get(2).type());
     }
 
     @Test
@@ -315,40 +291,6 @@ class DashboardServiceTest {
             }
         };
     }
-
-    private DashboardRepository.VarianceLocationProjection projectionVariance(String label, BigDecimal qty) {
-        return new DashboardRepository.VarianceLocationProjection() {
-            @Override
-            public UUID getLocationId() {
-                return UUID.randomUUID();
-            }
-
-            @Override
-            public String getLocationLabel() {
-                return label;
-            }
-
-            @Override
-            public BigDecimal getVarianceQty() {
-                return qty;
-            }
-        };
-    }
-
-    private DashboardRepository.CountAdjustmentProjection projectionCountAdjustment(LocalDate day, BigDecimal qty) {
-        return new DashboardRepository.CountAdjustmentProjection() {
-            @Override
-            public LocalDate getBucketDate() {
-                return day;
-            }
-
-            @Override
-            public BigDecimal getAdjustmentQty() {
-                return qty;
-            }
-        };
-    }
-
 
     private DashboardRepository.ActionBreakdownProjection projectionAction(String action, long count) {
         return new DashboardRepository.ActionBreakdownProjection() {
