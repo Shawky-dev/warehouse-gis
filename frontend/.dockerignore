@@ -1,4 +1,13 @@
 node_modules
-dist
+dist-ssr
 .git
 .vscode
+src
+public
+scripts
+*.ts
+*.tsx
+*.json
+*.md
+Dockerfile
+Dockerfile.railway

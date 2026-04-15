@@ -1,0 +1,18 @@
+# Runtime-only image for Railway deployment.
+# Pre-build the JAR locally first:
+#   cd backend && ./mvnw -B -DskipTests clean package
+# Then deploy:
+#   railway up . --service backend --path-as-root
+FROM eclipse-temurin:21-jre-jammy
+WORKDIR /app
+
+RUN groupadd --system app && useradd --system --gid app --create-home app
+
+COPY target/*.jar /app/app.jar
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+
+RUN chmod 500 /app/docker-entrypoint.sh && chown -R app:app /app
+
+EXPOSE 8080
+
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

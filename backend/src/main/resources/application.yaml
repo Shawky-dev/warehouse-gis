@@ -1,3 +1,6 @@
+server:
+  port: ${PORT:8080}
+
 spring:
   servlet:
     multipart:
@@ -8,6 +11,11 @@ spring:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/warehouse}
     username: ${SPRING_DATASOURCE_USERNAME:warehouse}
     password: ${SPRING_DATASOURCE_PASSWORD:warehouse}
+    hikari:
+      minimum-idle: 0
+      maximum-pool-size: 5
+      idle-timeout: 300000
+      keepalive-time: 0
 
   jpa:
     hibernate:

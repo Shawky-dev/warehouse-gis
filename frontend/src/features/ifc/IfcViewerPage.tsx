@@ -113,7 +113,7 @@ export default function IfcViewerPage() {
 
       fragments.core?.models.materials.list.onItemSet.add(({ value: material }) => {
         if (!("isLodMaterial" in material && material.isLodMaterial)) {
-          const mat = material as Record<string, unknown>;
+          const mat = material as unknown as Record<string, unknown>;
           mat.polygonOffset = true;
           mat.polygonOffsetUnits = 1;
           mat.polygonOffsetFactor = Math.random();

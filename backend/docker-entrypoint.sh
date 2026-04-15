@@ -12,6 +12,15 @@ copy_file_resource_for_app() {
   resource_value="$1"
   target_name="$2"
 
+  if printf '%s' "${resource_value}" | grep -q '^-----BEGIN '; then
+    target_path="${APP_SECRETS_DIR}/${target_name}"
+    printf '%s\n' "${resource_value}" > "${target_path}"
+    chown "${APP_USER}:${APP_USER}" "${target_path}"
+    chmod 400 "${target_path}"
+    printf 'file:%s' "${target_path}"
+    return
+  fi
+
   case "${resource_value}" in
     file:*)
       source_path="${resource_value#file:}"
