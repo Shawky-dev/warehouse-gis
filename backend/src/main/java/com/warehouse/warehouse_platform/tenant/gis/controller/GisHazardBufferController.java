@@ -2,6 +2,10 @@ package com.warehouse.warehouse_platform.tenant.gis.controller;
 
 import com.warehouse.warehouse_platform.tenant.access.TenantAccessPolicy;
 import com.warehouse.warehouse_platform.tenant.gis.service.HazardBufferService;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -10,6 +14,8 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -41,6 +47,16 @@ public class GisHazardBufferController {
         return ResponseEntity.ok(hazardBufferService.listAll());
     }
 
+    @GetMapping("/{bufferId}")
+    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).GIS_HAZARD_BUFFERS_VIEW)")
+    public ResponseEntity<HazardBufferService.HazardBufferSummary> get(
+            @PathVariable String tenantSlug,
+            @PathVariable UUID bufferId,
+            Authentication auth) {
+        tenantAccessPolicy.assertTenantAccess(auth, tenantSlug);
+        return ResponseEntity.ok(hazardBufferService.toSummary(hazardBufferService.getById(bufferId)));
+    }
+
     @GetMapping(value = "/geojson", produces = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).GIS_HAZARD_BUFFERS_VIEW)")
     public ResponseEntity<String> getGeoJson(
@@ -60,6 +76,38 @@ public class GisHazardBufferController {
         return ResponseEntity.ok(hazardBufferService.importGeoJson(file, tenantSlug));
     }
 
+    @PostMapping
+    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).GIS_HAZARD_BUFFERS_MANAGE)")
+    public ResponseEntity<HazardBufferService.HazardBufferSummary> create(
+            @PathVariable String tenantSlug,
+            @Valid @RequestBody HazardBufferRequest request,
+            Authentication auth) {
+        tenantAccessPolicy.assertTenantAccess(auth, tenantSlug);
+        return ResponseEntity.ok(hazardBufferService.createHazardBuffer(
+                tenantSlug,
+                request.name(),
+                request.coordinates(),
+                request.notes(),
+                request.restrictedHazardTypeIds()));
+    }
+
+    @PutMapping("/{bufferId}")
+    @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).GIS_HAZARD_BUFFERS_MANAGE)")
+    public ResponseEntity<HazardBufferService.HazardBufferSummary> update(
+            @PathVariable String tenantSlug,
+            @PathVariable UUID bufferId,
+            @Valid @RequestBody HazardBufferRequest request,
+            Authentication auth) {
+        tenantAccessPolicy.assertTenantAccess(auth, tenantSlug);
+        return ResponseEntity.ok(hazardBufferService.updateHazardBuffer(
+                tenantSlug,
+                bufferId,
+                request.name(),
+                request.coordinates(),
+                request.notes(),
+                request.restrictedHazardTypeIds()));
+    }
+
     @DeleteMapping("/{bufferId}")
     @PreAuthorize("hasAuthority(T(com.warehouse.warehouse_platform.security.permissions.TenantPermissions).GIS_HAZARD_BUFFERS_MANAGE)")
     public ResponseEntity<Void> delete(
@@ -69,5 +117,12 @@ public class GisHazardBufferController {
         tenantAccessPolicy.assertTenantAccess(auth, tenantSlug);
         hazardBufferService.delete(bufferId, tenantSlug);
         return ResponseEntity.noContent().build();
+    }
+
+    public record HazardBufferRequest(
+            @NotBlank @Size(max = 200) String name,
+            List<List<List<Double>>> coordinates,
+            String notes,
+            @NotEmpty List<UUID> restrictedHazardTypeIds) {
     }
 }

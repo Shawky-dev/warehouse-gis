@@ -106,6 +106,57 @@ public class HazardBufferService {
     }
 
     @Transactional
+    public HazardBufferSummary createHazardBuffer(
+            String tenantSlug,
+            String name,
+            List<List<List<Double>>> coordinates,
+            String notes,
+            List<UUID> restrictedHazardTypeIds) {
+        List<HazardType> restrictedTypes = resolveHazardTypesById(restrictedHazardTypeIds);
+        if (restrictedTypes.isEmpty()) {
+            throw GisException.badRequest("At least one restricted hazard type is required");
+        }
+
+        GisHazardBuffer saved = hazardBufferRepository.save(GisHazardBuffer.builder()
+                .name(requireName(name))
+                .source("MANUAL")
+                .geometry(ringsToPolygon(coordinates))
+                .notes(normalizeNotes(notes))
+                .restrictedHazardTypes(new ArrayList<>(restrictedTypes))
+                .build());
+
+        refreshGeoServer(tenantSlug, "create");
+        return toSummary(saved);
+    }
+
+    @Transactional
+    public HazardBufferSummary updateHazardBuffer(
+            String tenantSlug,
+            UUID bufferId,
+            String name,
+            List<List<List<Double>>> coordinates,
+            String notes,
+            List<UUID> restrictedHazardTypeIds) {
+        GisHazardBuffer buffer = hazardBufferRepository.findById(bufferId)
+                .orElseThrow(() -> GisException.notFound("Hazard buffer not found: " + bufferId));
+        List<HazardType> restrictedTypes = resolveHazardTypesById(restrictedHazardTypeIds);
+        if (restrictedTypes.isEmpty()) {
+            throw GisException.badRequest("At least one restricted hazard type is required");
+        }
+
+        buffer.setName(requireName(name));
+        buffer.setNotes(normalizeNotes(notes));
+        if (coordinates != null && !coordinates.isEmpty()) {
+            buffer.setGeometry(ringsToPolygon(coordinates));
+        }
+        buffer.setRestrictedHazardTypes(new ArrayList<>(restrictedTypes));
+
+        GisHazardBuffer saved = hazardBufferRepository.save(buffer);
+        refreshGeoServer(tenantSlug, "update");
+        return toSummary(saved);
+    }
+
+    @Transactional
     public void delete(UUID bufferId, String tenantSlug) {
         GisHazardBuffer buffer = hazardBufferRepository.findById(bufferId)
                 .orElseThrow(() -> GisException.notFound("Hazard buffer not found: " + bufferId));
@@ -237,7 +288,83 @@ public class HazardBufferService {
         return result;
     }
 
-    HazardBufferSummary toSummary(GisHazardBuffer b) {
+    private List<HazardType> resolveHazardTypesById(List<UUID> hazardTypeIds) {
+        if (hazardTypeIds == null || hazardTypeIds.isEmpty()) {
+            return List.of();
+        }
+        List<HazardType> result = new ArrayList<>();
+        for (UUID id : hazardTypeIds) {
+            HazardType ht = hazardTypeRepository.findById(id)
+                    .orElseThrow(() -> GisException.badRequest("Hazard type not found: " + id));
+            if (!Boolean.TRUE.equals(ht.getIsActive())) {
+                throw GisException.badRequest("Hazard type '" + ht.getCode() + "' is inactive");
+            }
+            result.add(ht);
+        }
+        return result;
+    }
+
+    public Polygon ringsToPolygon(List<List<List<Double>>> coordinateRings) {
+        if (coordinateRings == null || coordinateRings.isEmpty()) {
+            throw GisException.badRequest("Polygon coordinates are required");
+        }
+        try {
+            LinearRing shell = GEOM.createLinearRing(toClosedCoordinates(coordinateRings.get(0), "exterior"));
+            LinearRing[] holes = new LinearRing[Math.max(0, coordinateRings.size() - 1)];
+            for (int i = 1; i < coordinateRings.size(); i++) {
+                holes[i - 1] = GEOM.createLinearRing(toClosedCoordinates(coordinateRings.get(i), "interior"));
+            }
+            return GEOM.createPolygon(shell, holes);
+        } catch (GisException e) {
+            throw e;
+        } catch (Exception e) {
+            throw GisException.badRequest("Invalid polygon geometry: " + e.getMessage());
+        }
+    }
+
+    private Coordinate[] toClosedCoordinates(List<List<Double>> ring, String ringName) {
+        if (ring == null || ring.size() < 3) {
+            throw GisException.badRequest("Polygon " + ringName + " ring must contain at least 3 points");
+        }
+        List<Coordinate> coords = new ArrayList<>();
+        for (List<Double> point : ring) {
+            if (point == null || point.size() < 2 || point.get(0) == null || point.get(1) == null) {
+                throw GisException.badRequest("Polygon " + ringName + " ring contains an invalid coordinate");
+            }
+            coords.add(new Coordinate(point.get(0), point.get(1)));
+        }
+        Coordinate first = coords.get(0);
+        Coordinate last = coords.get(coords.size() - 1);
+        if (!first.equals2D(last)) {
+            coords.add(new Coordinate(first));
+        }
+        if (coords.size() < 4) {
+            throw GisException.badRequest("Polygon " + ringName + " ring must have at least 4 coordinates");
+        }
+        return coords.toArray(Coordinate[]::new);
+    }
+
+    private String requireName(String name) {
+        if (name == null || name.trim().isBlank()) {
+            throw GisException.badRequest("Hazard buffer name is required");
+        }
+        return name.trim();
+    }
+
+    private String normalizeNotes(String notes) {
+        return notes == null || notes.isBlank() ? null : notes;
+    }
+
+    private void refreshGeoServer(String tenantSlug, String operation) {
+        try {
+            geoServerProvisioningService.ensureHazardBufferLayerExists(tenantSlug);
+            geoServerProvisioningService.refreshLayerGroup(tenantSlug);
+        } catch (Exception e) {
+            log.warn("GeoServer refresh failed after hazard-buffer {} (non-fatal): {}", operation, e.getMessage());
+        }
+    }
+
+    public HazardBufferSummary toSummary(GisHazardBuffer b) {
         List<HazardTypeSummary> types = b.getRestrictedHazardTypes().stream()
                 .map(ht -> new HazardTypeSummary(ht.getId(), ht.getCode(), ht.getDisplayName()))
                 .toList();
@@ -250,15 +377,18 @@ public class HazardBufferService {
         String codesJson = b.getRestrictedHazardTypes().stream()
                 .map(ht -> "\"" + ht.getCode() + "\"")
                 .collect(java.util.stream.Collectors.joining(",", "[", "]"));
+        String idsJson = b.getRestrictedHazardTypes().stream()
+                .map(ht -> "\"" + ht.getId() + "\"")
+                .collect(java.util.stream.Collectors.joining(",", "[", "]"));
         StringBuilder coords = new StringBuilder();
         Polygon poly = b.getGeometry();
         if (poly != null) {
             coords.append("[");
-            for (Coordinate c : poly.getExteriorRing().getCoordinates()) {
-                coords.append("[").append(c.x).append(",").append(c.y).append("],");
+            appendRing(coords, poly.getExteriorRing().getCoordinates());
+            for (int i = 0; i < poly.getNumInteriorRing(); i++) {
+                coords.append(",");
+                appendRing(coords, poly.getInteriorRingN(i).getCoordinates());
             }
-            if (coords.charAt(coords.length() - 1) == ',')
-                coords.deleteCharAt(coords.length() - 1);
             coords.append("]");
         } else {
             coords.append("[]");
@@ -266,8 +396,20 @@ public class HazardBufferService {
         return "{\"type\":\"Feature\",\"properties\":{\"id\":\"" + b.getId()
                 + "\",\"name\":\"" + escapeJson(b.getName())
                 + "\",\"source\":\"" + b.getSource()
-                + "\",\"restrictedHazardTypeCodes\":" + codesJson
-                + "},\"geometry\":{\"type\":\"Polygon\",\"coordinates\":[" + coords + "]}}";
+                + "\",\"notes\":" + (b.getNotes() != null ? "\"" + escapeJson(b.getNotes()) + "\"" : "null")
+                + ",\"restrictedHazardTypeIds\":" + idsJson
+                + ",\"restrictedHazardTypeCodes\":" + codesJson
+                + "},\"geometry\":{\"type\":\"Polygon\",\"coordinates\":" + coords + "}}";
+    }
+
+    private void appendRing(StringBuilder coords, Coordinate[] ring) {
+        coords.append("[");
+        for (Coordinate c : ring) {
+            coords.append("[").append(c.x).append(",").append(c.y).append("],");
+        }
+        if (coords.charAt(coords.length() - 1) == ',')
+            coords.deleteCharAt(coords.length() - 1);
+        coords.append("]");
     }
 
     private static String escapeJson(String s) {

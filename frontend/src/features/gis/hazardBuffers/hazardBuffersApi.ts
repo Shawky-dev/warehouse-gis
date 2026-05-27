@@ -15,8 +15,46 @@ function headers(tenantSlug: string): Record<string, string> {
 // Re-export for convenience
 export type { HazardBufferFeatureProps };
 
+export interface HazardBufferRequest {
+    name: string;
+    coordinates?: number[][][];
+    notes?: string | null;
+    restrictedHazardTypeIds: string[];
+}
+
 export async function listHazardBuffers(tenantSlug: string): Promise<HazardBufferResult[]> {
     const res = await api.get<HazardBufferResult[]>(basePath(tenantSlug), {
+        headers: headers(tenantSlug),
+    });
+    return res.data;
+}
+
+export async function getHazardBuffer(
+    tenantSlug: string,
+    id: string
+): Promise<HazardBufferResult> {
+    const res = await api.get<HazardBufferResult>(`${basePath(tenantSlug)}/${id}`, {
+        headers: headers(tenantSlug),
+    });
+    return res.data;
+}
+
+export async function createHazardBuffer(
+    tenantSlug: string,
+    payload: HazardBufferRequest
+): Promise<HazardBufferResult> {
+    const res = await api.post<HazardBufferResult>(basePath(tenantSlug), payload, {
+        headers: headers(tenantSlug),
+    });
+    return res.data;
+}
+
+export async function updateHazardBuffer(
+    tenantSlug: string,
+    id: string,
+    payload: HazardBufferRequest
+): Promise<HazardBufferResult> {
+    const res = await api.put<HazardBufferResult>(`${basePath(tenantSlug)}/${id}`, payload, {
         headers: headers(tenantSlug),
     });
     return res.data;
@@ -57,9 +95,9 @@ export async function deleteHazardBuffer(tenantSlug: string, id: string): Promis
     });
 }
 
-export function extractHazardBufferErrorMessage(error: unknown): string | null {
-    if (!axios.isAxiosError(error)) return null;
+export function extractHazardBufferErrorMessage(error: unknown, fallback?: string): string | null {
+    if (!axios.isAxiosError(error)) return fallback ?? null;
     const data = error.response?.data as { message?: string } | undefined;
     if (data?.message) return data.message;
-    return null;
+    return fallback ?? null;
 }

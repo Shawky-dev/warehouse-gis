@@ -17,7 +17,7 @@ import CountSessionsPage from "@/features/tenant/counting/CountSessionsPage";
 import FloorPlansPage from "@/features/gis/floorplans/FloorPlansPage";
 import WarehouseMapPage from "@/features/gis/viewer/WarehouseMapPage";
 import ZoneManagementPage from "@/features/gis/zones/ZoneManagementPage";
-import HazardBuffersPage from "@/features/gis/hazardBuffers/HazardBuffersPage";
+import HazardBufferManagementPage from "@/features/gis/hazardBuffers/HazardBufferManagementPage";
 import DataLayersPage from "@/features/gis/dataLayers/DataLayersPage";
 import IfcViewerPage from "@/features/ifc/IfcViewerPage";
 import { RequirePermission } from "@/features/auth/guards/RequirePermission";
@@ -208,7 +208,7 @@ export const tenantRoutes = [
     path: PATHS.TENANT.GIS_HAZARD_BUFFERS_PATTERN,
     element: (
       <RequirePermission permission={TENANT_PERMISSIONS.GIS_HAZARD_BUFFERS_VIEW}>
-        <HazardBuffersPage />
+        <HazardBufferManagementPage />
       </RequirePermission>
     ),
   },

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { render, screen } from "@testing-library/react";
 import { I18nProvider } from "@/i18n";
@@ -67,8 +67,16 @@ vi.mock("@/features/gis/zones/ZoneManagementPage", () => ({
   default: () => <p>gis-zones-page</p>,
 }));
 
-vi.mock("@/features/gis/hazardBuffers/HazardBuffersPage", () => ({
+vi.mock("@/features/gis/hazardBuffers/HazardBufferManagementPage", () => ({
   default: () => <p>gis-hazard-buffers-page</p>,
+}));
+
+vi.mock("@/features/gis/dataLayers/DataLayersPage", () => ({
+  default: () => <p>gis-data-layers-page</p>,
+}));
+
+vi.mock("@/features/ifc/IfcViewerPage", () => ({
+  default: () => <p>ifc-viewer-page</p>,
 }));
 
 vi.mock("@/features/tenant/hazardtype/TenantHazardTypesPage", () => ({
@@ -100,6 +108,27 @@ function renderTenantRoute(path: string) {
     </I18nProvider>
   );
 }
+
+function createMockStorage(): Storage {
+  const store = new Map<string, string>();
+  return {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => { store.set(key, value); },
+    removeItem: (key: string) => { store.delete(key); },
+    clear: () => { store.clear(); },
+    key: (index: number) => Array.from(store.keys())[index] ?? null,
+    get length() {
+      return store.size;
+    },
+  };
+}
+
+beforeEach(() => {
+  Object.defineProperty(window, "localStorage", {
+    configurable: true,
+    value: createMockStorage(),
+  });
+});
 
 afterEach(() => {
   mockUseAuth.mockReset();

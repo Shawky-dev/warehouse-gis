@@ -21,8 +21,16 @@ vi.mock("@/features/gis/zones/ZoneManagementPage", () => ({
   default: () => <div>zones-page</div>,
 }));
 
-vi.mock("@/features/gis/hazardBuffers/HazardBuffersPage", () => ({
+vi.mock("@/features/gis/hazardBuffers/HazardBufferManagementPage", () => ({
   default: () => <div>hazard-buffers-page</div>,
+}));
+
+vi.mock("@/features/gis/dataLayers/DataLayersPage", () => ({
+  default: () => <div>data-layers-page</div>,
+}));
+
+vi.mock("@/features/ifc/IfcViewerPage", () => ({
+  default: () => <div>ifc-viewer-page</div>,
 }));
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8080";

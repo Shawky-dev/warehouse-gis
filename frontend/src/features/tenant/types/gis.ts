@@ -26,5 +26,8 @@ export interface HazardBufferResult {
 export interface HazardBufferFeatureProps {
     id: string;
     name: string;
+    source: string;
+    notes: string | null;
     restrictedHazardTypeIds: string[];
+    restrictedHazardTypeCodes: string[];
 }
