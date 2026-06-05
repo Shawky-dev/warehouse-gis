@@ -79,6 +79,11 @@ public class GeoServerProvisioningService {
     assignDefaultStyle(workspaceName, ZONES_LAYER);
     orderedSlugs.add(ZONES_LAYER);
 
+    publishTableLayer(workspaceName, tenantSlug, HAZARD_BUFFERS_LAYER, "gis_hazard_buffers");
+    createOrReplaceHazardBufferStyle(workspaceName);
+    assignDefaultStyle(workspaceName, HAZARD_BUFFERS_LAYER);
+    orderedSlugs.add(HAZARD_BUFFERS_LAYER);
+
     createOrReplaceLayerGroup(workspaceName, orderedSlugs);
   }
 
@@ -184,6 +189,7 @@ public class GeoServerProvisioningService {
     try {
       geoServerRestTemplate.postForEntity(url, buildSqlViewFeatureTypeJson(tenantSlug, layerSlug, templateName),
           Void.class);
+      recalculateFeatureTypeBounds(workspaceName, layerSlug);
       log.debug("GeoServer SQL view layer published: {}/{}/{}", workspaceName, DATASTORE_NAME, layerSlug);
     } catch (RestClientResponseException e) {
       if (isAlreadyExistsResponse(e)) {
@@ -212,6 +218,7 @@ public class GeoServerProvisioningService {
             "title": "%s",
             "srs": "EPSG:4326",
             "enabled": true,
+            "numDecimals": 10,
             "metadata": {
               "entry": {
                 "@key": "JDBC_VIRTUAL_TABLE",
@@ -245,15 +252,18 @@ public class GeoServerProvisioningService {
             "nativeName": "%s",
             "title": "%s",
             "srs": "EPSG:4326",
-            "enabled": true
+            "enabled": true,
+            "numDecimals": 10
           }
         }
         """.formatted(layerName, tableName, tableName.replace("_", " "));
     try {
       geoServerRestTemplate.postForEntity(url, body, Void.class);
+      recalculateFeatureTypeBounds(workspaceName, layerName);
       log.debug("GeoServer table layer published: {}/{}/{}", workspaceName, DATASTORE_NAME, layerName);
     } catch (RestClientResponseException e) {
       if (isAlreadyExistsResponse(e)) {
+        recalculateFeatureTypeBounds(workspaceName, layerName);
         log.debug("GeoServer table layer already exists, skipping: {}/{}", workspaceName, layerName);
       } else {
         log.warn("GeoServer table layer publish failed for [{}] [{}]: {}", layerName, e.getStatusCode(),
@@ -261,6 +271,22 @@ public class GeoServerProvisioningService {
         throw GeoServerProvisioningException.serverError(
             "Failed to publish GeoServer table layer '%s': %s".formatted(layerName, e.getMessage()));
       }
+    }
+  }
+
+  private void recalculateFeatureTypeBounds(String workspaceName, String layerName) {
+    String url = props.url() + "/rest/workspaces/" + workspaceName
+        + "/datastores/" + DATASTORE_NAME
+        + "/featuretypes/" + layerName
+        + "?recalculate=nativebbox,latlonbbox";
+    String body = "{\"featureType\":{\"name\":\"%s\"}}".formatted(layerName);
+    try {
+      RequestEntity<String> req = RequestEntity.put(URI.create(url)).body(body);
+      geoServerRestTemplate.exchange(req, Void.class);
+      log.debug("GeoServer bounds recalculated: {}/{}", workspaceName, layerName);
+    } catch (RestClientResponseException e) {
+      log.warn("GeoServer bounds recalculation failed for {}/{} [{}]: {}",
+          workspaceName, layerName, e.getStatusCode(), e.getMessage());
     }
   }
 
